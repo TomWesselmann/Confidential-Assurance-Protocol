@@ -1,0 +1,7 @@
+version: "lksg.v1"
+name: "LkSG-Demo"
+created_at: "2025-10-25T09:00:00Z"
+constraints:
+  require_at_least_one_ubo: true
+  supplier_count_max: 10
+notes: "Testpolicy für Tag 2"
