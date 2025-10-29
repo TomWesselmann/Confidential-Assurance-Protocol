@@ -64,6 +64,9 @@ enum Commands {
     /// Verifier-Commands
     #[command(subcommand)]
     Verifier(VerifierCommands),
+    /// Audit-Commands
+    #[command(subcommand)]
+    Audit(AuditCommands),
     /// Zeigt die Tool-Version an
     Version,
 }
@@ -155,6 +158,14 @@ enum ProofCommands {
         /// Output-Pfad (default: build/zk_proof.dat)
         #[arg(long)]
         out: Option<String>,
+
+        /// Optionaler Sanctions-Root (Hex-String)
+        #[arg(long)]
+        sanctions_root: Option<String>,
+
+        /// Optionaler Jurisdiction-Root (Hex-String)
+        #[arg(long)]
+        jurisdiction_root: Option<String>,
     },
     /// Verifiziert einen Zero-Knowledge-Proof
     ZkVerify {
@@ -235,6 +246,34 @@ enum VerifierCommands {
         /// Pfad zum Proof-Paket-Verzeichnis
         #[arg(long)]
         package: String,
+    },
+}
+
+#[derive(Subcommand)]
+enum AuditCommands {
+    /// Schreibt den Audit-Tip (aktueller Hash der Audit-Chain) in eine Datei
+    Tip {
+        /// Output-Pfad (default: build/audit.head)
+        #[arg(long)]
+        out: Option<String>,
+    },
+    /// Setzt einen Zeitanker im Manifest
+    Anchor {
+        /// Art des Zeitankers (tsa, blockchain, file)
+        #[arg(long)]
+        kind: String,
+
+        /// Referenz (Pfad, TxID oder URI)
+        #[arg(long, value_name = "ref")]
+        reference: String,
+
+        /// Input-Manifest-Pfad
+        #[arg(long)]
+        manifest_in: String,
+
+        /// Output-Manifest-Pfad
+        #[arg(long)]
+        manifest_out: String,
     },
 }
 
@@ -652,6 +691,8 @@ fn run_zk_build(
     policy_path: &str,
     manifest_path: &str,
     output: Option<String>,
+    sanctions_root: Option<String>,
+    jurisdiction_root: Option<String>,
 ) -> Result<(), Box<dyn Error>> {
     println!("🔬 Erstelle Zero-Knowledge-Proof...");
 
@@ -660,6 +701,9 @@ fn run_zk_build(
     // Lade Policy und Manifest
     let policy = policy::Policy::load(policy_path)?;
     let manifest = manifest::Manifest::load(manifest_path)?;
+
+    // Prüfe ob alle geforderten Statement-Roots vorhanden sind
+    policy.check_required_statement_roots(&sanctions_root, &jurisdiction_root)?;
 
     // Lade Commitments für Witness-Daten
     let commitments = Commitments::load("build/commitments.json")?;
@@ -679,6 +723,8 @@ fn run_zk_build(
         .into_iter()
         .filter(|s| !s.is_empty())
         .collect(),
+        sanctions_root,
+        jurisdiction_root,
     };
 
     // Erstelle Witness (private Daten)
@@ -798,6 +844,8 @@ fn run_zk_bench(
         .into_iter()
         .filter(|s| !s.is_empty())
         .collect(),
+        sanctions_root: None,
+        jurisdiction_root: None,
     };
 
     let witness = zk_system::Witness {
@@ -917,6 +965,65 @@ fn run_verifier_audit(package_path: &str) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+/// Audit tip - Schreibt den Audit-Tip in eine Datei
+fn run_audit_tip(out: Option<String>) -> Result<(), Box<dyn Error>> {
+    println!("📝 Schreibe Audit-Tip...");
+
+    let out_path = out.unwrap_or_else(|| "build/audit.head".to_string());
+    let audit_log_path = "build/agent.audit.jsonl";
+
+    // Lade Audit-Log
+    let audit = AuditLog::new(audit_log_path)?;
+
+    // Schreibe Tip
+    audit.write_tip(&out_path)?;
+
+    println!("✅ Audit-Tip geschrieben nach: {}", out_path);
+    println!("   Tip: {}", audit.get_tip());
+
+    Ok(())
+}
+
+/// Audit anchor - Setzt einen Zeitanker im Manifest
+fn run_audit_anchor(
+    kind: &str,
+    reference: &str,
+    manifest_in: &str,
+    manifest_out: &str,
+) -> Result<(), Box<dyn Error>> {
+    println!("⏰ Setze Zeitanker im Manifest...");
+
+    // Prüfe ob build/audit.head existiert
+    let tip_path = "build/audit.head";
+    if !std::path::Path::new(tip_path).exists() {
+        return Err(format!(
+            "Precondition-Fehler: {} existiert nicht. Führe zuerst 'audit tip' aus.",
+            tip_path
+        )
+        .into());
+    }
+
+    // Lade Audit-Tip
+    let audit_tip_hex = AuditLog::read_tip(tip_path)?;
+
+    // Lade Manifest
+    let mut manifest = manifest::Manifest::load(manifest_in)?;
+
+    // Setze Zeitanker
+    manifest.set_time_anchor(kind.to_string(), reference.to_string(), audit_tip_hex.clone());
+
+    // Speichere Manifest
+    manifest.save(manifest_out)?;
+
+    println!("✅ Zeitanker gesetzt:");
+    println!("   Kind:           {}", kind);
+    println!("   Referenz:       {}", reference);
+    println!("   Audit-Tip:      {}", audit_tip_hex);
+    println!("   Output:         {}", manifest_out);
+
+    Ok(())
+}
+
 /// Zeigt die Version an
 fn run_version() {
     println!("cap-agent v{}", VERSION);
@@ -950,7 +1057,9 @@ fn main() {
                 policy,
                 manifest,
                 out,
-            } => run_zk_build(policy, manifest, out.clone()),
+                sanctions_root,
+                jurisdiction_root,
+            } => run_zk_build(policy, manifest, out.clone(), sanctions_root.clone(), jurisdiction_root.clone()),
             ProofCommands::ZkVerify { proof } => run_zk_verify(proof),
             ProofCommands::Bench {
                 policy,
@@ -974,6 +1083,15 @@ fn main() {
             VerifierCommands::Run { package } => run_verifier_run(package),
             VerifierCommands::Extract { package } => run_verifier_extract(package),
             VerifierCommands::Audit { package } => run_verifier_audit(package),
+        },
+        Commands::Audit(cmd) => match cmd {
+            AuditCommands::Tip { out } => run_audit_tip(out.clone()),
+            AuditCommands::Anchor {
+                kind,
+                reference,
+                manifest_in,
+                manifest_out,
+            } => run_audit_anchor(kind, reference, manifest_in, manifest_out),
         },
         Commands::Version => {
             run_version();

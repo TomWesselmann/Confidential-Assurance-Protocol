@@ -31,6 +31,15 @@ pub struct SignatureInfo {
     pub sig_hex: String,
 }
 
+/// Zeitanker für externe Timestamps
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct TimeAnchor {
+    pub kind: String,           // "tsa", "blockchain", "file"
+    pub reference: String,       // Pfad, TxID oder URI
+    pub audit_tip_hex: String,  // Audit-Chain-Tip zum Zeitpunkt des Anchors
+    pub created_at: String,     // RFC3339 Timestamp
+}
+
 /// Manifest-Datenstruktur
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Manifest {
@@ -43,6 +52,8 @@ pub struct Manifest {
     pub audit: AuditInfo,
     pub proof: ProofInfo,
     pub signatures: Vec<SignatureInfo>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub time_anchor: Option<TimeAnchor>,
 }
 
 /// Signiertes Manifest
@@ -86,6 +97,7 @@ impl Manifest {
                 status: "none".to_string(),
             },
             signatures: Vec::new(),
+            time_anchor: None,
         })
     }
 
@@ -152,6 +164,21 @@ impl Manifest {
     #[allow(dead_code)]
     pub fn update_proof(&mut self, proof_type: String, status: String) {
         self.proof = ProofInfo { proof_type, status };
+    }
+
+    /// Setzt den Zeitanker im Manifest
+    ///
+    /// # Argumente
+    /// * `kind` - Art des Zeitankers ("tsa", "blockchain", "file")
+    /// * `reference` - Referenz (Pfad, TxID, URI)
+    /// * `audit_tip_hex` - Audit-Chain-Tip (Hex-String)
+    pub fn set_time_anchor(&mut self, kind: String, reference: String, audit_tip_hex: String) {
+        self.time_anchor = Some(TimeAnchor {
+            kind,
+            reference,
+            audit_tip_hex,
+            created_at: Utc::now().to_rfc3339(),
+        });
     }
 
     /// Serialisiert Manifest zu kanonischem JSON (für Signierung)
@@ -249,10 +276,62 @@ mod tests {
                 status: "none".to_string(),
             },
             signatures: Vec::new(),
+            time_anchor: None,
         };
 
         manifest.update_proof("mock".to_string(), "ok".to_string());
         assert_eq!(manifest.proof.proof_type, "mock");
         assert_eq!(manifest.proof.status, "ok");
+    }
+
+    #[test]
+    fn time_anchor_roundtrip_ok() {
+        use std::fs;
+
+        let temp_path = "/tmp/test_manifest_anchor.json";
+
+        let mut manifest = Manifest {
+            version: "manifest.v0".to_string(),
+            created_at: "2025-10-29T10:00:00Z".to_string(),
+            supplier_root: "0xabc".to_string(),
+            ubo_root: "0xdef".to_string(),
+            company_commitment_root: "0x123".to_string(),
+            policy: PolicyInfo {
+                name: "Test".to_string(),
+                version: "lksg.v1".to_string(),
+                hash: "0xhash".to_string(),
+            },
+            audit: AuditInfo {
+                tail_digest: "0xtail".to_string(),
+                events_count: 5,
+            },
+            proof: ProofInfo {
+                proof_type: "none".to_string(),
+                status: "none".to_string(),
+            },
+            signatures: Vec::new(),
+            time_anchor: None,
+        };
+
+        // Setze Zeitanker
+        manifest.set_time_anchor(
+            "tsa".to_string(),
+            "./tsa/test.tsr".to_string(),
+            "0x83a8779d".to_string(),
+        );
+
+        // Speichere und lade
+        manifest.save(temp_path).unwrap();
+        let loaded = Manifest::load(temp_path).unwrap();
+
+        // Prüfe Zeitanker
+        assert!(loaded.time_anchor.is_some());
+        let anchor = loaded.time_anchor.unwrap();
+        assert_eq!(anchor.kind, "tsa");
+        assert_eq!(anchor.reference, "./tsa/test.tsr");
+        assert_eq!(anchor.audit_tip_hex, "0x83a8779d");
+        assert!(!anchor.created_at.is_empty());
+
+        fs::remove_file(temp_path).ok();
     }
 }

@@ -288,6 +288,8 @@ mod tests {
             constraints: PolicyConstraints {
                 require_at_least_one_ubo: true,
                 supplier_count_max: 10,
+                ubo_count_min: None,
+                require_statement_roots: None,
             },
             notes: "".to_string(),
         };
@@ -312,6 +314,7 @@ mod tests {
                 status: "none".to_string(),
             },
             signatures: Vec::new(),
+            time_anchor: None,
         };
 
         let proof = Proof::build(&policy, &manifest, 5, 2).unwrap();
@@ -343,6 +346,7 @@ mod tests {
                 status: "none".to_string(),
             },
             signatures: Vec::new(),
+            time_anchor: None,
         };
 
         let manifest_hash = Proof::compute_manifest_hash(&manifest).unwrap();

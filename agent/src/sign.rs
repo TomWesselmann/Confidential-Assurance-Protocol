@@ -223,6 +223,7 @@ mod tests {
                 status: "ok".to_string(),
             },
             signatures: Vec::new(),
+            time_anchor: None,
         };
 
         // Generiere Schlüssel
@@ -262,6 +263,7 @@ mod tests {
                 status: "ok".to_string(),
             },
             signatures: Vec::new(),
+            time_anchor: None,
         };
 
         let mut csprng = OsRng;

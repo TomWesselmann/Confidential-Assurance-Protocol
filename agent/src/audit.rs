@@ -147,6 +147,47 @@ impl AuditLog {
     pub fn current_seq(&self) -> u64 {
         self.seq
     }
+
+    /// Gibt den aktuellen Audit-Tip (letzter Digest) zurück
+    ///
+    /// # Rückgabe
+    /// Hex-String des letzten Digest
+    pub fn get_tip(&self) -> String {
+        self.last_digest.clone()
+    }
+
+    /// Schreibt den Audit-Tip (H_n) in eine Datei
+    ///
+    /// # Argumente
+    /// * `out_path` - Zielpfad für die Tip-Datei
+    ///
+    /// # Rückgabe
+    /// Result mit () bei Erfolg
+    pub fn write_tip<P: AsRef<Path>>(&self, out_path: P) -> Result<(), Box<dyn Error>> {
+        let tip = self.get_tip();
+        // Entferne "0x" Präfix für saubere Hex-Ausgabe
+        let hex_only = tip.trim_start_matches("0x");
+        std::fs::write(out_path, hex_only)?;
+        Ok(())
+    }
+
+    /// Liest den Audit-Tip aus einer Datei
+    ///
+    /// # Argumente
+    /// * `tip_path` - Pfad zur Tip-Datei
+    ///
+    /// # Rückgabe
+    /// Result mit Hex-String des Tip
+    pub fn read_tip<P: AsRef<Path>>(tip_path: P) -> Result<String, Box<dyn Error>> {
+        let hex = std::fs::read_to_string(tip_path)?;
+        let hex = hex.trim();
+        // Füge "0x" Präfix hinzu falls nicht vorhanden
+        if hex.starts_with("0x") {
+            Ok(hex.to_string())
+        } else {
+            Ok(format!("0x{}", hex))
+        }
+    }
 }
 
 #[cfg(test)]
@@ -207,5 +248,31 @@ mod tests {
 
         // Digests sollten unterschiedlich sein
         assert_ne!(digest1, digest2);
+    }
+
+    #[test]
+    fn tip_write_and_read_ok() {
+        let temp_audit = "/tmp/test_tip_audit.jsonl";
+        let temp_tip = "/tmp/test_audit.head";
+        let _ = fs::remove_file(temp_audit); // Cleanup
+        let _ = fs::remove_file(temp_tip); // Cleanup
+
+        // Erstelle Audit-Log mit einigen Events
+        let mut audit = AuditLog::new(temp_audit).unwrap();
+        audit.log_event("test_event", json!({"foo": "bar"})).unwrap();
+        audit.log_event("another_event", json!({"baz": "qux"})).unwrap();
+
+        // Schreibe Tip
+        audit.write_tip(temp_tip).unwrap();
+
+        // Lese Tip zurück
+        let tip = AuditLog::read_tip(temp_tip).unwrap();
+
+        // Tip sollte dem letzten Digest entsprechen
+        assert_eq!(tip, audit.get_tip());
+        assert!(tip.starts_with("0x"));
+
+        let _ = fs::remove_file(temp_audit); // Cleanup
+        let _ = fs::remove_file(temp_tip); // Cleanup
     }
 }

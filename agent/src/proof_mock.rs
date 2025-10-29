@@ -172,6 +172,8 @@ mod tests {
             constraints: PolicyConstraints {
                 require_at_least_one_ubo: true,
                 supplier_count_max: 10,
+                ubo_count_min: None,
+                require_statement_roots: None,
             },
             notes: "".to_string(),
         };
@@ -196,6 +198,7 @@ mod tests {
                 status: "none".to_string(),
             },
             signatures: Vec::new(),
+            time_anchor: None,
         };
 
         let proof = MockProof::generate(&policy, &manifest, 5, 2).unwrap();
@@ -213,6 +216,8 @@ mod tests {
             constraints: PolicyConstraints {
                 require_at_least_one_ubo: true,
                 supplier_count_max: 5,
+                ubo_count_min: None,
+                require_statement_roots: None,
             },
             notes: "".to_string(),
         };
@@ -237,6 +242,7 @@ mod tests {
                 status: "none".to_string(),
             },
             signatures: Vec::new(),
+            time_anchor: None,
         };
 
         // 10 Suppliers, aber max ist 5
@@ -266,6 +272,7 @@ mod tests {
                 status: "none".to_string(),
             },
             signatures: Vec::new(),
+            time_anchor: None,
         };
 
         let proof = MockProof {

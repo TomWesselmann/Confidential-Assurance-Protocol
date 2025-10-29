@@ -248,6 +248,7 @@ mod tests {
                 status: "ok".to_string(),
             },
             signatures: Vec::new(),
+            time_anchor: None,
         };
 
         let manifest_hash = Proof::compute_manifest_hash(&manifest).unwrap();

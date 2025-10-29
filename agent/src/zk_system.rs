@@ -12,6 +12,12 @@ pub struct Statement {
     pub company_commitment_root: String,
     /// Constraint-Liste (öffentlich)
     pub constraints: Vec<String>,
+    /// Optionale Sanctions-Root (für externe Listen)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sanctions_root: Option<String>,
+    /// Optionale Jurisdiction-Root (für externe Listen)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub jurisdiction_root: Option<String>,
 }
 
 /// Witness für Zero-Knowledge-Proof
@@ -307,6 +313,8 @@ mod tests {
                 "require_at_least_one_ubo".to_string(),
                 "supplier_count_max_10".to_string(),
             ],
+            sanctions_root: None,
+            jurisdiction_root: None,
         };
 
         let witness = Witness {
@@ -332,6 +340,8 @@ mod tests {
                 "require_at_least_one_ubo".to_string(),
                 "supplier_count_max_10".to_string(),
             ],
+            sanctions_root: None,
+            jurisdiction_root: None,
         };
 
         let witness = Witness {
@@ -354,6 +364,8 @@ mod tests {
             policy_hash: "0xtest".to_string(),
             company_commitment_root: "0xroot".to_string(),
             constraints: vec!["require_at_least_one_ubo".to_string()],
+            sanctions_root: None,
+            jurisdiction_root: None,
         };
 
         let witness = Witness {
@@ -375,6 +387,8 @@ mod tests {
             policy_hash: "0xtest".to_string(),
             company_commitment_root: "0xroot".to_string(),
             constraints: vec!["require_at_least_one_ubo".to_string()],
+            sanctions_root: None,
+            jurisdiction_root: None,
         };
 
         let witness = Witness {
@@ -399,5 +413,41 @@ mod tests {
         let loaded_dat = load_zk_proof_dat(temp_dat).unwrap();
         assert_eq!(proof.system, loaded_dat.system);
         std::fs::remove_file(temp_dat).ok();
+    }
+
+    #[test]
+    fn statement_optional_roots_serialization() {
+        // Test mit optionalen Roots
+        let statement_with_roots = Statement {
+            policy_hash: "0xpolicy".to_string(),
+            company_commitment_root: "0xcompany".to_string(),
+            constraints: vec!["require_at_least_one_ubo".to_string()],
+            sanctions_root: Some("0x3a1f02bb".to_string()),
+            jurisdiction_root: Some("0x0c3f99aa".to_string()),
+        };
+
+        // Serialisiere zu JSON
+        let json_with_roots = serde_json::to_string(&statement_with_roots).unwrap();
+        assert!(json_with_roots.contains("sanctions_root"));
+        assert!(json_with_roots.contains("jurisdiction_root"));
+
+        // Deserialize zurück
+        let deserialized: Statement = serde_json::from_str(&json_with_roots).unwrap();
+        assert_eq!(deserialized.sanctions_root, Some("0x3a1f02bb".to_string()));
+        assert_eq!(deserialized.jurisdiction_root, Some("0x0c3f99aa".to_string()));
+
+        // Test ohne optionale Roots
+        let statement_no_roots = Statement {
+            policy_hash: "0xpolicy".to_string(),
+            company_commitment_root: "0xcompany".to_string(),
+            constraints: vec!["require_at_least_one_ubo".to_string()],
+            sanctions_root: None,
+            jurisdiction_root: None,
+        };
+
+        // Serialisiere zu JSON (skip_serializing_if sollte greifen)
+        let json_no_roots = serde_json::to_string(&statement_no_roots).unwrap();
+        assert!(!json_no_roots.contains("sanctions_root"));
+        assert!(!json_no_roots.contains("jurisdiction_root"));
     }
 }
