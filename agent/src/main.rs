@@ -6,6 +6,7 @@ mod manifest;
 mod policy;
 mod proof_engine;
 mod proof_mock;
+mod registry;
 mod sign;
 mod verifier;
 mod zk_system;
@@ -71,6 +72,9 @@ enum Commands {
     /// Lists-Commands
     #[command(subcommand)]
     Lists(ListsCommands),
+    /// Registry-Commands
+    #[command(subcommand)]
+    Registry(RegistryCommands),
     /// Zeigt die Tool-Version an
     Version,
 }
@@ -283,6 +287,34 @@ enum AuditCommands {
         #[arg(long)]
         manifest_out: String,
     },
+    /// Erstellt einen Timestamp für den Audit-Head
+    Timestamp {
+        /// Pfad zur Audit-Head-Datei
+        #[arg(long)]
+        head: String,
+
+        /// Output-Pfad (default: build/timestamp.tsr)
+        #[arg(long)]
+        out: Option<String>,
+
+        /// Verwendet Mock-Timestamp (default: true)
+        #[arg(long, default_value = "true")]
+        mock: bool,
+
+        /// Optionale TSA-URL (für echten Timestamp)
+        #[arg(long)]
+        tsa_url: Option<String>,
+    },
+    /// Verifiziert einen Timestamp gegen Audit-Head
+    VerifyTimestamp {
+        /// Pfad zur Audit-Head-Datei
+        #[arg(long)]
+        head: String,
+
+        /// Pfad zur Timestamp-Datei
+        #[arg(long)]
+        timestamp: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -306,6 +338,48 @@ enum ListsCommands {
         /// Output-Pfad (default: build/jurisdictions.root)
         #[arg(long)]
         out: Option<String>,
+    },
+}
+
+#[derive(Subcommand)]
+enum RegistryCommands {
+    /// Fügt einen Proof zur Registry hinzu
+    Add {
+        /// Pfad zum Manifest
+        #[arg(long)]
+        manifest: String,
+
+        /// Pfad zum Proof
+        #[arg(long)]
+        proof: String,
+
+        /// Optionaler Pfad zur Timestamp-Datei
+        #[arg(long)]
+        timestamp: Option<String>,
+
+        /// Registry-Datei (default: build/registry.json)
+        #[arg(long)]
+        registry: Option<String>,
+    },
+    /// Listet alle Registry-Einträge auf
+    List {
+        /// Registry-Datei (default: build/registry.json)
+        #[arg(long)]
+        registry: Option<String>,
+    },
+    /// Verifiziert einen Proof gegen die Registry
+    Verify {
+        /// Pfad zum Manifest
+        #[arg(long)]
+        manifest: String,
+
+        /// Pfad zum Proof
+        #[arg(long)]
+        proof: String,
+
+        /// Registry-Datei (default: build/registry.json)
+        #[arg(long)]
+        registry: Option<String>,
     },
 }
 
@@ -1067,6 +1141,99 @@ fn run_audit_anchor(
     Ok(())
 }
 
+/// Audit timestamp - Erstellt einen Timestamp für den Audit-Head
+fn run_audit_timestamp(
+    head_path: &str,
+    output: Option<String>,
+    is_mock: bool,
+    tsa_url: Option<String>,
+) -> Result<(), Box<dyn Error>> {
+    println!("⏰ Erstelle Timestamp für Audit-Head...");
+
+    // Lade Audit-Tip
+    let audit_tip_hex = std::fs::read_to_string(head_path)?;
+    let audit_tip_hex = audit_tip_hex.trim().to_string();
+
+    // Erstelle Timestamp
+    let timestamp = if is_mock {
+        println!("   ⚠️  MOCK TIMESTAMP (nicht für Produktion geeignet)");
+        registry::Timestamp::create_mock(audit_tip_hex)
+    } else if let Some(url) = tsa_url {
+        return Err(format!(
+            "Echter TSA-Timestamp noch nicht implementiert. TSA-URL: {}",
+            url
+        )
+        .into());
+    } else {
+        return Err("Bitte --mock oder --tsa-url angeben".into());
+    };
+
+    // Speichere Timestamp
+    let out_path = output.unwrap_or_else(|| "build/timestamp.tsr".to_string());
+    timestamp.save(&out_path)?;
+
+    // Log Audit-Event
+    let mut audit = AuditLog::new("build/agent.audit.jsonl")?;
+    audit.log_event(
+        "timestamp_generated",
+        json!({
+            "audit_tip": timestamp.audit_tip_hex,
+            "output": out_path,
+            "tsa": timestamp.tsa,
+            "created_at": timestamp.created_at
+        }),
+    )?;
+
+    println!("✅ Timestamp erstellt:");
+    println!("   Audit-Tip:      {}", timestamp.audit_tip_hex);
+    println!("   Erstellt:       {}", timestamp.created_at);
+    println!("   TSA:            {}", timestamp.tsa);
+    println!("   Output:         {}", out_path);
+
+    Ok(())
+}
+
+/// Audit verify-timestamp - Verifiziert einen Timestamp gegen Audit-Head
+fn run_audit_verify_timestamp(
+    head_path: &str,
+    timestamp_path: &str,
+) -> Result<(), Box<dyn Error>> {
+    println!("🔍 Verifiziere Timestamp...");
+
+    // Lade Audit-Tip
+    let audit_tip_hex = std::fs::read_to_string(head_path)?;
+    let audit_tip_hex = audit_tip_hex.trim();
+
+    // Lade Timestamp
+    let timestamp = registry::Timestamp::load(timestamp_path)?;
+
+    // Verifiziere
+    if timestamp.verify(audit_tip_hex) {
+        println!("✅ Timestamp valid");
+        println!("   Audit-Tip:      {}", timestamp.audit_tip_hex);
+        println!("   Erstellt:       {}", timestamp.created_at);
+        println!("   TSA:            {}", timestamp.tsa);
+
+        // Log Audit-Event
+        let mut audit = AuditLog::new("build/agent.audit.jsonl")?;
+        audit.log_event(
+            "timestamp_verified",
+            json!({
+                "audit_tip": audit_tip_hex,
+                "timestamp_file": timestamp_path,
+                "status": "ok"
+            }),
+        )?;
+
+        Ok(())
+    } else {
+        println!("❌ Timestamp invalid or mismatched head");
+        println!("   Erwartet:       {}", audit_tip_hex);
+        println!("   Gefunden:       {}", timestamp.audit_tip_hex);
+        Err("Timestamp-Verifikation fehlgeschlagen".into())
+    }
+}
+
 /// Lists sanctions-root - Generiert Sanctions Merkle Root
 fn run_lists_sanctions_root(csv_path: &str, output: Option<String>) -> Result<(), Box<dyn Error>> {
     println!("📋 Generiere Sanctions Merkle Root...");
@@ -1151,6 +1318,153 @@ fn run_lists_jurisdictions_root(csv_path: &str, output: Option<String>) -> Resul
     Ok(())
 }
 
+/// Registry add - Fügt einen Proof zur Registry hinzu
+fn run_registry_add(
+    manifest_path: &str,
+    proof_path: &str,
+    timestamp_path: Option<String>,
+    registry_path: Option<String>,
+) -> Result<(), Box<dyn Error>> {
+    println!("📝 Füge Proof zur Registry hinzu...");
+
+    let registry_file = registry_path.unwrap_or_else(|| "build/registry.json".to_string());
+
+    // Berechne Hashes
+    let manifest_hash = registry::compute_file_hash(manifest_path)?;
+    let proof_hash = registry::compute_file_hash(proof_path)?;
+
+    println!("   Manifest-Hash:  {}", manifest_hash);
+    println!("   Proof-Hash:     {}", proof_hash);
+
+    // Lade oder erstelle Registry
+    let mut registry = if std::path::Path::new(&registry_file).exists() {
+        registry::Registry::load(&registry_file)?
+    } else {
+        registry::Registry::new()
+    };
+
+    // Füge Eintrag hinzu
+    let id = registry.add_entry(manifest_hash.clone(), proof_hash.clone(), timestamp_path.clone());
+
+    // Speichere Registry
+    registry.save(&registry_file)?;
+
+    // Log Audit-Event
+    let mut audit = AuditLog::new("build/agent.audit.jsonl")?;
+    audit.log_event(
+        "registry_entry_added",
+        json!({
+            "id": id,
+            "manifest_hash": manifest_hash,
+            "proof_hash": proof_hash,
+            "timestamp_file": timestamp_path,
+            "registry_file": registry_file
+        }),
+    )?;
+
+    println!("✅ Proof zur Registry hinzugefügt:");
+    println!("   ID:             {}", id);
+    println!("   Registry:       {}", registry_file);
+    println!("   Einträge total: {}", registry.count());
+
+    Ok(())
+}
+
+/// Registry list - Listet alle Registry-Einträge auf
+fn run_registry_list(registry_path: Option<String>) -> Result<(), Box<dyn Error>> {
+    let registry_file = registry_path.unwrap_or_else(|| "build/registry.json".to_string());
+
+    if !std::path::Path::new(&registry_file).exists() {
+        println!("⚠️  Registry-Datei nicht gefunden: {}", registry_file);
+        println!("   Verwende 'registry add' um Einträge hinzuzufügen.");
+        return Ok(());
+    }
+
+    let registry = registry::Registry::load(&registry_file)?;
+
+    println!("──────────────────────────────────────────────");
+    println!("Proofs in local registry ({})", registry_file);
+    println!("──────────────────────────────────────────────");
+
+    if registry.entries.is_empty() {
+        println!("   (keine Einträge)");
+    } else {
+        for (idx, entry) in registry.entries.iter().enumerate() {
+            println!(
+                "#{:<3} Manifest: {}…  Proof: {}…  Date: {}",
+                idx + 1,
+                &entry.manifest_hash[..12],
+                &entry.proof_hash[..12],
+                entry.registered_at
+            );
+            if let Some(ref ts) = entry.timestamp_file {
+                println!("     Timestamp: {}", ts);
+            }
+        }
+    }
+
+    println!("──────────────────────────────────────────────");
+    println!("Total: {} Einträge", registry.count());
+
+    Ok(())
+}
+
+/// Registry verify - Verifiziert einen Proof gegen die Registry
+fn run_registry_verify(
+    manifest_path: &str,
+    proof_path: &str,
+    registry_path: Option<String>,
+) -> Result<(), Box<dyn Error>> {
+    println!("🔍 Verifiziere Proof gegen Registry...");
+
+    let registry_file = registry_path.unwrap_or_else(|| "build/registry.json".to_string());
+
+    if !std::path::Path::new(&registry_file).exists() {
+        println!("❌ Registry-Datei nicht gefunden: {}", registry_file);
+        return Err("Registry existiert nicht".into());
+    }
+
+    // Berechne Hashes
+    let manifest_hash = registry::compute_file_hash(manifest_path)?;
+    let proof_hash = registry::compute_file_hash(proof_path)?;
+
+    println!("   Manifest-Hash:  {}", manifest_hash);
+    println!("   Proof-Hash:     {}", proof_hash);
+
+    // Lade Registry
+    let registry = registry::Registry::load(&registry_file)?;
+
+    // Verifiziere
+    if registry.verify_entry(&manifest_hash, &proof_hash) {
+        let entry = registry.find_entry(&manifest_hash, &proof_hash).unwrap();
+        println!("✅ Entry verified in registry");
+        println!("   ID:             {}", entry.id);
+        println!("   Registered:     {}", entry.registered_at);
+        if let Some(ref ts) = entry.timestamp_file {
+            println!("   Timestamp:      {}", ts);
+        }
+
+        // Log Audit-Event
+        let mut audit = AuditLog::new("build/agent.audit.jsonl")?;
+        audit.log_event(
+            "registry_verified",
+            json!({
+                "manifest_hash": manifest_hash,
+                "proof_hash": proof_hash,
+                "registry_file": registry_file,
+                "status": "ok"
+            }),
+        )?;
+
+        Ok(())
+    } else {
+        println!("❌ Hash mismatch or not registered");
+        println!("   Registry:       {}", registry_file);
+        println!("   Einträge:       {}", registry.count());
+        Err("Proof nicht in Registry gefunden".into())
+    }
+}
+
 /// Zeigt die Version an
 fn run_version() {
     println!("cap-agent v{}", VERSION);
@@ -1220,10 +1534,33 @@ fn main() {
                 manifest_in,
                 manifest_out,
             } => run_audit_anchor(kind, reference, manifest_in, manifest_out),
+            AuditCommands::Timestamp {
+                head,
+                out,
+                mock,
+                tsa_url,
+            } => run_audit_timestamp(head, out.clone(), *mock, tsa_url.clone()),
+            AuditCommands::VerifyTimestamp { head, timestamp } => {
+                run_audit_verify_timestamp(head, timestamp)
+            }
         },
         Commands::Lists(cmd) => match cmd {
             ListsCommands::SanctionsRoot { csv, out } => run_lists_sanctions_root(csv, out.clone()),
             ListsCommands::JurisdictionsRoot { csv, out } => run_lists_jurisdictions_root(csv, out.clone()),
+        },
+        Commands::Registry(cmd) => match cmd {
+            RegistryCommands::Add {
+                manifest,
+                proof,
+                timestamp,
+                registry,
+            } => run_registry_add(manifest, proof, timestamp.clone(), registry.clone()),
+            RegistryCommands::List { registry } => run_registry_list(registry.clone()),
+            RegistryCommands::Verify {
+                manifest,
+                proof,
+                registry,
+            } => run_registry_verify(manifest, proof, registry.clone()),
         },
         Commands::Version => {
             run_version();
