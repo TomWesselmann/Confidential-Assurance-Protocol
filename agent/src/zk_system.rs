@@ -32,6 +32,9 @@ pub struct Witness {
     pub supplier_count: usize,
     /// UBO-Count (privat)
     pub ubo_count: usize,
+    /// Optionale Sanctions-Liste zum Mock-Check (privat, nur für SimplifiedZK)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sanctions_list: Option<Vec<String>>,
 }
 
 /// ZK-Proof-Struktur
@@ -108,6 +111,16 @@ impl SimplifiedZK {
                     let max_str = c.replace("supplier_count_max_", "");
                     let max: usize = max_str.parse()?;
                     witness.supplier_count <= max
+                }
+                "sanctions_non_membership" => {
+                    // Mock-Check: Prüfe ob UBO-Hashes nicht in Sanctions-Liste vorkommen
+                    if let Some(ref sanctions_list) = witness.sanctions_list {
+                        // Kein UBO darf auf der Sanktionsliste sein
+                        !witness.ubos.iter().any(|ubo_hash| sanctions_list.contains(ubo_hash))
+                    } else {
+                        // Wenn keine Sanctions-Liste vorhanden, gilt Check als bestanden
+                        true
+                    }
                 }
                 _ => {
                     return Err(format!("Unbekannte Constraint: {}", constraint).into());
@@ -322,6 +335,7 @@ mod tests {
             ubos: vec!["0xubo1".to_string()],
             supplier_count: 2,
             ubo_count: 1,
+            sanctions_list: None,
         };
 
         let proof = zk.prove(&statement, &witness).unwrap();
@@ -349,6 +363,7 @@ mod tests {
             ubos: vec!["0xubo1".to_string()],
             supplier_count: 1,
             ubo_count: 1,
+            sanctions_list: None,
         };
 
         let proof = zk.prove(&statement, &witness).unwrap();
@@ -373,6 +388,7 @@ mod tests {
             ubos: vec![], // Kein UBO -> sollte fehlschlagen
             supplier_count: 0,
             ubo_count: 0,
+            sanctions_list: None,
         };
 
         let proof = zk.prove(&statement, &witness).unwrap();
@@ -396,6 +412,7 @@ mod tests {
             ubos: vec!["0xubo1".to_string()],
             supplier_count: 0,
             ubo_count: 1,
+            sanctions_list: None,
         };
 
         let proof = zk.prove(&statement, &witness).unwrap();
@@ -449,5 +466,65 @@ mod tests {
         let json_no_roots = serde_json::to_string(&statement_no_roots).unwrap();
         assert!(!json_no_roots.contains("sanctions_root"));
         assert!(!json_no_roots.contains("jurisdiction_root"));
+    }
+
+    #[test]
+    fn sanctions_non_membership_ok() {
+        let zk = SimplifiedZK::new();
+
+        let statement = Statement {
+            policy_hash: "0xtest".to_string(),
+            company_commitment_root: "0xroot".to_string(),
+            constraints: vec!["sanctions_non_membership".to_string()],
+            sanctions_root: Some("0xsanctions".to_string()),
+            jurisdiction_root: None,
+        };
+
+        // UBO-Hashes die NICHT auf der Sanktionsliste sind
+        let witness = Witness {
+            suppliers: vec![],
+            ubos: vec!["0xubo_clean_1".to_string(), "0xubo_clean_2".to_string()],
+            supplier_count: 0,
+            ubo_count: 2,
+            sanctions_list: Some(vec![
+                "0xsanctioned_person_1".to_string(),
+                "0xsanctioned_person_2".to_string(),
+            ]),
+        };
+
+        let proof = zk.prove(&statement, &witness).unwrap();
+        assert_eq!(proof.status, "ok");
+
+        // Verifiziere Proof
+        let is_valid = zk.verify(&proof).unwrap();
+        assert!(is_valid);
+    }
+
+    #[test]
+    fn sanctions_non_membership_fail() {
+        let zk = SimplifiedZK::new();
+
+        let statement = Statement {
+            policy_hash: "0xtest".to_string(),
+            company_commitment_root: "0xroot".to_string(),
+            constraints: vec!["sanctions_non_membership".to_string()],
+            sanctions_root: Some("0xsanctions".to_string()),
+            jurisdiction_root: None,
+        };
+
+        // UBO ist auf der Sanktionsliste!
+        let witness = Witness {
+            suppliers: vec![],
+            ubos: vec!["0xubo_sanctioned".to_string()],
+            supplier_count: 0,
+            ubo_count: 1,
+            sanctions_list: Some(vec![
+                "0xsanctioned_person_1".to_string(),
+                "0xubo_sanctioned".to_string(), // Match!
+            ]),
+        };
+
+        let proof = zk.prove(&statement, &witness).unwrap();
+        assert_eq!(proof.status, "failed");
     }
 }

@@ -1,6 +1,7 @@
 mod audit;
 mod commitment;
 mod io;
+mod lists;
 mod manifest;
 mod policy;
 mod proof_engine;
@@ -67,6 +68,9 @@ enum Commands {
     /// Audit-Commands
     #[command(subcommand)]
     Audit(AuditCommands),
+    /// Lists-Commands
+    #[command(subcommand)]
+    Lists(ListsCommands),
     /// Zeigt die Tool-Version an
     Version,
 }
@@ -166,6 +170,10 @@ enum ProofCommands {
         /// Optionaler Jurisdiction-Root (Hex-String)
         #[arg(long)]
         jurisdiction_root: Option<String>,
+
+        /// Optionale Sanctions CSV für Mock-Check
+        #[arg(long)]
+        sanctions_csv: Option<String>,
     },
     /// Verifiziert einen Zero-Knowledge-Proof
     ZkVerify {
@@ -274,6 +282,30 @@ enum AuditCommands {
         /// Output-Manifest-Pfad
         #[arg(long)]
         manifest_out: String,
+    },
+}
+
+#[derive(Subcommand)]
+enum ListsCommands {
+    /// Generiert Sanctions Merkle Root aus CSV
+    SanctionsRoot {
+        /// Pfad zur Sanctions CSV
+        #[arg(long)]
+        csv: String,
+
+        /// Output-Pfad (default: build/sanctions.root)
+        #[arg(long)]
+        out: Option<String>,
+    },
+    /// Generiert Jurisdictions Merkle Root aus CSV
+    JurisdictionsRoot {
+        /// Pfad zur Jurisdictions CSV
+        #[arg(long)]
+        csv: String,
+
+        /// Output-Pfad (default: build/jurisdictions.root)
+        #[arg(long)]
+        out: Option<String>,
     },
 }
 
@@ -693,6 +725,7 @@ fn run_zk_build(
     output: Option<String>,
     sanctions_root: Option<String>,
     jurisdiction_root: Option<String>,
+    sanctions_csv: Option<String>,
 ) -> Result<(), Box<dyn Error>> {
     println!("🔬 Erstelle Zero-Knowledge-Proof...");
 
@@ -707,6 +740,14 @@ fn run_zk_build(
 
     // Lade Commitments für Witness-Daten
     let commitments = Commitments::load("build/commitments.json")?;
+
+    // Lade optional Sanctions-Liste für Mock-Check
+    let sanctions_list = if let Some(ref csv_path) = sanctions_csv {
+        let (_, entries) = lists::compute_sanctions_root(csv_path)?;
+        Some(entries.iter().map(|e| e.hash()).collect())
+    } else {
+        None
+    };
 
     // Erstelle Statement (öffentliche Daten)
     let statement = zk_system::Statement {
@@ -734,6 +775,7 @@ fn run_zk_build(
         ubos: vec![manifest.ubo_root.clone()],
         supplier_count: commitments.supplier_count.unwrap_or(0),
         ubo_count: commitments.ubo_count.unwrap_or(0),
+        sanctions_list,
     };
 
     // Erstelle ZK-Proof
@@ -853,6 +895,7 @@ fn run_zk_bench(
         ubos: vec![manifest.ubo_root.clone()],
         supplier_count: commitments.supplier_count.unwrap_or(0),
         ubo_count: commitments.ubo_count.unwrap_or(0),
+        sanctions_list: None,
     };
 
     let zk = zk_system::SimplifiedZK::new();
@@ -1024,6 +1067,90 @@ fn run_audit_anchor(
     Ok(())
 }
 
+/// Lists sanctions-root - Generiert Sanctions Merkle Root
+fn run_lists_sanctions_root(csv_path: &str, output: Option<String>) -> Result<(), Box<dyn Error>> {
+    println!("📋 Generiere Sanctions Merkle Root...");
+
+    let mut audit = AuditLog::new("build/agent.audit.jsonl")?;
+
+    // Berechne Root aus CSV
+    let (root, entries) = lists::compute_sanctions_root(csv_path)?;
+
+    let out_path = output.unwrap_or_else(|| "build/sanctions.root".to_string());
+
+    // Erstelle Root-Info
+    let info = lists::SanctionsRootInfo {
+        root: root.clone(),
+        count: entries.len(),
+        source: csv_path.to_string(),
+        generated_at: chrono::Utc::now().to_rfc3339(),
+        algorithm: "BLAKE3".to_string(),
+    };
+
+    // Speichere Root-Info
+    lists::save_sanctions_root_info(&info, &out_path)?;
+
+    // Audit-Event
+    audit.log_event(
+        "sanctions_root_generated",
+        json!({
+            "root": root,
+            "count": entries.len(),
+            "source": csv_path,
+            "output": out_path
+        }),
+    )?;
+
+    println!("✅ Sanctions Root generiert:");
+    println!("   Root:   {}", root);
+    println!("   Count:  {}", entries.len());
+    println!("   Output: {}", out_path);
+
+    Ok(())
+}
+
+/// Lists jurisdictions-root - Generiert Jurisdictions Merkle Root
+fn run_lists_jurisdictions_root(csv_path: &str, output: Option<String>) -> Result<(), Box<dyn Error>> {
+    println!("🌍 Generiere Jurisdictions Merkle Root...");
+
+    let mut audit = AuditLog::new("build/agent.audit.jsonl")?;
+
+    // Berechne Root aus CSV
+    let (root, entries) = lists::compute_jurisdictions_root(csv_path)?;
+
+    let out_path = output.unwrap_or_else(|| "build/jurisdictions.root".to_string());
+
+    // Erstelle Root-Info
+    let info = lists::JurisdictionsRootInfo {
+        root: root.clone(),
+        count: entries.len(),
+        source: csv_path.to_string(),
+        generated_at: chrono::Utc::now().to_rfc3339(),
+        algorithm: "BLAKE3".to_string(),
+    };
+
+    // Speichere Root-Info
+    lists::save_jurisdictions_root_info(&info, &out_path)?;
+
+    // Audit-Event
+    audit.log_event(
+        "jurisdictions_root_generated",
+        json!({
+            "root": root,
+            "count": entries.len(),
+            "source": csv_path,
+            "output": out_path
+        }),
+    )?;
+
+    println!("✅ Jurisdictions Root generiert:");
+    println!("   Root:   {}", root);
+    println!("   Count:  {}", entries.len());
+    println!("   Output: {}", out_path);
+
+    Ok(())
+}
+
 /// Zeigt die Version an
 fn run_version() {
     println!("cap-agent v{}", VERSION);
@@ -1059,7 +1186,8 @@ fn main() {
                 out,
                 sanctions_root,
                 jurisdiction_root,
-            } => run_zk_build(policy, manifest, out.clone(), sanctions_root.clone(), jurisdiction_root.clone()),
+                sanctions_csv,
+            } => run_zk_build(policy, manifest, out.clone(), sanctions_root.clone(), jurisdiction_root.clone(), sanctions_csv.clone()),
             ProofCommands::ZkVerify { proof } => run_zk_verify(proof),
             ProofCommands::Bench {
                 policy,
@@ -1092,6 +1220,10 @@ fn main() {
                 manifest_in,
                 manifest_out,
             } => run_audit_anchor(kind, reference, manifest_in, manifest_out),
+        },
+        Commands::Lists(cmd) => match cmd {
+            ListsCommands::SanctionsRoot { csv, out } => run_lists_sanctions_root(csv, out.clone()),
+            ListsCommands::JurisdictionsRoot { csv, out } => run_lists_jurisdictions_root(csv, out.clone()),
         },
         Commands::Version => {
             run_version();
