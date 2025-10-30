@@ -4,9 +4,9 @@
 
 Der **LkSG Proof Agent** ist ein Rust-basiertes CLI-Tool für die Erzeugung und Verifikation von kryptographischen Nachweisen im Kontext des deutschen Lieferkettensorgfaltspflichtengesetzes (LkSG).
 
-**Version:** 0.8.0
-**Status:** Tag 3 MVP (Proof & Verifier Layer) + Manifest Schema Validation v1.0 + Complete Verifier CLI + Standardized Proof Export v1.0 – Vollständig implementiert
-**Entwicklung:** Tag 1 (Commitment Engine) + Tag 2 (Policy Layer) + Tag 3 (Proof Layer) + Manifest Schema Validation + Complete Verifier CLI + Standardized Proof Export
+**Version:** 0.7.1
+**Status:** Tag 3 MVP (Proof & Verifier Layer) + Manifest Schema Validation v1.0 + Complete Verifier CLI + Standardized Proof Export v1.0 + Registry SQLite Adapter v1.0 + SQLite Edge-Case Tests – Vollständig implementiert
+**Entwicklung:** Tag 1 (Commitment Engine) + Tag 2 (Policy Layer) + Tag 3 (Proof Layer) + Manifest Schema Validation + Complete Verifier CLI + Standardized Proof Export + Registry SQLite Backend
 
 ---
 
@@ -703,7 +703,7 @@ cargo run -- proof export --manifest build/manifest.json --proof build/zk_proof.
 ```bash
 cargo test
 ```
-**Ergebnis:** 53/53 Tests bestanden ✅
+**Ergebnis:** 58/58 Tests bestanden ✅ (53 Unit + 5 Integration)
 
 **Tests pro Modul:**
 - `io::tests`: 2 Tests (CSV-Parsing)
@@ -715,6 +715,7 @@ cargo test
 - `proof_engine::tests`: 3 Tests (Proof-Build, Verify, DAT-Serialisierung)
 - `verifier::tests`: 3 Tests (Integrity-Check, Package-Summary)
 - `sign::tests`: 3 Tests (Keypair-Generation, Sign & Verify)
+- `test_registry_sqlite`: 5 Tests (Corruption, Migration, Duplicates, WAL, Roundtrip)
 
 ### Clippy (Lint-Check)
 ```bash
@@ -783,7 +784,7 @@ build/
 - ✅ Alle Artefakte in `build/proof_package/` generiert
 - ✅ Proof-Pakete verifizierbar durch externes Verifier-Tool
 - ✅ CI-Pipeline grün (Build + Test + Clippy)
-- ✅ 53/53 Tests bestanden
+- ✅ 58/58 Tests bestanden
 - ✅ 0 Clippy-Warnings
 - ✅ Reproduzierbare Hashes & Proofs (deterministisch)
 - ✅ Dokumentation vollständig (CLAUDE.md)
@@ -791,17 +792,29 @@ build/
 
 ---
 
-## Nächste Schritte (Tag 4 – ZK-Integration)
+## Nächste Schritte (v0.8.0 – Registry Enhancements)
 
-1. Implementierung eines echten ProofSystems:
+1. **Registry Entry Signing:**
+   - Optional Ed25519-Signatur für Registry-Einträge
+   - Flag: `--sign-key keys/company.ed25519`
+   - Verifikation in `registry verify`
+
+2. **Schema Versioning:**
+   - Explizite Schema-Version in `registry_meta` Table
+   - `schema_version()` Helper-Funktion
+   - Forward-kompatible Migrationen
+
+3. **Performance Benchmarks:**
+   - JSON vs SQLite Load/Save Benchmarks
+   - Criterion.rs Integration (`cargo bench`)
+   - Target: ≥ 2× Improvement für ≥ 1000 Entries
+
+4. **ZK-Integration (Tag 4):**
    - Halo2, Spartan, Nova oder RISC0
-2. Replacement von `proof_mock` durch `proof_engine` mit ZK-Backend
-3. Integration öffentlicher Listen-Roots:
-   - Sanctions Lists (OFAC, EU, UN)
-   - Jurisdiction Mappings
-4. ZK-Verifier CLI für Auditoren (native ZK-Proof-Verifikation)
-5. Blockchain-Anchoring (optional):
-   - Timestamping via RFC3161 oder Ethereum/Solana
+   - Replacement von `proof_mock` durch ZK-Backend
+   - Integration öffentlicher Listen-Roots (OFAC, EU, UN)
+   - ZK-Verifier CLI für Auditoren
+   - Blockchain-Anchoring (optional)
 
 ---
 
@@ -814,5 +827,6 @@ build/
 ---
 
 **Dokumentation erstellt:** 2025-10-25
-**Version:** Tag 3 MVP (v0.3.0)
+**Letzte Aktualisierung:** 2025-10-30
+**Version:** v0.7.1 (Registry SQLite Adapter + Edge-Case Tests)
 **Autor:** Claude Code (Anthropic)
