@@ -836,24 +836,59 @@ build/
 
 ---
 
-## Nächste Schritte (v0.8.0 – Registry Enhancements)
+## Performance Benchmarking (v0.8.0)
 
-1. **Registry Entry Signing:**
-   - Optional Ed25519-Signatur für Registry-Einträge
-   - Flag: `--sign-key keys/company.ed25519`
-   - Verifikation in `registry verify`
+### Benchmark-Suite mit Criterion.rs
 
-2. **Schema Versioning:**
+Das Projekt enthält automatisierte Performance-Benchmarks für das Registry-System, um JSON- und SQLite-Backends zu vergleichen.
+
+#### Ausführung:
+```bash
+# Vollständige Benchmarks
+cargo bench --bench registry_bench
+
+# Schneller Test
+cargo bench --bench registry_bench -- --quick
+
+# HTML-Reports generieren
+open target/criterion/report/index.html
+```
+
+#### Benchmark-Kategorien:
+
+1. **registry_insert** - Einfügen von Einträgen
+2. **registry_load** - Laden der gesamten Registry
+3. **registry_find** - Suchen nach Hash
+4. **registry_list** - Auflisten aller Einträge
+
+#### Performance-Ergebnisse (1000 Einträge):
+
+| Operation | JSON | SQLite | Vergleich |
+|-----------|------|--------|-----------|
+| **Insert** | 110.7 ms | 27.1 ms | ✅ SQLite **4× schneller** |
+| **Load** | 320 µs | 1.19 ms | ✅ JSON **3.7× schneller** |
+| **Find** | 428 µs | 9.5 µs | ✅ SQLite **45× schneller** (Index) |
+| **List** | 533 µs | 1.29 ms | ✅ JSON **2.4× schneller** |
+
+**Empfehlung:**
+- SQLite für Workloads mit vielen Writes und Suchen (Production)
+- JSON für einfache Setups und kleine Datenmengen (<100 Entries)
+
+---
+
+## Nächste Schritte (v0.9.0+)
+
+1. **Schema Versioning:**
    - Explizite Schema-Version in `registry_meta` Table
    - `schema_version()` Helper-Funktion
    - Forward-kompatible Migrationen
 
-3. **Performance Benchmarks:**
-   - JSON vs SQLite Load/Save Benchmarks
-   - Criterion.rs Integration (`cargo bench`)
-   - Target: ≥ 2× Improvement für ≥ 1000 Entries
+2. **Multi-Signature Support:**
+   - Chain-of-Trust für Registry-Einträge
+   - Mehrere Signaturen pro Entry
+   - Signatur-Timestamp-Verknüpfung
 
-4. **ZK-Integration (Tag 4):**
+3. **ZK-Integration (Tag 4):**
    - Halo2, Spartan, Nova oder RISC0
    - Replacement von `proof_mock` durch ZK-Backend
    - Integration öffentlicher Listen-Roots (OFAC, EU, UN)

@@ -3,6 +3,10 @@ name = "cap-agent"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "cap_agent"
+path = "src/lib.rs"
+
 [[bin]]
 name = "cap-agent"
 path = "src/main.rs"
@@ -22,3 +26,10 @@ rand = "0.8"
 base64 = "0.22"
 jsonschema = "0.17"
 rusqlite = { version = "0.31", features = ["bundled"] }
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "registry_bench"
+harness = false
