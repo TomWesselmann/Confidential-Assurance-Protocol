@@ -222,6 +222,38 @@ impl Timestamp {
     }
 }
 
+/// Verifiziert, ob ein Manifest- und Proof-Hash in einer Registry-Datei existiert
+///
+/// # Argumente
+/// * `registry_path` - Pfad zur Registry-JSON-Datei
+/// * `manifest_hash` - SHA3-256 Hash des Manifests
+/// * `proof_hash` - SHA3-256 Hash des Proofs
+///
+/// # Rückgabe
+/// true wenn Eintrag gefunden, false sonst
+pub fn verify_entry_from_file(
+    registry_path: &str,
+    manifest_hash: &str,
+    proof_hash: &str,
+) -> Result<bool, Box<dyn Error>> {
+    let registry = Registry::load(registry_path)?;
+    Ok(registry.verify_entry(manifest_hash, proof_hash))
+}
+
+/// Verifiziert einen Mock-Timestamp aus Datei
+///
+/// # Argumente
+/// * `ts_path` - Pfad zur Timestamp-Datei
+///
+/// # Rückgabe
+/// true wenn Timestamp-Status "ok" ist, false sonst
+pub fn verify_timestamp_from_file(ts_path: &str) -> bool {
+    match Timestamp::load(ts_path) {
+        Ok(ts) => ts.status == "ok",
+        Err(_) => false,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

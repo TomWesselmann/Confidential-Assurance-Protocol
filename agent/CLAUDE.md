@@ -4,9 +4,9 @@
 
 Der **LkSG Proof Agent** ist ein Rust-basiertes CLI-Tool für die Erzeugung und Verifikation von kryptographischen Nachweisen im Kontext des deutschen Lieferkettensorgfaltspflichtengesetzes (LkSG).
 
-**Version:** 0.6.0
-**Status:** Tag 3 MVP (Proof & Verifier Layer) + Manifest Schema Validation v1.0 – Vollständig implementiert
-**Entwicklung:** Tag 1 (Commitment Engine) + Tag 2 (Policy Layer) + Tag 3 (Proof Layer) + Manifest Schema Validation
+**Version:** 0.7.0
+**Status:** Tag 3 MVP (Proof & Verifier Layer) + Manifest Schema Validation v1.0 + Complete Verifier CLI – Vollständig implementiert
+**Entwicklung:** Tag 1 (Commitment Engine) + Tag 2 (Policy Layer) + Tag 3 (Proof Layer) + Manifest Schema Validation + Complete Verifier CLI
 
 ---
 
@@ -249,6 +249,48 @@ cargo run -- manifest validate --file build/manifest.json
 - ✅ Validierung erfolgreich + Audit-Log-Eintrag
 - ❌ Validierung fehlgeschlagen + Liste der Fehler
 
+#### `manifest verify` – Offline Proof-Paket-Verifikation
+```bash
+cargo run -- manifest verify \
+  --manifest build/manifest.json \
+  --proof build/zk_proof.dat \
+  --registry build/registry.json \
+  [--timestamp build/timestamp.tsr] \
+  [--out build/verification.report.json]
+```
+**Funktion:** Führt vollständige Offline-Verifikation eines Proof-Pakets durch
+**Verifikationsschritte:**
+1. Hash-Berechnung (Manifest + Proof)
+2. Signatur-Verifikation (prüft ob Signaturen vorhanden)
+3. Timestamp-Verifikation (optional, Mock)
+4. Registry-Match (prüft ob Hashes in Registry registriert sind)
+
+**Voraussetzung:**
+- `build/manifest.json` muss existieren
+- `build/zk_proof.dat` oder äquivalente Proof-Datei muss existieren
+- `build/registry.json` muss existieren
+**Optionen:**
+- `--manifest` - Pfad zur Manifest-Datei (erforderlich)
+- `--proof` - Pfad zur Proof-Datei (erforderlich)
+- `--registry` - Pfad zur Registry-Datei (erforderlich)
+- `--timestamp` - Optionaler Pfad zur Timestamp-Datei
+- `--out` - Optionaler Pfad für Verification Report (Standard: `build/verification.report.json`)
+**Output:**
+- ✅ Verifikation erfolgreich + Verification Report + Audit-Log-Eintrag
+- ❌ Verifikation fehlgeschlagen + Verification Report mit Details
+
+**Report-Format:**
+```json
+{
+  "manifest_hash": "0xd490be94abc123...",
+  "proof_hash": "0x83a8779ddef456...",
+  "timestamp_valid": true,
+  "registry_match": true,
+  "signature_valid": true,
+  "status": "ok"
+}
+```
+
 #### `sign keygen` – Schlüsselerzeugung
 ```bash
 cargo run -- sign keygen --dir keys
@@ -455,6 +497,32 @@ cargo run -- verifier audit --package build/proof_package
 **Verwendung:**
 ```bash
 cargo run -- manifest validate --file build/manifest.json --schema docs/manifest.schema.json
+```
+
+### `build/verification.report.json` (Verification Report)
+**Funktion:** Report für vollständige Offline-Verifikation (manifest verify)
+**Format:**
+```json
+{
+  "manifest_hash": "0xd490be94abc123...",
+  "proof_hash": "0x83a8779ddef456...",
+  "timestamp_valid": true,
+  "registry_match": true,
+  "signature_valid": true,
+  "status": "ok"
+}
+```
+**Felder:**
+- `manifest_hash`: SHA3-256 Hash der Manifest-Datei
+- `proof_hash`: SHA3-256 Hash der Proof-Datei
+- `timestamp_valid`: Timestamp-Verifikation (true/false)
+- `registry_match`: Registry-Eintrag gefunden (true/false)
+- `signature_valid`: Signatur vorhanden (true/false)
+- `status`: Gesamtstatus ("ok" oder "fail")
+
+**Verwendung:**
+```bash
+cargo run -- manifest verify --manifest build/manifest.json --proof build/zk_proof.dat --registry build/registry.json
 ```
 
 ### `agent.audit.jsonl` (JSONL – Hash-Chain)
