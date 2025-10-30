@@ -409,6 +409,10 @@ enum RegistryCommands {
         /// Registry-Backend (json|sqlite, default: json)
         #[arg(long, default_value = "json")]
         backend: String,
+
+        /// Optionaler Pfad zum Signing-Key (Ed25519, default: keys/company.ed25519)
+        #[arg(long)]
+        signing_key: Option<String>,
     },
     /// Listet alle Registry-Einträge auf
     List {
@@ -1587,6 +1591,7 @@ fn run_registry_add(
     timestamp_path: Option<String>,
     registry_path: Option<String>,
     backend_str: &str,
+    signing_key_path: Option<String>,
 ) -> Result<(), Box<dyn Error>> {
     use registry::RegistryBackend;
 
@@ -1621,13 +1626,42 @@ fn run_registry_add(
     let id = format!("proof_{:03}", current_reg.entries.len() + 1);
 
     // Create entry
-    let entry = registry::RegistryEntry {
+    let mut entry = registry::RegistryEntry {
         id: id.clone(),
         manifest_hash: manifest_hash.clone(),
         proof_hash: proof_hash.clone(),
         timestamp_file: timestamp_path.clone(),
         registered_at: chrono::Utc::now().to_rfc3339(),
+        signature: None,
+        public_key: None,
     };
+
+    // Sign entry if signing key provided
+    if let Some(key_path) = signing_key_path {
+        let key_file = if key_path.is_empty() {
+            "keys/company.ed25519"
+        } else {
+            &key_path
+        };
+
+        println!("   Signing-Key:    {}", key_file);
+
+        // Load signing key
+        let key_bytes = std::fs::read(key_file)
+            .map_err(|e| format!("Failed to read signing key from {}: {}", key_file, e))?;
+
+        if key_bytes.len() != 32 {
+            return Err(format!("Invalid signing key length (expected 32 bytes, got {})", key_bytes.len()).into());
+        }
+
+        let signing_key = ed25519_dalek::SigningKey::from_bytes(
+            &key_bytes.try_into().unwrap()
+        );
+
+        // Sign entry
+        registry::sign_entry(&mut entry, &signing_key)?;
+        println!("   ✓ Entry signed with Ed25519");
+    }
 
     // Add entry
     store.add_entry(entry)?;
@@ -1759,6 +1793,14 @@ fn run_registry_verify(
             println!("   Timestamp:      {}", ts);
         }
 
+        // Verify signature if present
+        let signature_valid = registry::verify_entry_signature(&entry)?;
+        if signature_valid {
+            println!("   ✓ Ed25519 signature valid");
+        } else {
+            println!("   ⚠ No signature present (backward compatibility)");
+        }
+
         // Log Audit-Event
         let mut audit = AuditLog::new("build/agent.audit.jsonl")?;
         audit.log_event(
@@ -1768,6 +1810,7 @@ fn run_registry_verify(
                 "proof_hash": proof_hash,
                 "registry_file": registry_file,
                 "backend": backend_str,
+                "signature_valid": signature_valid,
                 "status": "ok"
             }),
         )?;
@@ -2139,7 +2182,8 @@ fn main() {
                 timestamp,
                 registry,
                 backend,
-            } => run_registry_add(manifest, proof, timestamp.clone(), registry.clone(), backend),
+                signing_key,
+            } => run_registry_add(manifest, proof, timestamp.clone(), registry.clone(), backend, signing_key.clone()),
             RegistryCommands::List { registry, backend } => run_registry_list(registry.clone(), backend),
             RegistryCommands::Verify {
                 manifest,

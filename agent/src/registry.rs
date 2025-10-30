@@ -9,6 +9,8 @@ use sha3::{Digest, Sha3_256};
 use std::error::Error;
 use std::fs;
 use std::path::Path;
+use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
+use base64::{Engine, engine::general_purpose};
 
 /// Registry-Eintrag für einen einzelnen Proof
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -19,6 +21,12 @@ pub struct RegistryEntry {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timestamp_file: Option<String>,
     pub registered_at: String, // RFC3339
+    /// Ed25519 signature over entry_hash (optional for backward compatibility)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signature: Option<String>,
+    /// Base64-encoded Ed25519 public key (optional for backward compatibility)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub public_key: Option<String>,
 }
 
 /// Lokale Registry-Struktur
@@ -83,6 +91,8 @@ impl Registry {
             proof_hash,
             timestamp_file,
             registered_at: Utc::now().to_rfc3339(),
+            signature: None,
+            public_key: None,
         };
         self.entries.push(entry);
         id
@@ -137,6 +147,104 @@ pub fn compute_file_hash<P: AsRef<Path>>(path: P) -> Result<String, Box<dyn Erro
     hasher.update(&content);
     let hash = hasher.finalize();
     Ok(format!("0x{}", hex::encode(hash)))
+}
+
+// ============================================================================
+// Registry Entry Signing (v0.8.0)
+// ============================================================================
+
+/// Berechnet BLAKE3-Hash des Entry-Cores (ohne Signatur-Felder)
+///
+/// # Argumente
+/// * `entry` - Registry-Eintrag
+///
+/// # Rückgabe
+/// BLAKE3-Hash als Bytes
+fn compute_entry_core_hash(entry: &RegistryEntry) -> Result<Vec<u8>, Box<dyn Error>> {
+    // Create core entry without signature fields for deterministic hashing
+    #[derive(Serialize)]
+    struct EntryCore<'a> {
+        id: &'a str,
+        manifest_hash: &'a str,
+        proof_hash: &'a str,
+        timestamp_file: &'a Option<String>,
+        registered_at: &'a str,
+    }
+
+    let core = EntryCore {
+        id: &entry.id,
+        manifest_hash: &entry.manifest_hash,
+        proof_hash: &entry.proof_hash,
+        timestamp_file: &entry.timestamp_file,
+        registered_at: &entry.registered_at,
+    };
+
+    let json = serde_json::to_vec(&core)?;
+    let hash = blake3::hash(&json);
+    Ok(hash.as_bytes().to_vec())
+}
+
+/// Signiert einen Registry-Eintrag mit Ed25519
+///
+/// # Argumente
+/// * `entry` - Mutable Referenz auf Registry-Eintrag
+/// * `signing_key` - Ed25519 Signing Key
+///
+/// # Rückgabe
+/// Ok(()) wenn erfolgreich, Fehler sonst
+pub fn sign_entry(entry: &mut RegistryEntry, signing_key: &SigningKey) -> Result<(), Box<dyn Error>> {
+    // Compute hash of entry core (without signature fields)
+    let entry_hash = compute_entry_core_hash(entry)?;
+
+    // Sign the hash
+    let signature = signing_key.sign(&entry_hash);
+
+    // Encode signature and public key as base64
+    let sig_b64 = general_purpose::STANDARD.encode(signature.to_bytes());
+    let pubkey_b64 = general_purpose::STANDARD.encode(signing_key.verifying_key().to_bytes());
+
+    // Update entry with signature
+    entry.signature = Some(sig_b64);
+    entry.public_key = Some(pubkey_b64);
+
+    Ok(())
+}
+
+/// Verifiziert die Signatur eines Registry-Eintrags
+///
+/// # Argumente
+/// * `entry` - Registry-Eintrag
+///
+/// # Rückgabe
+/// Ok(true) wenn Signatur gültig, Ok(false) wenn keine Signatur, Err bei Fehler
+pub fn verify_entry_signature(entry: &RegistryEntry) -> Result<bool, Box<dyn Error>> {
+    // Check if signature exists
+    let (sig_b64, pubkey_b64) = match (&entry.signature, &entry.public_key) {
+        (Some(s), Some(p)) => (s, p),
+        _ => return Ok(false), // No signature present (backward compatibility)
+    };
+
+    // Decode signature and public key
+    let sig_bytes = general_purpose::STANDARD.decode(sig_b64)?;
+    let pubkey_bytes = general_purpose::STANDARD.decode(pubkey_b64)?;
+
+    // Parse Ed25519 types
+    let signature = Signature::from_bytes(
+        &sig_bytes.try_into()
+            .map_err(|_| "Invalid signature length")?
+    );
+    let verifying_key = VerifyingKey::from_bytes(
+        &pubkey_bytes.try_into()
+            .map_err(|_| "Invalid public key length")?
+    )?;
+
+    // Compute entry hash
+    let entry_hash = compute_entry_core_hash(entry)?;
+
+    // Verify signature
+    verifying_key.verify(&entry_hash, &signature)?;
+
+    Ok(true)
 }
 
 /// Timestamp-Struktur (RFC3161-Mock)
@@ -469,7 +577,9 @@ impl SqliteRegistryStore {
                 manifest_hash TEXT NOT NULL,
                 proof_hash TEXT NOT NULL,
                 timestamp_file TEXT,
-                registered_at TEXT NOT NULL
+                registered_at TEXT NOT NULL,
+                signature TEXT,
+                public_key TEXT
             );
 
             CREATE INDEX IF NOT EXISTS idx_registry_hashes
@@ -493,7 +603,7 @@ impl RegistryStore for SqliteRegistryStore {
     fn load(&self) -> Result<Registry, Box<dyn Error>> {
         let conn = self.conn.borrow();
         let mut stmt = conn.prepare(
-            "SELECT id, manifest_hash, proof_hash, timestamp_file, registered_at
+            "SELECT id, manifest_hash, proof_hash, timestamp_file, registered_at, signature, public_key
              FROM registry_entries
              ORDER BY registered_at DESC"
         )?;
@@ -505,6 +615,8 @@ impl RegistryStore for SqliteRegistryStore {
                 proof_hash: row.get(2)?,
                 timestamp_file: row.get(3)?,
                 registered_at: row.get(4)?,
+                signature: row.get(5).ok(),
+                public_key: row.get(6).ok(),
             })
         })?;
 
@@ -529,14 +641,16 @@ impl RegistryStore for SqliteRegistryStore {
         // Insert all entries
         for entry in &reg.entries {
             tx.execute(
-                "INSERT OR REPLACE INTO registry_entries(id, manifest_hash, proof_hash, timestamp_file, registered_at)
-                 VALUES(?, ?, ?, ?, ?)",
+                "INSERT OR REPLACE INTO registry_entries(id, manifest_hash, proof_hash, timestamp_file, registered_at, signature, public_key)
+                 VALUES(?, ?, ?, ?, ?, ?, ?)",
                 rusqlite::params![
                     &entry.id,
                     &entry.manifest_hash,
                     &entry.proof_hash,
                     &entry.timestamp_file,
-                    &entry.registered_at
+                    &entry.registered_at,
+                    &entry.signature,
+                    &entry.public_key
                 ],
             )?;
         }
@@ -548,14 +662,16 @@ impl RegistryStore for SqliteRegistryStore {
     fn add_entry(&self, entry: RegistryEntry) -> Result<(), Box<dyn Error>> {
         let conn = self.conn.borrow();
         conn.execute(
-            "INSERT OR REPLACE INTO registry_entries(id, manifest_hash, proof_hash, timestamp_file, registered_at)
-             VALUES(?, ?, ?, ?, ?)",
+            "INSERT OR REPLACE INTO registry_entries(id, manifest_hash, proof_hash, timestamp_file, registered_at, signature, public_key)
+             VALUES(?, ?, ?, ?, ?, ?, ?)",
             rusqlite::params![
                 &entry.id,
                 &entry.manifest_hash,
                 &entry.proof_hash,
                 &entry.timestamp_file,
-                &entry.registered_at
+                &entry.registered_at,
+                &entry.signature,
+                &entry.public_key
             ],
         )?;
         Ok(())
@@ -564,7 +680,7 @@ impl RegistryStore for SqliteRegistryStore {
     fn find_by_hashes(&self, manifest_hash: &str, proof_hash: &str) -> Result<Option<RegistryEntry>, Box<dyn Error>> {
         let conn = self.conn.borrow();
         let mut stmt = conn.prepare(
-            "SELECT id, manifest_hash, proof_hash, timestamp_file, registered_at
+            "SELECT id, manifest_hash, proof_hash, timestamp_file, registered_at, signature, public_key
              FROM registry_entries
              WHERE manifest_hash = ?1 AND proof_hash = ?2
              LIMIT 1"
@@ -579,6 +695,8 @@ impl RegistryStore for SqliteRegistryStore {
                 proof_hash: row.get(2)?,
                 timestamp_file: row.get(3)?,
                 registered_at: row.get(4)?,
+                signature: row.get(5).ok(),
+                public_key: row.get(6).ok(),
             }));
         }
 
@@ -714,5 +832,77 @@ mod tests {
         assert!(loaded.verify(&tip));
 
         fs::remove_file(temp_path).ok();
+    }
+
+    // Registry Entry Signing Tests (v0.8.0)
+
+    #[test]
+    fn test_sign_and_verify_roundtrip() {
+        // Create a test entry
+        let mut entry = RegistryEntry {
+            id: "proof_001".to_string(),
+            manifest_hash: "0xabc123".to_string(),
+            proof_hash: "0xdef456".to_string(),
+            timestamp_file: Some("test.tsr".to_string()),
+            registered_at: chrono::Utc::now().to_rfc3339(),
+            signature: None,
+            public_key: None,
+        };
+
+        // Generate a signing key
+        let signing_key = ed25519_dalek::SigningKey::from_bytes(&[42u8; 32]);
+
+        // Sign the entry
+        sign_entry(&mut entry, &signing_key).unwrap();
+
+        // Verify signature is present
+        assert!(entry.signature.is_some());
+        assert!(entry.public_key.is_some());
+
+        // Verify signature
+        let valid = verify_entry_signature(&entry).unwrap();
+        assert!(valid, "Signature should be valid");
+    }
+
+    #[test]
+    fn test_tampered_entry_fails_verification() {
+        // Create and sign an entry
+        let mut entry = RegistryEntry {
+            id: "proof_001".to_string(),
+            manifest_hash: "0xabc123".to_string(),
+            proof_hash: "0xdef456".to_string(),
+            timestamp_file: None,
+            registered_at: chrono::Utc::now().to_rfc3339(),
+            signature: None,
+            public_key: None,
+        };
+
+        let signing_key = ed25519_dalek::SigningKey::from_bytes(&[42u8; 32]);
+        sign_entry(&mut entry, &signing_key).unwrap();
+
+        // Tamper with the entry
+        entry.manifest_hash = "0xTAMPERED".to_string();
+
+        // Verification should fail
+        let result = verify_entry_signature(&entry);
+        assert!(result.is_err(), "Tampered entry should fail verification");
+    }
+
+    #[test]
+    fn test_missing_signature_returns_false() {
+        // Create an entry without signature
+        let entry = RegistryEntry {
+            id: "proof_001".to_string(),
+            manifest_hash: "0xabc123".to_string(),
+            proof_hash: "0xdef456".to_string(),
+            timestamp_file: None,
+            registered_at: chrono::Utc::now().to_rfc3339(),
+            signature: None,
+            public_key: None,
+        };
+
+        // Verify should return Ok(false) for backward compatibility
+        let valid = verify_entry_signature(&entry).unwrap();
+        assert!(!valid, "Entry without signature should return false");
     }
 }

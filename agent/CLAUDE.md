@@ -4,9 +4,9 @@
 
 Der **LkSG Proof Agent** ist ein Rust-basiertes CLI-Tool für die Erzeugung und Verifikation von kryptographischen Nachweisen im Kontext des deutschen Lieferkettensorgfaltspflichtengesetzes (LkSG).
 
-**Version:** 0.6.1
-**Status:** Tag 3 MVP (Proof & Verifier Layer) + Manifest Schema Validation v1.0 + Complete Verifier CLI + Standardized Proof Export v1.0 + Registry SQLite Adapter v1.0 + SQLite Edge-Case Tests + ZK Backend Abstraction – Vollständig implementiert
-**Entwicklung:** Tag 1 (Commitment Engine) + Tag 2 (Policy Layer) + Tag 3 (Proof Layer) + Manifest Schema Validation + Complete Verifier CLI + Standardized Proof Export + Registry SQLite Backend + ZK Backend Abstraction
+**Version:** 0.8.0
+**Status:** Tag 3 MVP (Proof & Verifier Layer) + Manifest Schema Validation v1.0 + Complete Verifier CLI + Standardized Proof Export v1.0 + Registry SQLite Adapter v1.0 + SQLite Edge-Case Tests + ZK Backend Abstraction + Registry Entry Signing – Vollständig implementiert
+**Entwicklung:** Tag 1 (Commitment Engine) + Tag 2 (Policy Layer) + Tag 3 (Proof Layer) + Manifest Schema Validation + Complete Verifier CLI + Standardized Proof Export + Registry SQLite Backend + ZK Backend Abstraction + Registry Entry Signing
 
 ---
 
@@ -193,8 +193,8 @@ Der **LkSG Proof Agent** ist ein Rust-basiertes CLI-Tool für die Erzeugung und 
   - `show_audit_trail()` – Zeigt Audit-Event-Kette
 - **Output:** Verifikationsergebnisse (Konsole)
 
-#### `registry.rs` – Registry Store (Pluggable Backend)
-- **Funktion:** Pluggable Persistence-Layer für Proof-Registry mit JSON und SQLite Backends
+#### `registry.rs` – Registry Store (Pluggable Backend + Entry Signing)
+- **Funktion:** Pluggable Persistence-Layer für Proof-Registry mit JSON und SQLite Backends, inkl. Ed25519-Signierung
 - **Trait:** `RegistryStore`
   - `load()` – Lädt vollständige Registry
   - `save()` – Speichert Registry
@@ -210,7 +210,13 @@ Der **LkSG Proof Agent** ist ein Rust-basiertes CLI-Tool für die Erzeugung und 
   - `open_store()` – Factory-Funktion zur Backend-Auswahl
 - **SQLite Schema:**
   - `registry_meta` – Metadata (registry_version)
-  - `registry_entries` – Proof-Einträge mit Index auf (manifest_hash, proof_hash)
+  - `registry_entries` – Proof-Einträge mit Index auf (manifest_hash, proof_hash), inkl. `signature` und `public_key` Felder
+- **Entry Signing (v0.8.0):**
+  - `sign_entry()` – Signiert Registry-Eintrag mit Ed25519
+  - `verify_entry_signature()` – Verifiziert Ed25519-Signatur eines Eintrags
+  - `compute_entry_core_hash()` – BLAKE3-Hash des Entry-Cores (ohne Signatur-Felder)
+  - CLI-Flag: `--signing-key <path>` (default: keys/company.ed25519)
+  - Backward-compatible: Einträge ohne Signatur werden toleriert
 - **Migration:** Vollständige Migration zwischen Backends via `registry migrate` Command
 - **Output:** `build/registry.json` oder `build/registry.sqlite`
 
@@ -739,7 +745,7 @@ cargo run -- proof export --manifest build/manifest.json --proof build/zk_proof.
 ```bash
 cargo test
 ```
-**Ergebnis:** 61/61 Tests bestanden ✅ (53 Unit + 5 SQLite Integration + 3 ZK Backend Architecture)
+**Ergebnis:** 64/64 Tests bestanden ✅ (56 Unit + 5 SQLite Integration + 3 ZK Backend Architecture)
 
 **Tests pro Modul:**
 - `io::tests`: 2 Tests (CSV-Parsing)
@@ -751,6 +757,7 @@ cargo test
 - `proof_engine::tests`: 3 Tests (Proof-Build, Verify, DAT-Serialisierung)
 - `verifier::tests`: 3 Tests (Integrity-Check, Package-Summary)
 - `sign::tests`: 3 Tests (Keypair-Generation, Sign & Verify)
+- `registry::tests`: 9 Tests (Registry CRUD, Timestamp, Entry Signing)
 - `test_registry_sqlite`: 5 Tests (Corruption, Migration, Duplicates, WAL, Roundtrip)
 - `test_zk_backend`: 3 Tests (Architecture exists, CLI readiness, Integration path)
 
@@ -821,7 +828,7 @@ build/
 - ✅ Alle Artefakte in `build/proof_package/` generiert
 - ✅ Proof-Pakete verifizierbar durch externes Verifier-Tool
 - ✅ CI-Pipeline grün (Build + Test + Clippy)
-- ✅ 61/61 Tests bestanden
+- ✅ 64/64 Tests bestanden
 - ✅ 0 Clippy-Warnings
 - ✅ Reproduzierbare Hashes & Proofs (deterministisch)
 - ✅ Dokumentation vollständig (CLAUDE.md)
@@ -865,5 +872,5 @@ build/
 
 **Dokumentation erstellt:** 2025-10-25
 **Letzte Aktualisierung:** 2025-10-30
-**Version:** v0.6.1 (ZK Backend Abstraction)
+**Version:** v0.8.0 (Registry Entry Signing)
 **Autor:** Claude Code (Anthropic)
