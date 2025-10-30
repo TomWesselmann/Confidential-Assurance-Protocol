@@ -20,7 +20,7 @@ use std::error::Error;
 use std::fs;
 use zk_system::ProofSystem;
 
-const VERSION: &str = "0.7.0";
+const VERSION: &str = "0.8.0";
 
 /// LkSG Proof Agent - Confidential Assurance Protocol (CAP)
 ///
@@ -168,7 +168,7 @@ enum ProofCommands {
         #[arg(long)]
         manifest: String,
     },
-    /// Exportiert ein Proof-Paket
+    /// Exportiert ein standardisiertes CAP Proof-Paket
     Export {
         /// Pfad zum Manifest
         #[arg(long)]
@@ -178,13 +178,25 @@ enum ProofCommands {
         #[arg(long)]
         proof: String,
 
-        /// Optional: Pfad zur Signatur
+        /// Optional: Pfad zur Timestamp-Datei
         #[arg(long)]
-        signature: Option<String>,
+        timestamp: Option<String>,
 
-        /// Output-Verzeichnis (default: build/proof_package)
+        /// Optional: Pfad zur Registry-Datei
+        #[arg(long)]
+        registry: Option<String>,
+
+        /// Optional: Pfad zum Verification Report
+        #[arg(long)]
+        report: Option<String>,
+
+        /// Output-Verzeichnis (default: build/cap-proof)
         #[arg(long)]
         out: Option<String>,
+
+        /// Überschreibt existierendes Output-Verzeichnis
+        #[arg(long)]
+        force: bool,
     },
     /// Erstellt einen Zero-Knowledge-Proof (Tag 4)
     ZkBuild {
@@ -425,6 +437,40 @@ struct VerificationReport {
     pub registry_match: bool,
     pub signature_valid: bool,
     pub status: String,
+}
+
+/// Package Meta für proof export Kommando (CAP-Proof v1.0)
+#[derive(Debug, Serialize, Deserialize)]
+struct PackageMeta {
+    pub version: String,
+    pub created_at: String,
+    pub files: PackageFiles,
+    pub hashes: PackageHashes,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct PackageFiles {
+    pub manifest: String,
+    pub proof: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timestamp: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub registry: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub report: Option<String>,
+    pub readme: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+struct PackageHashes {
+    pub manifest_sha3: String,
+    pub proof_sha3: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timestamp_sha3: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub registry_sha3: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub report_sha3: Option<String>,
 }
 
 /// Hauptfunktion: Führt das prepare-Kommando aus
@@ -793,45 +839,187 @@ fn run_proof_verify_v3(proof_path: &str, manifest_path: &str) -> Result<(), Box<
     Ok(())
 }
 
-/// Proof export - Exportiert Proof-Paket
+/// Proof export - Exportiert standardisiertes CAP Proof-Paket (v1.0)
+///
+/// # Argumente
+/// * `manifest_path` - Pfad zur Manifest-Datei
+/// * `proof_path` - Pfad zur Proof-Datei
+/// * `timestamp_path` - Optionaler Pfad zur Timestamp-Datei
+/// * `registry_path` - Optionaler Pfad zur Registry-Datei
+/// * `report_path` - Optionaler Pfad zum Verification Report
+/// * `output` - Optionaler Output-Pfad (Standard: build/cap-proof)
+/// * `force` - Überschreibt existierendes Verzeichnis
+///
+/// # Rückgabe
+/// Result mit () bei Erfolg
 fn run_proof_export(
     manifest_path: &str,
     proof_path: &str,
-    signature_path: Option<String>,
+    timestamp_path: Option<String>,
+    registry_path: Option<String>,
+    report_path: Option<String>,
     output: Option<String>,
+    force: bool,
 ) -> Result<(), Box<dyn Error>> {
-    println!("📦 Exportiere Proof-Paket...");
+    use sha3::{Digest, Sha3_256};
+    use chrono::Utc;
 
-    let mut audit = AuditLog::new("build/agent.audit.jsonl")?;
+    println!("📦 Exportiere standardisiertes CAP Proof-Paket (v1.0)...");
 
-    // Lade Manifest und Proof
-    let manifest = manifest::Manifest::load(manifest_path)?;
-    let proof = if proof_path.ends_with(".dat") {
-        proof_engine::Proof::load_from_dat(proof_path)?
+    // 1. Output-Verzeichnis vorbereiten
+    let output_dir = output.unwrap_or_else(|| "build/cap-proof".to_string());
+    let out_path = std::path::Path::new(&output_dir);
+
+    if out_path.exists() {
+        if force {
+            fs::remove_dir_all(out_path)?;
+            println!("   ⚠️  Existierendes Verzeichnis entfernt (--force)");
+        } else {
+            return Err(format!("Output-Verzeichnis '{}' existiert bereits. Verwenden Sie --force zum Überschreiben.", output_dir).into());
+        }
+    }
+    fs::create_dir_all(out_path)?;
+
+    // 2. Dateien kopieren
+    println!("   📁 Kopiere Dateien...");
+
+    // Manifest
+    let manifest_dst = out_path.join("manifest.json");
+    fs::copy(manifest_path, &manifest_dst)?;
+    println!("      ✓ manifest.json");
+
+    // Proof
+    let proof_dst = out_path.join("proof.dat");
+    fs::copy(proof_path, &proof_dst)?;
+    println!("      ✓ proof.dat");
+
+    // Timestamp (optional)
+    let ts_dst = if let Some(ts) = timestamp_path.as_ref() {
+        let dst = out_path.join("timestamp.tsr");
+        fs::copy(ts, &dst)?;
+        println!("      ✓ timestamp.tsr");
+        Some(dst)
     } else {
-        proof_engine::Proof::load(proof_path)?
+        println!("      ⊘ timestamp.tsr (nicht angegeben)");
+        None
     };
 
-    // Output-Verzeichnis
-    let output_dir = output.unwrap_or_else(|| "build/proof_package".to_string());
+    // Registry (optional)
+    let reg_dst = if let Some(reg) = registry_path.as_ref() {
+        let dst = out_path.join("registry.json");
+        fs::copy(reg, &dst)?;
+        println!("      ✓ registry.json");
+        Some(dst)
+    } else {
+        println!("      ⊘ registry.json (nicht angegeben)");
+        None
+    };
 
-    // Exportiere Paket
-    proof_engine::export_proof_package(
-        &manifest,
-        &proof,
-        signature_path.as_deref(),
-        &output_dir,
-    )?;
+    // Report (optional oder minimal)
+    let rep_dst = out_path.join("verification.report.json");
+    if let Some(rep) = report_path.as_ref() {
+        fs::copy(rep, &rep_dst)?;
+        println!("      ✓ verification.report.json");
+    } else {
+        // Erstelle minimalen Report
+        fs::write(&rep_dst, r#"{"status":"unknown","note":"No verification performed before export"}"#)?;
+        println!("      ⚠️  verification.report.json (minimal, status=unknown)");
+    }
 
+    // 3. README.txt erstellen
+    println!("   📝 Erstelle README.txt...");
+    let readme_dst = out_path.join("README.txt");
+    let readme = format!(
+r#"CAP Proof Package (v1.0)
+========================
+
+This package contains a complete, offline-verifiable proof package
+following the Confidential Assurance Protocol (CAP) standard.
+
+Files:
+------
+- manifest.json              : Manifest with commitments and policy info
+- proof.dat                  : Zero-knowledge proof (Base64-encoded)
+- timestamp.tsr              : Timestamp signature (optional)
+- registry.json              : Local proof registry (optional)
+- verification.report.json   : Pre-verification report
+- README.txt                 : This file
+- _meta.json                 : Package metadata with SHA3-256 hashes
+
+Verification:
+-------------
+To verify this package offline, use:
+
+  cap manifest verify \
+    --manifest manifest.json \
+    --proof proof.dat \
+    --registry registry.json \
+    --timestamp timestamp.tsr \
+    --out verification.report.json
+
+Package created: {}
+Package version: cap-proof.v1.0
+
+For more information, see: https://cap.protocol/
+"#,
+        Utc::now().to_rfc3339()
+    );
+    fs::write(&readme_dst, readme)?;
+
+    // 4. _meta.json erstellen (mit Hashes)
+    println!("   🔐 Berechne Hashes und erstelle _meta.json...");
+
+    // Helper-Funktion für SHA3-256
+    let compute_sha3 = |path: &std::path::Path| -> Result<String, Box<dyn Error>> {
+        let bytes = fs::read(path)?;
+        Ok(format!("0x{:x}", Sha3_256::digest(&bytes)))
+    };
+
+    let hashes = PackageHashes {
+        manifest_sha3: compute_sha3(&manifest_dst)?,
+        proof_sha3: compute_sha3(&proof_dst)?,
+        timestamp_sha3: ts_dst.as_ref().and_then(|p| compute_sha3(p).ok()),
+        registry_sha3: reg_dst.as_ref().and_then(|p| compute_sha3(p).ok()),
+        report_sha3: Some(compute_sha3(&rep_dst)?),
+    };
+
+    let meta = PackageMeta {
+        version: "cap-proof.v1.0".to_string(),
+        created_at: Utc::now().to_rfc3339(),
+        files: PackageFiles {
+            manifest: "manifest.json".to_string(),
+            proof: "proof.dat".to_string(),
+            timestamp: ts_dst.as_ref().map(|_| "timestamp.tsr".to_string()),
+            registry: reg_dst.as_ref().map(|_| "registry.json".to_string()),
+            report: Some("verification.report.json".to_string()),
+            readme: "README.txt".to_string(),
+        },
+        hashes,
+    };
+
+    let meta_dst = out_path.join("_meta.json");
+    let meta_json = serde_json::to_string_pretty(&meta)?;
+    fs::write(&meta_dst, meta_json)?;
+
+    // 5. Audit-Log-Eintrag
+    let mut audit = AuditLog::new("build/agent.audit.jsonl")?;
     audit.log_event(
-        "proof_exported",
+        "proof_package_exported",
         json!({
             "output": &output_dir,
-            "has_signature": signature_path.is_some()
+            "version": "cap-proof.v1.0",
+            "has_timestamp": timestamp_path.is_some(),
+            "has_registry": registry_path.is_some(),
+            "has_report": report_path.is_some()
         }),
     )?;
 
-    println!("✅ Proof-Paket exportiert: {}", output_dir);
+    // 6. Erfolg
+    println!();
+    println!("✅ CAP Proof-Paket erfolgreich exportiert!");
+    println!("   Verzeichnis: {}", output_dir);
+    println!("   Dateien: {}", if ts_dst.is_some() && reg_dst.is_some() { 7 } else if ts_dst.is_some() || reg_dst.is_some() { 6 } else { 5 });
+    println!("   Package Version: cap-proof.v1.0");
 
     Ok(())
 }
@@ -1725,9 +1913,20 @@ fn main() {
             ProofCommands::Export {
                 manifest,
                 proof,
-                signature,
+                timestamp,
+                registry,
+                report,
                 out,
-            } => run_proof_export(manifest, proof, signature.clone(), out.clone()),
+                force,
+            } => run_proof_export(
+                manifest,
+                proof,
+                timestamp.clone(),
+                registry.clone(),
+                report.clone(),
+                out.clone(),
+                *force,
+            ),
             ProofCommands::ZkBuild {
                 policy,
                 manifest,

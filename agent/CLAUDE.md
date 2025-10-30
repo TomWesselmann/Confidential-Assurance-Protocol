@@ -4,9 +4,9 @@
 
 Der **LkSG Proof Agent** ist ein Rust-basiertes CLI-Tool für die Erzeugung und Verifikation von kryptographischen Nachweisen im Kontext des deutschen Lieferkettensorgfaltspflichtengesetzes (LkSG).
 
-**Version:** 0.7.0
-**Status:** Tag 3 MVP (Proof & Verifier Layer) + Manifest Schema Validation v1.0 + Complete Verifier CLI – Vollständig implementiert
-**Entwicklung:** Tag 1 (Commitment Engine) + Tag 2 (Policy Layer) + Tag 3 (Proof Layer) + Manifest Schema Validation + Complete Verifier CLI
+**Version:** 0.8.0
+**Status:** Tag 3 MVP (Proof & Verifier Layer) + Manifest Schema Validation v1.0 + Complete Verifier CLI + Standardized Proof Export v1.0 – Vollständig implementiert
+**Entwicklung:** Tag 1 (Commitment Engine) + Tag 2 (Policy Layer) + Tag 3 (Proof Layer) + Manifest Schema Validation + Complete Verifier CLI + Standardized Proof Export
 
 ---
 
@@ -328,14 +328,51 @@ cargo run -- proof verify --proof build/proof.dat --manifest build/manifest.json
 ```
 **Output:** Bestätigung der Gültigkeit + Manifest-Hash + Policy-Hash + Status
 
-#### `proof export` – Proof-Paket-Export
+#### `proof export` – Standardisiertes CAP Proof-Paket-Export (v1.0)
 ```bash
-cargo run -- proof export --manifest build/manifest.json --proof build/proof.dat --out build/proof_package
+cargo run -- proof export \
+  --manifest build/manifest.json \
+  --proof build/zk_proof.dat \
+  [--timestamp build/timestamp.tsr] \
+  [--registry build/registry.json] \
+  [--report build/verification.report.json] \
+  [--out build/cap-proof] \
+  [--force]
 ```
-**Output:** Proof-Paket-Verzeichnis mit:
-- `manifest.json`
-- `proof.dat`
-- `README.txt`
+**Funktion:** Erstellt ein standardisiertes, auditor-fertiges CAP Proof-Paket (v1.0)
+
+**Voraussetzung:**
+- `build/manifest.json` muss existieren
+- `build/zk_proof.dat` oder äquivalente Proof-Datei muss existieren
+- Optional: Timestamp, Registry, Verification Report
+
+**Optionen:**
+- `--manifest` - Pfad zur Manifest-Datei (erforderlich)
+- `--proof` - Pfad zur Proof-Datei (erforderlich)
+- `--timestamp` - Optionaler Pfad zur Timestamp-Datei
+- `--registry` - Optionaler Pfad zur Registry-Datei
+- `--report` - Optionaler Pfad zum Verification Report (wird minimal erstellt wenn nicht angegeben)
+- `--out` - Output-Verzeichnis (Standard: `build/cap-proof`)
+- `--force` - Überschreibt existierendes Output-Verzeichnis
+
+**Output:** Standardisiertes CAP Proof-Paket mit fester Struktur:
+```
+cap-proof/
+├─ manifest.json               # Manifest mit Commitments
+├─ proof.dat                   # ZK-Proof (Base64-kodiert)
+├─ timestamp.tsr               # Timestamp (optional)
+├─ registry.json               # Registry (optional)
+├─ verification.report.json    # Verification Report
+├─ README.txt                  # Human-readable Anleitung
+└─ _meta.json                  # SHA3-256 Hashes aller Dateien
+```
+
+**Features:**
+- SHA3-256 Hashes für alle Dateien in `_meta.json`
+- Package Version: `cap-proof.v1.0`
+- Minimaler Verification Report wenn nicht angegeben
+- Audit-Log-Eintrag für jeden Export
+- Verifikationsanleitung in README.txt
 
 #### `verifier run` – Proof-Paket-Verifikation
 ```bash
@@ -524,6 +561,48 @@ cargo run -- manifest validate --file build/manifest.json --schema docs/manifest
 ```bash
 cargo run -- manifest verify --manifest build/manifest.json --proof build/zk_proof.dat --registry build/registry.json
 ```
+
+### `build/cap-proof/_meta.json` (Package Metadata CAP v1.0)
+**Funktion:** Metadata und SHA3-256 Hashes für standardisierte CAP Proof-Pakete
+**Version:** cap-proof.v1.0
+**Format:**
+```json
+{
+  "version": "cap-proof.v1.0",
+  "created_at": "2025-10-30T...",
+  "files": {
+    "manifest": "manifest.json",
+    "proof": "proof.dat",
+    "timestamp": "timestamp.tsr",
+    "registry": "registry.json",
+    "report": "verification.report.json",
+    "readme": "README.txt"
+  },
+  "hashes": {
+    "manifest_sha3": "0x...",
+    "proof_sha3": "0x...",
+    "timestamp_sha3": "0x...",
+    "registry_sha3": "0x...",
+    "report_sha3": "0x..."
+  }
+}
+```
+**Felder:**
+- `version`: Package-Format-Version ("cap-proof.v1.0")
+- `created_at`: RFC3339 Timestamp der Package-Erstellung
+- `files`: Liste aller enthaltenen Dateien (optionale Felder können null sein)
+- `hashes`: SHA3-256 Hashes aller Dateien (0x-präfixiert, 64 Hex-Zeichen)
+
+**Verwendung:**
+```bash
+cargo run -- proof export --manifest build/manifest.json --proof build/zk_proof.dat --registry build/registry.json
+```
+
+**Zweck:**
+- Integritätsprüfung aller Package-Dateien
+- Versionskontrolle für Package-Format
+- Audit-Trail für Package-Erstellung
+- Maschinenlesbare Metadaten für automatisierte Verifikation
 
 ### `agent.audit.jsonl` (JSONL – Hash-Chain)
 ```jsonl
