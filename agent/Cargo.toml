@@ -21,3 +21,4 @@ ed25519-dalek = { version = "2.1", features = ["rand_core"] }
 rand = "0.8"
 base64 = "0.22"
 jsonschema = "0.17"
+rusqlite = { version = "0.31", features = ["bundled"] }

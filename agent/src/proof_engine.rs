@@ -224,6 +224,7 @@ impl Proof {
 ///
 /// # Rückgabe
 /// Result
+#[allow(dead_code)]
 pub fn export_proof_package<P: AsRef<Path>>(
     manifest: &Manifest,
     proof: &Proof,

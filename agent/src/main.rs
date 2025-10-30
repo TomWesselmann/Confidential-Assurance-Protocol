@@ -402,15 +402,23 @@ enum RegistryCommands {
         #[arg(long)]
         timestamp: Option<String>,
 
-        /// Registry-Datei (default: build/registry.json)
+        /// Registry-Datei (default: build/registry.json oder build/registry.sqlite)
         #[arg(long)]
         registry: Option<String>,
+
+        /// Registry-Backend (json|sqlite, default: json)
+        #[arg(long, default_value = "json")]
+        backend: String,
     },
     /// Listet alle Registry-Einträge auf
     List {
-        /// Registry-Datei (default: build/registry.json)
+        /// Registry-Datei (default: build/registry.json oder build/registry.sqlite)
         #[arg(long)]
         registry: Option<String>,
+
+        /// Registry-Backend (json|sqlite, default: json)
+        #[arg(long, default_value = "json")]
+        backend: String,
     },
     /// Verifiziert einen Proof gegen die Registry
     Verify {
@@ -422,9 +430,31 @@ enum RegistryCommands {
         #[arg(long)]
         proof: String,
 
-        /// Registry-Datei (default: build/registry.json)
+        /// Registry-Datei (default: build/registry.json oder build/registry.sqlite)
         #[arg(long)]
         registry: Option<String>,
+
+        /// Registry-Backend (json|sqlite, default: json)
+        #[arg(long, default_value = "json")]
+        backend: String,
+    },
+    /// Migriert Registry zwischen Backends
+    Migrate {
+        /// Quell-Backend (json|sqlite)
+        #[arg(long)]
+        from: String,
+
+        /// Quell-Datei
+        #[arg(long)]
+        input: String,
+
+        /// Ziel-Backend (json|sqlite)
+        #[arg(long)]
+        to: String,
+
+        /// Ziel-Datei
+        #[arg(long)]
+        output: String,
     },
 }
 
@@ -1556,10 +1586,28 @@ fn run_registry_add(
     proof_path: &str,
     timestamp_path: Option<String>,
     registry_path: Option<String>,
+    backend_str: &str,
 ) -> Result<(), Box<dyn Error>> {
+    use registry::RegistryBackend;
+
     println!("📝 Füge Proof zur Registry hinzu...");
 
-    let registry_file = registry_path.unwrap_or_else(|| "build/registry.json".to_string());
+    // Parse backend
+    let backend = match backend_str {
+        "sqlite" => RegistryBackend::Sqlite,
+        _ => RegistryBackend::Json,
+    };
+
+    // Determine registry file
+    let registry_file = registry_path.unwrap_or_else(|| match backend {
+        RegistryBackend::Json => "build/registry.json".to_string(),
+        RegistryBackend::Sqlite => "build/registry.sqlite".to_string(),
+    });
+
+    println!("   Backend:        {}", backend_str);
+
+    // Open store
+    let store = registry::open_store(backend, std::path::Path::new(&registry_file))?;
 
     // Berechne Hashes
     let manifest_hash = registry::compute_file_hash(manifest_path)?;
@@ -1568,18 +1616,21 @@ fn run_registry_add(
     println!("   Manifest-Hash:  {}", manifest_hash);
     println!("   Proof-Hash:     {}", proof_hash);
 
-    // Lade oder erstelle Registry
-    let mut registry = if std::path::Path::new(&registry_file).exists() {
-        registry::Registry::load(&registry_file)?
-    } else {
-        registry::Registry::new()
+    // Load current registry to get next ID
+    let current_reg = store.load()?;
+    let id = format!("proof_{:03}", current_reg.entries.len() + 1);
+
+    // Create entry
+    let entry = registry::RegistryEntry {
+        id: id.clone(),
+        manifest_hash: manifest_hash.clone(),
+        proof_hash: proof_hash.clone(),
+        timestamp_file: timestamp_path.clone(),
+        registered_at: chrono::Utc::now().to_rfc3339(),
     };
 
-    // Füge Eintrag hinzu
-    let id = registry.add_entry(manifest_hash.clone(), proof_hash.clone(), timestamp_path.clone());
-
-    // Speichere Registry
-    registry.save(&registry_file)?;
+    // Add entry
+    store.add_entry(entry)?;
 
     // Log Audit-Event
     let mut audit = AuditLog::new("build/agent.audit.jsonl")?;
@@ -1590,21 +1641,38 @@ fn run_registry_add(
             "manifest_hash": manifest_hash,
             "proof_hash": proof_hash,
             "timestamp_file": timestamp_path,
-            "registry_file": registry_file
+            "registry_file": registry_file,
+            "backend": backend_str
         }),
     )?;
 
+    let total = store.list()?.len();
     println!("✅ Proof zur Registry hinzugefügt:");
     println!("   ID:             {}", id);
     println!("   Registry:       {}", registry_file);
-    println!("   Einträge total: {}", registry.count());
+    println!("   Einträge total: {}", total);
 
     Ok(())
 }
 
 /// Registry list - Listet alle Registry-Einträge auf
-fn run_registry_list(registry_path: Option<String>) -> Result<(), Box<dyn Error>> {
-    let registry_file = registry_path.unwrap_or_else(|| "build/registry.json".to_string());
+fn run_registry_list(
+    registry_path: Option<String>,
+    backend_str: &str,
+) -> Result<(), Box<dyn Error>> {
+    use registry::RegistryBackend;
+
+    // Parse backend
+    let backend = match backend_str {
+        "sqlite" => RegistryBackend::Sqlite,
+        _ => RegistryBackend::Json,
+    };
+
+    // Determine registry file
+    let registry_file = registry_path.unwrap_or_else(|| match backend {
+        RegistryBackend::Json => "build/registry.json".to_string(),
+        RegistryBackend::Sqlite => "build/registry.sqlite".to_string(),
+    });
 
     if !std::path::Path::new(&registry_file).exists() {
         println!("⚠️  Registry-Datei nicht gefunden: {}", registry_file);
@@ -1612,16 +1680,18 @@ fn run_registry_list(registry_path: Option<String>) -> Result<(), Box<dyn Error>
         return Ok(());
     }
 
-    let registry = registry::Registry::load(&registry_file)?;
+    // Open store and load entries
+    let store = registry::open_store(backend, std::path::Path::new(&registry_file))?;
+    let entries = store.list()?;
 
     println!("──────────────────────────────────────────────");
     println!("Proofs in local registry ({})", registry_file);
     println!("──────────────────────────────────────────────");
 
-    if registry.entries.is_empty() {
+    if entries.is_empty() {
         println!("   (keine Einträge)");
     } else {
-        for (idx, entry) in registry.entries.iter().enumerate() {
+        for (idx, entry) in entries.iter().enumerate() {
             println!(
                 "#{:<3} Manifest: {}…  Proof: {}…  Date: {}",
                 idx + 1,
@@ -1636,7 +1706,7 @@ fn run_registry_list(registry_path: Option<String>) -> Result<(), Box<dyn Error>
     }
 
     println!("──────────────────────────────────────────────");
-    println!("Total: {} Einträge", registry.count());
+    println!("Total: {} Einträge", entries.len());
 
     Ok(())
 }
@@ -1646,10 +1716,23 @@ fn run_registry_verify(
     manifest_path: &str,
     proof_path: &str,
     registry_path: Option<String>,
+    backend_str: &str,
 ) -> Result<(), Box<dyn Error>> {
+    use registry::RegistryBackend;
+
     println!("🔍 Verifiziere Proof gegen Registry...");
 
-    let registry_file = registry_path.unwrap_or_else(|| "build/registry.json".to_string());
+    // Parse backend
+    let backend = match backend_str {
+        "sqlite" => RegistryBackend::Sqlite,
+        _ => RegistryBackend::Json,
+    };
+
+    // Determine registry file
+    let registry_file = registry_path.unwrap_or_else(|| match backend {
+        RegistryBackend::Json => "build/registry.json".to_string(),
+        RegistryBackend::Sqlite => "build/registry.sqlite".to_string(),
+    });
 
     if !std::path::Path::new(&registry_file).exists() {
         println!("❌ Registry-Datei nicht gefunden: {}", registry_file);
@@ -1663,12 +1746,12 @@ fn run_registry_verify(
     println!("   Manifest-Hash:  {}", manifest_hash);
     println!("   Proof-Hash:     {}", proof_hash);
 
-    // Lade Registry
-    let registry = registry::Registry::load(&registry_file)?;
+    // Open store and find entry
+    let store = registry::open_store(backend, std::path::Path::new(&registry_file))?;
+    let entry_opt = store.find_by_hashes(&manifest_hash, &proof_hash)?;
 
     // Verifiziere
-    if registry.verify_entry(&manifest_hash, &proof_hash) {
-        let entry = registry.find_entry(&manifest_hash, &proof_hash).unwrap();
+    if let Some(entry) = entry_opt {
         println!("✅ Entry verified in registry");
         println!("   ID:             {}", entry.id);
         println!("   Registered:     {}", entry.registered_at);
@@ -1684,17 +1767,85 @@ fn run_registry_verify(
                 "manifest_hash": manifest_hash,
                 "proof_hash": proof_hash,
                 "registry_file": registry_file,
+                "backend": backend_str,
                 "status": "ok"
             }),
         )?;
 
         Ok(())
     } else {
+        let total = store.list()?.len();
         println!("❌ Hash mismatch or not registered");
         println!("   Registry:       {}", registry_file);
-        println!("   Einträge:       {}", registry.count());
+        println!("   Einträge:       {}", total);
         Err("Proof nicht in Registry gefunden".into())
     }
+}
+
+/// Registry migrate - Migriert Registry zwischen Backends
+fn run_registry_migrate(
+    from_backend_str: &str,
+    from_path: &str,
+    to_backend_str: &str,
+    to_path: &str,
+) -> Result<(), Box<dyn Error>> {
+    use registry::RegistryBackend;
+
+    println!("🔄 Migriere Registry...");
+    println!("   Von: {} ({})", from_path, from_backend_str);
+    println!("   Nach: {} ({})", to_path, to_backend_str);
+
+    // Parse backends
+    let from_backend = match from_backend_str {
+        "sqlite" => RegistryBackend::Sqlite,
+        "json" => RegistryBackend::Json,
+        _ => return Err(format!("Unbekanntes Backend: {}", from_backend_str).into()),
+    };
+
+    let to_backend = match to_backend_str {
+        "sqlite" => RegistryBackend::Sqlite,
+        "json" => RegistryBackend::Json,
+        _ => return Err(format!("Unbekanntes Backend: {}", to_backend_str).into()),
+    };
+
+    // Check source exists
+    if !std::path::Path::new(from_path).exists() {
+        return Err(format!("Quell-Registry nicht gefunden: {}", from_path).into());
+    }
+
+    // Open source store
+    let from_store = registry::open_store(from_backend, std::path::Path::new(from_path))?;
+
+    // Load all data
+    println!("   Lade Daten...");
+    let registry_data = from_store.load()?;
+    let entry_count = registry_data.entries.len();
+
+    // Open target store
+    let to_store = registry::open_store(to_backend, std::path::Path::new(to_path))?;
+
+    // Save all data
+    println!("   Schreibe {} Einträge...", entry_count);
+    to_store.save(&registry_data)?;
+
+    // Log Audit-Event
+    let mut audit = AuditLog::new("build/agent.audit.jsonl")?;
+    audit.log_event(
+        "registry_migrated",
+        json!({
+            "from_backend": from_backend_str,
+            "from_path": from_path,
+            "to_backend": to_backend_str,
+            "to_path": to_path,
+            "entries_migrated": entry_count
+        }),
+    )?;
+
+    println!("✅ Migration erfolgreich:");
+    println!("   Einträge:       {}", entry_count);
+    println!("   Ziel:           {}", to_path);
+
+    Ok(())
 }
 
 /// Manifest validate - Validiert ein Manifest gegen das JSON Schema
@@ -1987,13 +2138,21 @@ fn main() {
                 proof,
                 timestamp,
                 registry,
-            } => run_registry_add(manifest, proof, timestamp.clone(), registry.clone()),
-            RegistryCommands::List { registry } => run_registry_list(registry.clone()),
+                backend,
+            } => run_registry_add(manifest, proof, timestamp.clone(), registry.clone(), backend),
+            RegistryCommands::List { registry, backend } => run_registry_list(registry.clone(), backend),
             RegistryCommands::Verify {
                 manifest,
                 proof,
                 registry,
-            } => run_registry_verify(manifest, proof, registry.clone()),
+                backend,
+            } => run_registry_verify(manifest, proof, registry.clone(), backend),
+            RegistryCommands::Migrate {
+                from,
+                input,
+                to,
+                output,
+            } => run_registry_migrate(from, input, to, output),
         },
         Commands::Version => {
             run_version();

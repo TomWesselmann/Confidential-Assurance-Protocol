@@ -193,6 +193,27 @@ Der **LkSG Proof Agent** ist ein Rust-basiertes CLI-Tool für die Erzeugung und 
   - `show_audit_trail()` – Zeigt Audit-Event-Kette
 - **Output:** Verifikationsergebnisse (Konsole)
 
+#### `registry.rs` – Registry Store (Pluggable Backend)
+- **Funktion:** Pluggable Persistence-Layer für Proof-Registry mit JSON und SQLite Backends
+- **Trait:** `RegistryStore`
+  - `load()` – Lädt vollständige Registry
+  - `save()` – Speichert Registry
+  - `add_entry()` – Fügt einzelnen Entry hinzu
+  - `find_by_hashes()` – Sucht Entry nach Manifest- und Proof-Hash
+  - `list()` – Listet alle Entries auf
+- **Implementierungen:**
+  - `JsonRegistryStore` – JSON-basierte Speicherung (Standard, backward-compatible)
+  - `SqliteRegistryStore` – SQLite-basierte Speicherung (WAL mode, concurrent-safe)
+- **Backend Selection:**
+  - `RegistryBackend::Json` – Standard-Backend
+  - `RegistryBackend::Sqlite` – SQLite-Backend
+  - `open_store()` – Factory-Funktion zur Backend-Auswahl
+- **SQLite Schema:**
+  - `registry_meta` – Metadata (registry_version)
+  - `registry_entries` – Proof-Einträge mit Index auf (manifest_hash, proof_hash)
+- **Migration:** Vollständige Migration zwischen Backends via `registry migrate` Command
+- **Output:** `build/registry.json` oder `build/registry.sqlite`
+
 ---
 
 ## CLI-Kommandos
@@ -400,6 +421,56 @@ cargo run -- verifier extract --package build/proof_package
 cargo run -- verifier audit --package build/proof_package
 ```
 **Output:** Audit-Event-Anzahl + Tail-Digest
+
+---
+
+### Registry Commands (Pluggable Backend)
+
+#### `registry add` – Proof zur Registry hinzufügen
+```bash
+cargo run -- registry add \
+  --manifest build/manifest.json \
+  --proof build/proof.dat \
+  [--timestamp build/timestamp.tsr] \
+  [--registry build/registry.json] \
+  [--backend json|sqlite]
+```
+**Funktion:** Fügt einen Proof-Eintrag zur Registry hinzu
+**Backends:**
+- `json` (Standard) - Speichert Registry in JSON-Datei
+- `sqlite` - Speichert Registry in SQLite-Datenbank
+**Output:**
+- Registry-Eintrag mit ID, Manifest-Hash, Proof-Hash
+- Audit-Log-Eintrag
+
+#### `registry list` – Registry-Einträge auflisten
+```bash
+cargo run -- registry list \
+  [--registry build/registry.json] \
+  [--backend json|sqlite]
+```
+**Funktion:** Listet alle Registry-Einträge auf
+**Output:** Formatierte Liste mit Manifest-Hash, Proof-Hash, Datum
+
+#### `registry verify` – Proof gegen Registry verifizieren
+```bash
+cargo run -- registry verify \
+  --manifest build/manifest.json \
+  --proof build/proof.dat \
+  [--registry build/registry.json] \
+  [--backend json|sqlite]
+```
+**Funktion:** Verifiziert, ob ein Proof in der Registry registriert ist
+**Output:** Verifikationsergebnis (OK/FAIL) + Audit-Log-Eintrag
+
+#### `registry migrate` – Registry-Migration zwischen Backends
+```bash
+cargo run -- registry migrate \
+  --from json --input build/registry.json \
+  --to sqlite --output build/registry.sqlite
+```
+**Funktion:** Migriert Registry zwischen JSON und SQLite
+**Output:** Anzahl migrierter Einträge + Audit-Log-Eintrag
 
 ---
 
@@ -632,7 +703,7 @@ cargo run -- proof export --manifest build/manifest.json --proof build/zk_proof.
 ```bash
 cargo test
 ```
-**Ergebnis:** 26/26 Tests bestanden ✅
+**Ergebnis:** 53/53 Tests bestanden ✅
 
 **Tests pro Modul:**
 - `io::tests`: 2 Tests (CSV-Parsing)
@@ -699,6 +770,7 @@ build/
 | Serialisierung | serde + serde_json + serde_yaml + base64 |
 | CSV | csv v1.3 |
 | JSON Schema | jsonschema v0.17 (Draft 2020-12) |
+| SQLite | rusqlite v0.31 (bundled) |
 | Zeitformat | RFC3339 (UTC, chrono v0.4) |
 | Plattform | Offline, Cross-Platform (Linux/macOS/Windows) |
 | Netzwerk | Verboten (kein HTTP, kein API-Zugriff) |
@@ -711,7 +783,7 @@ build/
 - ✅ Alle Artefakte in `build/proof_package/` generiert
 - ✅ Proof-Pakete verifizierbar durch externes Verifier-Tool
 - ✅ CI-Pipeline grün (Build + Test + Clippy)
-- ✅ 26/26 Tests bestanden
+- ✅ 53/53 Tests bestanden
 - ✅ 0 Clippy-Warnings
 - ✅ Reproduzierbare Hashes & Proofs (deterministisch)
 - ✅ Dokumentation vollständig (CLAUDE.md)
