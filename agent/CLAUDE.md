@@ -214,6 +214,23 @@ Der **LkSG Proof Agent** ist ein Rust-basiertes CLI-Tool für die Erzeugung und 
 - **Migration:** Vollständige Migration zwischen Backends via `registry migrate` Command
 - **Output:** `build/registry.json` oder `build/registry.sqlite`
 
+#### `registry.rs` – Timestamp Provider (Pluggable Interface)
+- **Funktion:** Abstrahiertes Timestamp-Interface für mock und echte RFC3161 TSAs
+- **Trait:** `TimestampProvider`
+  - `create()` – Erstellt Timestamp für Audit-Tip
+  - `verify()` – Verifiziert Timestamp gegen Audit-Tip
+  - `name()` – Gibt Provider-Namen zurück
+- **Implementierungen:**
+  - `MockRfc3161Provider` – Lokaler Mock (SHA3-basiert, kein Netzwerk)
+  - `RealRfc3161Provider` – Stub für echte RFC3161 TSA (noch nicht implementiert)
+- **Provider Selection:**
+  - `ProviderKind::MockRfc3161` – Standard (bestehende Funktionalität)
+  - `ProviderKind::RealRfc3161 { tsa_url }` – Zukünftig für echte TSAs
+  - `make_provider()` – Factory-Funktion
+  - `provider_from_cli()` – Parser für CLI-Flags
+- **Architektur:** Vorbereitet für CLI-Integration (`--provider mock|rfc3161`)
+- **Output:** Timestamp-Struktur (tsr.v1)
+
 ---
 
 ## CLI-Kommandos

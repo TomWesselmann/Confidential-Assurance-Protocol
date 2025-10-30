@@ -223,6 +223,126 @@ impl Timestamp {
     }
 }
 
+// ============================================================================
+// Timestamp Provider Abstraction (Pluggable Interface)
+// ============================================================================
+
+/// Timestamp Provider Trait - allows pluggable timestamp sources
+#[allow(dead_code)]
+pub trait TimestampProvider {
+    /// Creates a timestamp for the given audit tip
+    fn create(&self, audit_tip_hex: &str) -> Result<Timestamp, Box<dyn Error>>;
+
+    /// Verifies a timestamp against an audit tip
+    fn verify(&self, audit_tip_hex: &str, ts: &Timestamp) -> Result<bool, Box<dyn Error>>;
+
+    /// Returns the provider name
+    fn name(&self) -> &'static str;
+}
+
+/// Provider kind selector
+#[derive(Debug, Clone)]
+#[allow(dead_code)]
+pub enum ProviderKind {
+    MockRfc3161,
+    RealRfc3161 { tsa_url: String },
+}
+
+/// Factory function to create a timestamp provider
+#[allow(dead_code)]
+pub fn make_provider(kind: ProviderKind) -> Box<dyn TimestampProvider> {
+    match kind {
+        ProviderKind::MockRfc3161 => Box::new(MockRfc3161Provider),
+        ProviderKind::RealRfc3161 { tsa_url } => Box::new(RealRfc3161Provider { tsa_url }),
+    }
+}
+
+/// Helper to parse provider from CLI string
+#[allow(dead_code)]
+pub fn provider_from_cli(kind: &str, tsa_url: Option<String>) -> ProviderKind {
+    match kind {
+        "rfc3161" => ProviderKind::RealRfc3161 {
+            tsa_url: tsa_url.unwrap_or_else(|| "https://freetsa.org/tsr".to_string()),
+        },
+        _ => ProviderKind::MockRfc3161,
+    }
+}
+
+// ============================================================================
+// Mock RFC3161 Provider (current behavior)
+// ============================================================================
+
+/// Mock RFC3161 Timestamp Provider
+#[allow(dead_code)]
+pub struct MockRfc3161Provider;
+
+impl TimestampProvider for MockRfc3161Provider {
+    fn create(&self, audit_tip_hex: &str) -> Result<Timestamp, Box<dyn Error>> {
+        let now = Utc::now().to_rfc3339();
+        let mut hasher = Sha3_256::new();
+        hasher.update(audit_tip_hex.as_bytes());
+        hasher.update(now.as_bytes());
+        let sig = hasher.finalize();
+        let signature = hex::encode(&sig[..]);
+
+        Ok(Timestamp {
+            version: "tsr.v1".to_string(),
+            audit_tip_hex: audit_tip_hex.to_string(),
+            created_at: now,
+            tsa: "local-mock".to_string(),
+            signature,
+            status: "ok".to_string(),
+        })
+    }
+
+    fn verify(&self, audit_tip_hex: &str, ts: &Timestamp) -> Result<bool, Box<dyn Error>> {
+        if ts.audit_tip_hex != audit_tip_hex {
+            return Ok(false);
+        }
+
+        // Verify mock signature
+        let mut hasher = Sha3_256::new();
+        hasher.update(ts.audit_tip_hex.as_bytes());
+        hasher.update(ts.created_at.as_bytes());
+        let expected_sig = hasher.finalize();
+        let expected_sig_hex = hex::encode(&expected_sig[..]);
+
+        Ok(ts.signature == expected_sig_hex && ts.status == "ok")
+    }
+
+    fn name(&self) -> &'static str {
+        "mock_rfc3161"
+    }
+}
+
+// ============================================================================
+// Real RFC3161 Provider (stub for future implementation)
+// ============================================================================
+
+/// Real RFC3161 Timestamp Provider (not yet implemented)
+#[allow(dead_code)]
+pub struct RealRfc3161Provider {
+    pub tsa_url: String,
+}
+
+impl TimestampProvider for RealRfc3161Provider {
+    fn create(&self, _audit_tip_hex: &str) -> Result<Timestamp, Box<dyn Error>> {
+        Err(format!(
+            "Real RFC3161 provider not yet implemented (tsa_url={}). Use --provider mock for now.",
+            self.tsa_url
+        )
+        .into())
+    }
+
+    fn verify(&self, _audit_tip_hex: &str, _ts: &Timestamp) -> Result<bool, Box<dyn Error>> {
+        Err("Real RFC3161 provider not yet implemented. Use --provider mock for now.".into())
+    }
+
+    fn name(&self) -> &'static str {
+        "real_rfc3161"
+    }
+}
+
 /// Verifiziert, ob ein Manifest- und Proof-Hash in einer Registry-Datei existiert
 ///
 /// # Argumente
