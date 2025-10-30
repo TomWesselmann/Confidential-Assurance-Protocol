@@ -7,6 +7,9 @@ use std::fs::File;
 use std::io::{BufRead, BufReader, Write};
 use std::path::Path;
 
+/// Manifest Schema Version (JSON Schema Draft 2020-12)
+pub const MANIFEST_SCHEMA_VERSION: &str = "manifest.v1.0";
+
 /// Audit-Informationen für Manifest
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AuditInfo {
@@ -82,7 +85,7 @@ impl Manifest {
         let (tail_digest, events_count) = Self::read_audit_tail(audit_log_path)?;
 
         Ok(Manifest {
-            version: "manifest.v0".to_string(),
+            version: MANIFEST_SCHEMA_VERSION.to_string(),
             created_at: Utc::now().to_rfc3339(),
             supplier_root: commitments.supplier_root.clone(),
             ubo_root: commitments.ubo_root.clone(),
@@ -247,7 +250,7 @@ mod tests {
 
         let manifest = Manifest::build(&commitments, policy_info, temp_audit).unwrap();
 
-        assert_eq!(manifest.version, "manifest.v0");
+        assert_eq!(manifest.version, "manifest.v1.0");
         assert_eq!(manifest.supplier_root, "0xabc");
         assert_eq!(manifest.proof.proof_type, "none");
 
@@ -257,7 +260,7 @@ mod tests {
     #[test]
     fn test_manifest_update_proof() {
         let mut manifest = Manifest {
-            version: "manifest.v0".to_string(),
+            version: "manifest.v1.0".to_string(),
             created_at: "2025-10-25T10:00:00Z".to_string(),
             supplier_root: "0xabc".to_string(),
             ubo_root: "0xdef".to_string(),
@@ -291,7 +294,7 @@ mod tests {
         let temp_path = "/tmp/test_manifest_anchor.json";
 
         let mut manifest = Manifest {
-            version: "manifest.v0".to_string(),
+            version: "manifest.v1.0".to_string(),
             created_at: "2025-10-29T10:00:00Z".to_string(),
             supplier_root: "0xabc".to_string(),
             ubo_root: "0xdef".to_string(),

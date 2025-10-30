@@ -101,6 +101,16 @@ enum ManifestCommands {
         #[arg(long)]
         out: Option<String>,
     },
+    /// Validiert ein Manifest gegen das JSON Schema
+    Validate {
+        /// Pfad zur Manifest-Datei
+        #[arg(long)]
+        file: String,
+
+        /// Pfad zur Schema-Datei (default: docs/manifest.schema.json)
+        #[arg(long)]
+        schema: Option<String>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -1465,6 +1475,62 @@ fn run_registry_verify(
     }
 }
 
+/// Manifest validate - Validiert ein Manifest gegen das JSON Schema
+fn run_manifest_validate(
+    manifest_path: &str,
+    schema_path: Option<String>,
+) -> Result<(), Box<dyn Error>> {
+    println!("🔍 Validiere Manifest gegen JSON Schema...");
+
+    // Default schema path
+    let schema_file = schema_path.unwrap_or_else(|| "docs/manifest.schema.json".to_string());
+
+    // Load manifest JSON
+    let manifest_content = std::fs::read_to_string(manifest_path)?;
+    let manifest_json: serde_json::Value = serde_json::from_str(&manifest_content)?;
+
+    // Load schema JSON
+    let schema_content = std::fs::read_to_string(&schema_file)?;
+    let schema_json: serde_json::Value = serde_json::from_str(&schema_content)?;
+
+    // Compile schema (Draft 2020-12)
+    use jsonschema::JSONSchema;
+    let compiled = JSONSchema::options()
+        .compile(&schema_json)
+        .map_err(|e| format!("Schema compilation failed: {}", e))?;
+
+    // Validate
+    if compiled.is_valid(&manifest_json) {
+        println!("✅ Manifest ist gültig gemäß Schema {}", schema_file);
+        println!("   Manifest: {}", manifest_path);
+        println!("   Schema:   {}", schema_file);
+
+        // Log audit event
+        let mut audit = AuditLog::new("build/agent.audit.jsonl")?;
+        audit.log_event(
+            "manifest_validated",
+            json!({
+                "manifest_file": manifest_path,
+                "schema_file": schema_file,
+                "status": "valid"
+            }),
+        )?;
+
+        Ok(())
+    } else {
+        println!("❌ Manifest-Validierung fehlgeschlagen:");
+
+        // Collect errors
+        if let Err(errors) = compiled.validate(&manifest_json) {
+            for (i, error) in errors.enumerate() {
+                eprintln!("   Fehler #{}: {}", i + 1, error);
+            }
+        }
+
+        Err("Manifest validation failed".into())
+    }
+}
+
 /// Zeigt die Version an
 fn run_version() {
     println!("cap-agent v{}", VERSION);
@@ -1482,6 +1548,9 @@ fn main() {
         Commands::Manifest(cmd) => match cmd {
             ManifestCommands::Build { policy, out } => {
                 run_manifest_build(policy, out.clone())
+            }
+            ManifestCommands::Validate { file, schema } => {
+                run_manifest_validate(file, schema.clone())
             }
         },
         Commands::Proof(cmd) => match cmd {

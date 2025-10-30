@@ -4,9 +4,9 @@
 
 Der **LkSG Proof Agent** ist ein Rust-basiertes CLI-Tool für die Erzeugung und Verifikation von kryptographischen Nachweisen im Kontext des deutschen Lieferkettensorgfaltspflichtengesetzes (LkSG).
 
-**Version:** 0.3.0
-**Status:** Tag 3 MVP (Proof & Verifier Layer) – Vollständig implementiert
-**Entwicklung:** Tag 1 (Commitment Engine) + Tag 2 (Policy Layer) + Tag 3 (Proof Layer)
+**Version:** 0.6.0
+**Status:** Tag 3 MVP (Proof & Verifier Layer) + Manifest Schema Validation v1.0 – Vollständig implementiert
+**Entwicklung:** Tag 1 (Commitment Engine) + Tag 2 (Policy Layer) + Tag 3 (Proof Layer) + Manifest Schema Validation
 
 ---
 
@@ -121,7 +121,7 @@ Der **LkSG Proof Agent** ist ein Rust-basiertes CLI-Tool für die Erzeugung und 
 - **Struktur:**
   ```json
   {
-    "version": "manifest.v0",
+    "version": "manifest.v1.0",
     "created_at": "2025-10-25T...",
     "supplier_root": "0x...",
     "ubo_root": "0x...",
@@ -235,6 +235,19 @@ cargo run -- manifest build --policy examples/policy.lksg.v1.yml
 ```
 **Voraussetzung:** `build/commitments.json` muss existieren
 **Output:** `build/manifest.json`
+
+#### `manifest validate` – Manifest-Validierung
+```bash
+cargo run -- manifest validate --file build/manifest.json
+```
+**Funktion:** Validiert ein Manifest gegen das JSON Schema Draft 2020-12
+**Voraussetzung:** `docs/manifest.schema.json` (wird automatisch verwendet)
+**Optionen:**
+- `--file` - Pfad zur Manifest-Datei (erforderlich)
+- `--schema` - Optionaler Pfad zum Schema (Standard: `docs/manifest.schema.json`)
+**Output:**
+- ✅ Validierung erfolgreich + Audit-Log-Eintrag
+- ❌ Validierung fehlgeschlagen + Liste der Fehler
 
 #### `sign keygen` – Schlüsselerzeugung
 ```bash
@@ -365,10 +378,10 @@ cargo run -- verifier audit --package build/proof_package
 }
 ```
 
-### `manifest.json` (manifest.v0)
+### `manifest.json` (manifest.v1.0)
 ```json
 {
-  "version": "manifest.v0",
+  "version": "manifest.v1.0",
   "created_at": "2025-10-25T13:07:41.027357+00:00",
   "supplier_root": "0x...",
   "ubo_root": "0x...",
@@ -421,6 +434,27 @@ cargo run -- verifier audit --package build/proof_package
   "signer_pubkey": "0x...",
   "signed_at": "2025-10-25T..."
 }
+```
+
+### `docs/manifest.schema.json` (JSON Schema Draft 2020-12)
+**Funktion:** Formale JSON-Schema-Validierung für Manifeste (manifest.v1.0)
+**Standard:** JSON Schema Draft 2020-12
+**Validierungsregeln:**
+- `version`: Muss exakt "manifest.v1.0" sein
+- `created_at`: RFC3339 DateTime-Format
+- `supplier_root`, `ubo_root`, `company_commitment_root`: BLAKE3-Hashes (0x + 64 Hex-Zeichen)
+- `policy.version`: Pattern `^[a-z0-9\\.]+$` (z.B. "lksg.v1")
+- `policy.hash`: SHA3-256 Hash (0x + 64 Hex-Zeichen)
+- `audit.tail_digest`: SHA3-256 Hash (0x + 64 Hex-Zeichen)
+- `audit.events_count`: Integer ≥ 0
+- `proof.type`: Enum ["none", "mock", "zk", "halo2", "spartan", "risc0"]
+- `proof.status`: Enum ["none", "ok", "failed"]
+- `signatures`: Array von Ed25519-Signaturen
+- `time_anchor` (optional): TSA/Blockchain/File-Zeitstempel
+
+**Verwendung:**
+```bash
+cargo run -- manifest validate --file build/manifest.json --schema docs/manifest.schema.json
 ```
 
 ### `agent.audit.jsonl` (JSONL – Hash-Chain)
@@ -517,6 +551,7 @@ build/
 | Signatur | ed25519-dalek v2.1 |
 | Serialisierung | serde + serde_json + serde_yaml + base64 |
 | CSV | csv v1.3 |
+| JSON Schema | jsonschema v0.17 (Draft 2020-12) |
 | Zeitformat | RFC3339 (UTC, chrono v0.4) |
 | Plattform | Offline, Cross-Platform (Linux/macOS/Windows) |
 | Netzwerk | Verboten (kein HTTP, kein API-Zugriff) |

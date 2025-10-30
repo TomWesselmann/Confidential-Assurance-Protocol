@@ -204,7 +204,7 @@ mod tests {
     #[test]
     fn test_sign_and_verify() {
         let manifest = Manifest {
-            version: "manifest.v0".to_string(),
+            version: "manifest.v1.0".to_string(),
             created_at: "2025-10-25T10:00:00Z".to_string(),
             supplier_root: "0xabc".to_string(),
             ubo_root: "0xdef".to_string(),
@@ -244,7 +244,7 @@ mod tests {
     #[test]
     fn test_verify_fails_with_wrong_key() {
         let manifest = Manifest {
-            version: "manifest.v0".to_string(),
+            version: "manifest.v1.0".to_string(),
             created_at: "2025-10-25T10:00:00Z".to_string(),
             supplier_root: "0xabc".to_string(),
             ubo_root: "0xdef".to_string(),
