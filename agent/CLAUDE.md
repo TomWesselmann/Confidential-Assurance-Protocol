@@ -4,9 +4,9 @@
 
 Der **LkSG Proof Agent** ist ein Rust-basiertes CLI-Tool für die Erzeugung und Verifikation von kryptographischen Nachweisen im Kontext des deutschen Lieferkettensorgfaltspflichtengesetzes (LkSG).
 
-**Version:** 0.7.1
-**Status:** Tag 3 MVP (Proof & Verifier Layer) + Manifest Schema Validation v1.0 + Complete Verifier CLI + Standardized Proof Export v1.0 + Registry SQLite Adapter v1.0 + SQLite Edge-Case Tests – Vollständig implementiert
-**Entwicklung:** Tag 1 (Commitment Engine) + Tag 2 (Policy Layer) + Tag 3 (Proof Layer) + Manifest Schema Validation + Complete Verifier CLI + Standardized Proof Export + Registry SQLite Backend
+**Version:** 0.6.1
+**Status:** Tag 3 MVP (Proof & Verifier Layer) + Manifest Schema Validation v1.0 + Complete Verifier CLI + Standardized Proof Export v1.0 + Registry SQLite Adapter v1.0 + SQLite Edge-Case Tests + ZK Backend Abstraction – Vollständig implementiert
+**Entwicklung:** Tag 1 (Commitment Engine) + Tag 2 (Policy Layer) + Tag 3 (Proof Layer) + Manifest Schema Validation + Complete Verifier CLI + Standardized Proof Export + Registry SQLite Backend + ZK Backend Abstraction
 
 ---
 
@@ -230,6 +230,25 @@ Der **LkSG Proof Agent** ist ein Rust-basiertes CLI-Tool für die Erzeugung und 
   - `provider_from_cli()` – Parser für CLI-Flags
 - **Architektur:** Vorbereitet für CLI-Integration (`--provider mock|rfc3161`)
 - **Output:** Timestamp-Struktur (tsr.v1)
+
+#### `zk_system.rs` – ZK Backend Abstraction (Pluggable Interface)
+- **Funktion:** Abstrahierte ZK-Backend-Auswahl für Mock und zukünftige echte ZK-Systeme
+- **Trait:** `ProofSystem`
+  - `prove()` – Erstellt ZK-Proof aus Statement und Witness
+  - `verify()` – Verifiziert ZK-Proof
+  - `name()` – Gibt Backend-Namen zurück
+- **Backend Enum:** `ZkBackend`
+  - `Mock` – SimplifiedZK (bestehende Implementierung)
+  - `ZkVm` – Placeholder für RISC Zero (noch nicht implementiert)
+  - `Halo2` – Placeholder für Halo2 (noch nicht implementiert)
+- **Factory Funktionen:**
+  - `backend_factory()` – Erstellt Backend-Instanz aus ZkBackend-Enum
+  - `backend_from_cli()` – Parser für CLI-String ("mock", "zkvm", "halo2")
+- **Implementierungen:**
+  - `SimplifiedZK` – Mock-Backend (bestehende Funktionalität)
+  - `NotImplementedZk` – Stub für zukünftige Backends (liefert "not implemented" Fehler)
+- **Architektur:** Vorbereitet für CLI-Integration (`--backend mock|zkvm|halo2`)
+- **Output:** ZkProof-Struktur (proof.v0)
 
 ---
 
@@ -720,7 +739,7 @@ cargo run -- proof export --manifest build/manifest.json --proof build/zk_proof.
 ```bash
 cargo test
 ```
-**Ergebnis:** 58/58 Tests bestanden ✅ (53 Unit + 5 Integration)
+**Ergebnis:** 61/61 Tests bestanden ✅ (53 Unit + 5 SQLite Integration + 3 ZK Backend Architecture)
 
 **Tests pro Modul:**
 - `io::tests`: 2 Tests (CSV-Parsing)
@@ -733,6 +752,7 @@ cargo test
 - `verifier::tests`: 3 Tests (Integrity-Check, Package-Summary)
 - `sign::tests`: 3 Tests (Keypair-Generation, Sign & Verify)
 - `test_registry_sqlite`: 5 Tests (Corruption, Migration, Duplicates, WAL, Roundtrip)
+- `test_zk_backend`: 3 Tests (Architecture exists, CLI readiness, Integration path)
 
 ### Clippy (Lint-Check)
 ```bash
@@ -801,7 +821,7 @@ build/
 - ✅ Alle Artefakte in `build/proof_package/` generiert
 - ✅ Proof-Pakete verifizierbar durch externes Verifier-Tool
 - ✅ CI-Pipeline grün (Build + Test + Clippy)
-- ✅ 58/58 Tests bestanden
+- ✅ 61/61 Tests bestanden
 - ✅ 0 Clippy-Warnings
 - ✅ Reproduzierbare Hashes & Proofs (deterministisch)
 - ✅ Dokumentation vollständig (CLAUDE.md)
@@ -845,5 +865,5 @@ build/
 
 **Dokumentation erstellt:** 2025-10-25
 **Letzte Aktualisierung:** 2025-10-30
-**Version:** v0.7.1 (Registry SQLite Adapter + Edge-Case Tests)
+**Version:** v0.6.1 (ZK Backend Abstraction)
 **Autor:** Claude Code (Anthropic)

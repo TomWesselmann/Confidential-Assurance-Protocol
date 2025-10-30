@@ -82,6 +82,88 @@ pub trait ProofSystem {
     fn name(&self) -> &str;
 }
 
+// ============================================================================
+// ZK Backend Abstraction (Pluggable Interface)
+// ============================================================================
+
+/// ZK Backend selector enum
+#[allow(dead_code)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ZkBackend {
+    /// Mock/Simplified ZK (current implementation)
+    Mock,
+    /// ZK-VM backend (e.g., RISC Zero) - not yet implemented
+    ZkVm,
+    /// Halo2 backend - not yet implemented
+    Halo2,
+}
+
+/// Factory function to create a ZK backend
+#[allow(dead_code)]
+pub fn backend_factory(kind: ZkBackend) -> Box<dyn ProofSystem> {
+    match kind {
+        ZkBackend::Mock => Box::new(SimplifiedZK::new()),
+        ZkBackend::ZkVm => Box::new(NotImplementedZk::new("zkvm")),
+        ZkBackend::Halo2 => Box::new(NotImplementedZk::new("halo2")),
+    }
+}
+
+/// Parse backend from CLI string
+#[allow(dead_code)]
+pub fn backend_from_cli(backend_str: &str) -> Result<ZkBackend, Box<dyn Error>> {
+    match backend_str.to_lowercase().as_str() {
+        "mock" => Ok(ZkBackend::Mock),
+        "zkvm" | "zk-vm" | "risc0" => Ok(ZkBackend::ZkVm),
+        "halo2" => Ok(ZkBackend::Halo2),
+        _ => Err(format!("Unknown ZK backend: '{}'. Available: mock, zkvm, halo2", backend_str).into()),
+    }
+}
+
+// ============================================================================
+// Not Implemented Backend Stub
+// ============================================================================
+
+/// Placeholder backend for future implementations
+#[allow(dead_code)]
+pub struct NotImplementedZk {
+    label: String,
+}
+
+#[allow(dead_code)]
+impl NotImplementedZk {
+    pub fn new(label: &str) -> Self {
+        Self {
+            label: label.to_string(),
+        }
+    }
+}
+
+impl ProofSystem for NotImplementedZk {
+    fn prove(&self, _statement: &Statement, _witness: &Witness) -> Result<ZkProof, Box<dyn Error>> {
+        Err(format!(
+            "ZK backend '{}' is not yet implemented. Use --backend mock for now.",
+            self.label
+        )
+        .into())
+    }
+
+    fn verify(&self, _proof: &ZkProof) -> Result<bool, Box<dyn Error>> {
+        Err(format!(
+            "ZK backend '{}' is not yet implemented. Use --backend mock for now.",
+            self.label
+        )
+        .into())
+    }
+
+    fn name(&self) -> &str {
+        &self.label
+    }
+}
+
+// ============================================================================
+// Simplified ZK Backend (Mock implementation)
+// ============================================================================
+
 /// Simplified ZK-Backend
 /// Mock-Implementierung für MVP, kann später durch echte ZK-Library ersetzt werden
 pub struct SimplifiedZK {
