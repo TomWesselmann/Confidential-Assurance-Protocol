@@ -70,7 +70,9 @@ fn test_build_minimal_bundle_ok() {
     // Create bundle via CLI
     let output = std::process::Command::new("cargo")
         .args(&[
-            "run",
+            "run", "--bin", "cap-agent",
+            "--bin",
+            "cap-agent",
             "--",
             "bundle-v2",
             "--manifest",
@@ -135,7 +137,9 @@ fn test_bundle_exists_without_force_fails() {
     // Try to create again WITHOUT --force (should fail)
     let output = std::process::Command::new("cargo")
         .args(&[
-            "run",
+            "run", "--bin", "cap-agent",
+            "--bin",
+            "cap-agent",
             "--",
             "bundle-v2",
             "--manifest",
@@ -181,7 +185,9 @@ fn test_tamper_manifest_detected() {
     fs::remove_dir_all(&bundle_path).ok();
     let output = std::process::Command::new("cargo")
         .args(&[
-            "run",
+            "run", "--bin", "cap-agent",
+            "--bin",
+            "cap-agent",
             "--",
             "bundle-v2",
             "--manifest",
@@ -288,7 +294,9 @@ fn test_bundle_structure_complete() {
     fs::remove_dir_all(&bundle_path).ok();
     std::process::Command::new("cargo")
         .args(&[
-            "run",
+            "run", "--bin", "cap-agent",
+            "--bin",
+            "cap-agent",
             "--",
             "bundle-v2",
             "--manifest",

@@ -53,7 +53,7 @@ fn cli_set_private_anchor_ok() {
     // Run CLI command
     let output = Command::new("cargo")
         .args([
-            "run",
+            "run", "--bin", "cap-agent",
             "--",
             "audit",
             "set-private-anchor",
@@ -95,7 +95,7 @@ fn cli_set_private_anchor_mismatch_fails() {
     // Try to set private anchor with wrong_tip (should fail)
     let output = Command::new("cargo")
         .args([
-            "run",
+            "run", "--bin", "cap-agent",
             "--",
             "audit",
             "set-private-anchor",
@@ -136,7 +136,7 @@ fn cli_set_public_anchor_ethereum_ok() {
     // Run CLI command
     let output = Command::new("cargo")
         .args([
-            "run",
+            "run", "--bin", "cap-agent",
             "--",
             "audit",
             "set-public-anchor",
@@ -182,7 +182,7 @@ fn cli_verify_anchor_ok() {
     // Set private anchor
     Command::new("cargo")
         .args([
-            "run",
+            "run", "--bin", "cap-agent",
             "--",
             "audit",
             "set-private-anchor",
@@ -197,7 +197,7 @@ fn cli_verify_anchor_ok() {
     // Set public anchor
     Command::new("cargo")
         .args([
-            "run",
+            "run", "--bin", "cap-agent",
             "--",
             "audit",
             "set-public-anchor",
@@ -216,7 +216,7 @@ fn cli_verify_anchor_ok() {
     // Verify dual-anchor
     let output = Command::new("cargo")
         .args([
-            "run",
+            "run", "--bin", "cap-agent",
             "--",
             "audit",
             "verify-anchor",

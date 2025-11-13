@@ -10,7 +10,7 @@ use std::time::Duration;
 /// Helper: Start REST API server in background
 fn start_test_server() -> std::process::Child {
     let child = Command::new("cargo")
-        .args(["run", "--bin", "cap-verifier-api"])
+        .args(["run", "--bin", "cap-agent", "--bin", "cap-verifier-api"])
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .spawn()
@@ -27,7 +27,7 @@ fn generate_mock_token() -> String {
     // For testing, we'll use a simple mock token
     // In production, this would come from an OAuth2 provider
     let output = Command::new("cargo")
-        .args(["run", "--example", "generate_mock_token"])
+        .args(["run", "--bin", "cap-agent", "--example", "generate_mock_token"])
         .output()
         .expect("Failed to generate mock token");
 
