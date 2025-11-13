@@ -1,0 +1,52 @@
+# Development Environment Values
+
+replicaCount: 1
+
+image:
+  tag: "dev-latest"
+  pullPolicy: Always
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 256Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+autoscaling:
+  enabled: false
+
+ingress:
+  enabled: true
+  hosts:
+    - host: cap-verifier-dev.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: cap-verifier-dev-tls
+      hosts:
+        - cap-verifier-dev.local
+
+features:
+  allow_embedded_ir: true
+  require_mtls: false
+  enable_prometheus_metrics: true
+
+oauth2:
+  enabled: false  # Use mock auth in dev
+
+tls:
+  enabled: false
+
+rateLimit:
+  enabled: false  # No rate limiting in dev
+
+env:
+  - name: RUST_LOG
+    value: "debug,hyper=info,tokio=info"
+  - name: RUST_BACKTRACE
+    value: "1"
+  - name: ENVIRONMENT
+    value: "development"

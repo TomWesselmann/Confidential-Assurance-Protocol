@@ -1,0 +1,17 @@
+apiVersion: v2
+name: cap-verifier
+description: CAP Verifier REST API - Production-Ready Deployment
+type: application
+version: 1.0.0
+appVersion: "0.11.0"
+keywords:
+  - lksg
+  - compliance
+  - supply-chain
+  - verifier
+home: https://github.com/yourorg/cap-agent
+sources:
+  - https://github.com/yourorg/cap-agent
+maintainers:
+  - name: CAP Team
+    email: cap-team@example.com

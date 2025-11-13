@@ -1,0 +1,132 @@
+name: Policy Compiler CI
+
+on:
+  push:
+    paths:
+      - 'src/policy_v2/**'
+      - 'schemas/**'
+      - 'examples/lksg_v1.*'
+      - 'tests/golden_ir.rs'
+      - '.github/workflows/policy-compiler.yml'
+  pull_request:
+    paths:
+      - 'src/policy_v2/**'
+      - 'schemas/**'
+      - 'examples/lksg_v1.*'
+      - 'tests/golden_ir.rs'
+
+jobs:
+  build-test:
+    name: Build and Test Policy Compiler
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Cache cargo registry
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-registry-
+
+      - name: Cache cargo index
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-git-
+
+      - name: Cache cargo build
+        uses: actions/cache@v3
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-build-
+
+      - name: Build library
+        run: cargo build --lib --locked
+
+      - name: Run policy_v2 unit tests
+        run: cargo test --lib policy_v2 --no-fail-fast
+
+      - name: Run golden file tests
+        run: cargo test --test golden_ir --no-fail-fast
+
+      - name: Check golden file integrity
+        run: |
+          # Ensure golden files haven't changed
+          git diff --exit-code examples/lksg_v1.ir.json || {
+            echo "❌ Golden file has changed! Run 'UPDATE_GOLDEN=1 cargo test test_golden_ir_lksg_v1' to update."
+            exit 1
+          }
+
+      - name: Run clippy (policy_v2 only)
+        run: cargo clippy --lib -- -D warnings -A clippy::all -W clippy::correctness -W clippy::suspicious
+
+      - name: Test CLI commands
+        run: |
+          cargo build --bin cap-agent
+
+          # Test lint
+          ./target/debug/cap-agent policy lint examples/lksg_v1.policy.yml --strict
+
+          # Test compile
+          ./target/debug/cap-agent policy compile examples/lksg_v1.policy.yml -o /tmp/test.ir.json
+
+          # Test show
+          ./target/debug/cap-agent policy show /tmp/test.ir.json
+
+          # Verify hash matches golden file
+          IR_HASH=$(jq -r '.ir_hash' /tmp/test.ir.json)
+          GOLDEN_HASH=$(jq -r '.ir_hash' examples/lksg_v1.ir.json)
+
+          if [ "$IR_HASH" != "$GOLDEN_HASH" ]; then
+            echo "❌ IR hash mismatch!"
+            echo "Generated: $IR_HASH"
+            echo "Golden: $GOLDEN_HASH"
+            exit 1
+          fi
+
+          echo "✅ All CLI tests passed"
+
+  coverage:
+    name: Test Coverage
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-tarpaulin
+        run: cargo install cargo-tarpaulin
+
+      - name: Generate coverage report
+        run: |
+          cargo tarpaulin \
+            --out Xml \
+            --output-dir coverage \
+            --lib \
+            --exclude-files 'src/main.rs' \
+            --exclude-files 'src/bin/*' \
+            -- --test-threads=1
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage/cobertura.xml
+          flags: policy_v2
+          name: policy-compiler-coverage
+          fail_ci_if_error: false

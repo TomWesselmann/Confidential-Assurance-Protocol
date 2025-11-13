@@ -34,13 +34,45 @@ pub struct SignatureInfo {
     pub sig_hex: String,
 }
 
-/// Zeitanker für externe Timestamps
+/// Private Anchor (lokaler Audit-Tip)
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+pub struct TimeAnchorPrivate {
+    pub audit_tip_hex: String,  // 0x-prefixed SHA3-256 hash
+    pub created_at: String,     // RFC3339 Timestamp
+}
+
+/// Public Chain Enum für Blockchain-Anker
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum PublicChain {
+    Ethereum,
+    Hedera,
+    #[serde(rename = "btc")]
+    Btc,
+}
+
+/// Public Anchor (öffentlicher Ledger-Verweis)
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+pub struct TimeAnchorPublic {
+    pub chain: PublicChain,
+    pub txid: String,           // Transaction ID (format depends on chain)
+    pub digest: String,         // 0x-prefixed hash of audit_tip for on-chain notarization
+    pub created_at: String,     // RFC3339 Timestamp
+}
+
+/// Zeitanker für externe Timestamps (Dual-Anchor Support v0.9.0)
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TimeAnchor {
-    pub kind: String,           // "tsa", "blockchain", "file"
+    pub kind: String,           // "tsa", "blockchain", "file", "none"
     pub reference: String,       // Pfad, TxID oder URI
     pub audit_tip_hex: String,  // Audit-Chain-Tip zum Zeitpunkt des Anchors
     pub created_at: String,     // RFC3339 Timestamp
+
+    // Dual-Anchor Fields (v0.9.0, optional, additive)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub private: Option<TimeAnchorPrivate>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub public: Option<TimeAnchorPublic>,
 }
 
 /// Manifest-Datenstruktur
@@ -181,7 +213,103 @@ impl Manifest {
             reference,
             audit_tip_hex,
             created_at: Utc::now().to_rfc3339(),
+            private: None,
+            public: None,
         });
+    }
+
+    /// Setzt den Private Anchor (Dual-Anchor v0.9.0)
+    ///
+    /// # Argumente
+    /// * `audit_tip_hex` - Audit-Chain-Tip (0x-prefixed)
+    /// * `created_at` - RFC3339 Timestamp (optional, None = jetzt)
+    ///
+    /// # Errors
+    /// Returns error if time_anchor is not initialized or if audit_tip doesn't match
+    pub fn set_private_anchor(&mut self, audit_tip_hex: String, created_at: Option<String>) -> Result<(), Box<dyn Error>> {
+        let anchor = self.time_anchor.as_mut()
+            .ok_or("time_anchor must be initialized before setting private anchor")?;
+
+        // Consistency check: private.audit_tip_hex must match time_anchor.audit_tip_hex
+        if audit_tip_hex != anchor.audit_tip_hex {
+            return Err(format!(
+                "Private audit_tip_hex ({}) does not match time_anchor.audit_tip_hex ({})",
+                audit_tip_hex, anchor.audit_tip_hex
+            ).into());
+        }
+
+        anchor.private = Some(TimeAnchorPrivate {
+            audit_tip_hex,
+            created_at: created_at.unwrap_or_else(|| Utc::now().to_rfc3339()),
+        });
+
+        Ok(())
+    }
+
+    /// Setzt den Public Anchor (Dual-Anchor v0.9.0)
+    ///
+    /// # Argumente
+    /// * `chain` - Blockchain (ethereum, hedera, btc)
+    /// * `txid` - Transaction ID
+    /// * `digest` - Hash des Audit-Tip (0x-prefixed)
+    /// * `created_at` - RFC3339 Timestamp (optional, None = jetzt)
+    ///
+    /// # Errors
+    /// Returns error if time_anchor is not initialized
+    pub fn set_public_anchor(
+        &mut self,
+        chain: PublicChain,
+        txid: String,
+        digest: String,
+        created_at: Option<String>,
+    ) -> Result<(), Box<dyn Error>> {
+        let anchor = self.time_anchor.as_mut()
+            .ok_or("time_anchor must be initialized before setting public anchor")?;
+
+        anchor.public = Some(TimeAnchorPublic {
+            chain,
+            txid,
+            digest,
+            created_at: created_at.unwrap_or_else(|| Utc::now().to_rfc3339()),
+        });
+
+        Ok(())
+    }
+
+    /// Validiert Dual-Anchor-Konsistenz
+    ///
+    /// # Returns
+    /// Ok(()) wenn konsistent, Err mit Details bei Inkonsistenz
+    pub fn validate_dual_anchor(&self) -> Result<(), Box<dyn Error>> {
+        let anchor = match &self.time_anchor {
+            Some(a) => a,
+            None => return Ok(()), // No anchor = OK
+        };
+
+        // Check private anchor consistency
+        if let Some(private) = &anchor.private {
+            if private.audit_tip_hex != anchor.audit_tip_hex {
+                return Err(format!(
+                    "Private anchor audit_tip_hex mismatch: expected {}, got {}",
+                    anchor.audit_tip_hex, private.audit_tip_hex
+                ).into());
+            }
+        }
+
+        // Check public anchor format (basic validation)
+        if let Some(public) = &anchor.public {
+            if !public.digest.starts_with("0x") || public.digest.len() != 66 {
+                return Err(format!(
+                    "Public anchor digest has invalid format: {}",
+                    public.digest
+                ).into());
+            }
+            if public.txid.is_empty() {
+                return Err("Public anchor txid cannot be empty".into());
+            }
+        }
+
+        Ok(())
     }
 
     /// Serialisiert Manifest zu kanonischem JSON (für Signierung)

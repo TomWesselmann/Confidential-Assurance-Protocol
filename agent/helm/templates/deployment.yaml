@@ -1,0 +1,96 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "cap-verifier.fullname" . }}
+  labels:
+    {{- include "cap-verifier.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "cap-verifier.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "cap-verifier.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "cap-verifier.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+      - name: {{ .Chart.Name }}
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 12 }}
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        livenessProbe:
+          {{- toYaml .Values.livenessProbe | nindent 12 }}
+        readinessProbe:
+          {{- toYaml .Values.readinessProbe | nindent 12 }}
+        resources:
+          {{- toYaml .Values.resources | nindent 12 }}
+        env:
+        {{- toYaml .Values.env | nindent 12 }}
+        - name: OAUTH2_ENABLED
+          value: {{ .Values.oauth2.enabled | quote }}
+        - name: OAUTH2_ISSUER
+          value: {{ .Values.oauth2.issuer | quote }}
+        - name: OAUTH2_AUDIENCE
+          value: {{ .Values.oauth2.audience | quote }}
+        - name: OAUTH2_JWKS_URL
+          value: {{ .Values.oauth2.jwks_url | quote }}
+        - name: TLS_ENABLED
+          value: {{ .Values.tls.enabled | quote }}
+        - name: TLS_REQUIRE_MTLS
+          value: {{ .Values.tls.require_mtls | quote }}
+        - name: CACHE_SIZE
+          value: {{ .Values.cache.size | quote }}
+        - name: FEATURE_ALLOW_EMBEDDED_IR
+          value: {{ .Values.features.allow_embedded_ir | quote }}
+        - name: FEATURE_REQUIRE_MTLS
+          value: {{ .Values.features.require_mtls | quote }}
+        volumeMounts:
+        - name: config
+          mountPath: /etc/cap-verifier
+          readOnly: true
+        {{- if .Values.tls.enabled }}
+        - name: tls-certs
+          mountPath: /etc/ssl/certs
+          readOnly: true
+        {{- end }}
+      volumes:
+      - name: config
+        configMap:
+          name: {{ include "cap-verifier.fullname" . }}-config
+      {{- if .Values.tls.enabled }}
+      - name: tls-certs
+        secret:
+          secretName: {{ include "cap-verifier.fullname" . }}-tls
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

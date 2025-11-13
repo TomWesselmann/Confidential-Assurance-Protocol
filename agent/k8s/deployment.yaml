@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cap-verifier-api
+  namespace: cap-system
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: cap-verifier-api
+  template:
+    metadata:
+      labels:
+        app: cap-verifier-api
+    spec:
+      containers:
+      - name: cap-api
+        image: cap-agent:0.11.0
+        ports:
+        - containerPort: 8080
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8080

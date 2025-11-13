@@ -1,3 +1,8 @@
+/// Package Verifier – I/O-based Proof Package Verification
+///
+/// This module provides package-level verification that loads files from disk.
+/// For pure, portable verification logic, see `cap_agent::verifier::core` in the library.
+
 use crate::manifest::Manifest;
 use crate::proof_engine::Proof;
 use std::error::Error;

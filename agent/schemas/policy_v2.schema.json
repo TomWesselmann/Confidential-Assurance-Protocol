@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cap.example.com/schemas/policy_v2.schema.json",
+  "title": "CAP Policy v2",
+  "description": "Policy definition schema for Confidential Assurance Protocol v2",
+  "type": "object",
+  "required": ["id", "version", "legal_basis", "inputs", "rules"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9\\._-]+$",
+      "description": "Unique policy identifier (lowercase, alphanumeric, dots, underscores, hyphens)"
+    },
+    "version": {
+      "type": "string",
+      "description": "Policy version"
+    },
+    "legal_basis": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "properties": {
+          "directive": {
+            "type": "string",
+            "description": "Legal directive name (e.g., LkSG, GDPR)"
+          },
+          "article": {
+            "type": "string",
+            "description": "Specific article reference"
+          }
+        }
+      },
+      "description": "Legal basis for the policy"
+    },
+    "description": {
+      "type": "string",
+      "description": "Human-readable description"
+    },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["type"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["hex", "array", "string", "number", "boolean"],
+            "description": "Input data type"
+          },
+          "items": {
+            "type": "string",
+            "description": "Type of array items (for array types)"
+          }
+        }
+      },
+      "description": "Input variable definitions"
+    },
+    "rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "op", "lhs", "rhs"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9_]+$",
+            "description": "Unique rule identifier"
+          },
+          "op": {
+            "type": "string",
+            "enum": ["non_membership", "eq", "range_min"],
+            "description": "Operator type"
+          },
+          "lhs": {
+            "description": "Left-hand side expression (variable reference or literal)"
+          },
+          "rhs": {
+            "description": "Right-hand side expression (variable reference or literal)"
+          }
+        }
+      },
+      "description": "Policy rules"
+    },
+    "adaptivity": {
+      "type": "object",
+      "properties": {
+        "predicates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "expr"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Predicate identifier"
+              },
+              "expr": {
+                "description": "Predicate expression"
+              }
+            }
+          }
+        },
+        "activations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["when", "rules"],
+            "properties": {
+              "when": {
+                "type": "string",
+                "description": "Predicate ID that triggers activation"
+              },
+              "rules": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Rule IDs to activate"
+              }
+            }
+          }
+        }
+      },
+      "description": "Adaptive policy behavior based on predicates"
+    }
+  }
+}

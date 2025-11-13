@@ -1,13 +1,21 @@
 /// Registry Performance Benchmarks
 ///
-/// Measures performance of JSON vs SQLite backends for various operations:
+/// Measures performance of v1.0 and v1.1 registry operations:
+///
+/// **v1.0 Backend Benchmarks (JSON vs SQLite):**
 /// - insert: Adding entries to registry
 /// - load: Loading entire registry from disk
 /// - find: Finding entries by hash
 /// - list: Listing all entries
+///
+/// **v1.1 API Benchmarks (UnifiedRegistry):**
+/// - unified_registry_load_v1_0: Loading v1.0 files with auto-migration
+/// - unified_registry_load_v1_1: Loading native v1.1 files
+/// - unified_registry_save: Saving as v1.1 format
+/// - migration_v1_0_to_v1_1: Migration performance
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
-use cap_agent::registry::{RegistryEntry, RegistryBackend, open_store};
+use cap_agent::registry::{RegistryEntry, RegistryBackend, open_store, UnifiedRegistry, RegistryEntryV1_1, Registry as RegistryV1_0};
 use std::path::Path;
 use std::fs;
 
@@ -194,11 +202,141 @@ fn bench_registry_list(c: &mut Criterion) {
     group.finish();
 }
 
+/// Helper: Create mock v1.1 registry entry
+fn create_mock_entry_v1_1(id: usize) -> RegistryEntryV1_1 {
+    RegistryEntryV1_1::new(
+        format!("entry_{:05}", id),
+        "lksg.v1".to_string(),
+        format!("sha3-256:{:064x}", id),
+        format!("0x{:064x}", id),
+    )
+}
+
+/// Helper: Setup v1.0 registry file for migration testing
+fn setup_v1_0_registry(num_entries: usize, path: &str) {
+    let _ = fs::remove_file(path);
+    let mut registry = RegistryV1_0::new();
+
+    for i in 0..num_entries {
+        registry.add_entry(
+            format!("0x{:064x}", i),
+            format!("0x{:064x}", i + 1000000),
+            None,
+        );
+    }
+
+    let json = serde_json::to_string(&registry).unwrap();
+    fs::write(path, json).unwrap();
+}
+
+/// Helper: Setup v1.1 registry file
+fn setup_v1_1_registry(num_entries: usize, path: &str) {
+    let _ = fs::remove_file(path);
+    let mut registry = UnifiedRegistry::new("cap-agent-bench");
+
+    for i in 0..num_entries {
+        registry.add_entry(create_mock_entry_v1_1(i)).unwrap();
+    }
+
+    registry.save(Path::new(path)).unwrap();
+}
+
+/// Benchmark: UnifiedRegistry load v1.0 files (with auto-migration)
+fn bench_unified_registry_load_v1_0(c: &mut Criterion) {
+    let mut group = c.benchmark_group("unified_registry_load_v1_0");
+
+    for size in [100, 1000].iter() {
+        let path = "bench_unified_v1_0.json";
+        setup_v1_0_registry(*size, path);
+
+        group.bench_with_input(BenchmarkId::new("v1.0_auto_migrate", size), size, |b, _size| {
+            b.iter(|| {
+                let _registry = UnifiedRegistry::load(black_box(Path::new(path))).unwrap();
+            });
+        });
+
+        fs::remove_file(path).ok();
+    }
+
+    group.finish();
+}
+
+/// Benchmark: UnifiedRegistry load v1.1 files
+fn bench_unified_registry_load_v1_1(c: &mut Criterion) {
+    let mut group = c.benchmark_group("unified_registry_load_v1_1");
+
+    for size in [100, 1000].iter() {
+        let path = "bench_unified_v1_1.json";
+        setup_v1_1_registry(*size, path);
+
+        group.bench_with_input(BenchmarkId::new("v1.1_native", size), size, |b, _size| {
+            b.iter(|| {
+                let _registry = UnifiedRegistry::load(black_box(Path::new(path))).unwrap();
+            });
+        });
+
+        fs::remove_file(path).ok();
+    }
+
+    group.finish();
+}
+
+/// Benchmark: UnifiedRegistry save (always v1.1)
+fn bench_unified_registry_save(c: &mut Criterion) {
+    let mut group = c.benchmark_group("unified_registry_save");
+
+    for size in [100, 1000].iter() {
+        let mut registry = UnifiedRegistry::new("cap-agent-bench");
+
+        for i in 0..*size {
+            registry.add_entry(create_mock_entry_v1_1(i)).unwrap();
+        }
+
+        group.bench_with_input(BenchmarkId::new("v1.1", size), size, |b, _size| {
+            b.iter(|| {
+                let path = "bench_unified_save.json";
+                registry.save(black_box(Path::new(path))).unwrap();
+                fs::remove_file(path).ok();
+            });
+        });
+    }
+
+    group.finish();
+}
+
+/// Benchmark: v1.0 → v1.1 migration
+fn bench_migration(c: &mut Criterion) {
+    let mut group = c.benchmark_group("migration_v1_0_to_v1_1");
+
+    for size in [100, 1000].iter() {
+        group.bench_with_input(BenchmarkId::new("migrate", size), size, |b, size| {
+            b.iter(|| {
+                // Create fresh v1_0 registry each iteration
+                let mut v1_0 = RegistryV1_0::new();
+                for i in 0..*size {
+                    v1_0.add_entry(
+                        format!("0x{:064x}", i),
+                        format!("0x{:064x}", i + 1000000),
+                        None,
+                    );
+                }
+                let _v1_1 = cap_agent::registry::migrate_to_v1_1(black_box(v1_0), "cap-agent-bench").unwrap();
+            });
+        });
+    }
+
+    group.finish();
+}
+
 criterion_group!(
     benches,
     bench_registry_insert,
     bench_registry_load,
     bench_registry_find,
-    bench_registry_list
+    bench_registry_list,
+    bench_unified_registry_load_v1_0,
+    bench_unified_registry_load_v1_1,
+    bench_unified_registry_save,
+    bench_migration
 );
 criterion_main!(benches);

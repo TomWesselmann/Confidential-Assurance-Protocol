@@ -12,6 +12,8 @@ use std::path::Path;
 use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
 use base64::{Engine, engine::general_purpose};
 
+use crate::keys;
+
 /// Registry-Eintrag für einen einzelnen Proof
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RegistryEntry {
@@ -27,6 +29,42 @@ pub struct RegistryEntry {
     /// Base64-encoded Ed25519 public key (optional for backward compatibility)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub public_key: Option<String>,
+
+    // BLOB Store Fields (v0.9)
+    /// BLAKE3 hash of manifest BLOB
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub blob_manifest: Option<String>,
+    /// BLAKE3 hash of proof BLOB
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub blob_proof: Option<String>,
+    /// BLAKE3 hash of WASM verifier BLOB
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub blob_wasm: Option<String>,
+    /// SHA3-256 hash of ABI JSON BLOB
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub blob_abi: Option<String>,
+
+    // Self-Verification Fields (v0.9)
+    /// Self-verification status: unknown, ok, fail
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub selfverify_status: Option<String>,
+    /// RFC3339 timestamp of last self-verification
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub selfverify_at: Option<String>,
+    /// Verifier name (e.g., "cap-wasm-verifier")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub verifier_name: Option<String>,
+    /// Verifier version (e.g., "1.0.0")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub verifier_version: Option<String>,
+
+    // Key Management Fields (v0.10)
+    /// Key Identifier (16 bytes = 32 hex chars, derived from public key)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kid: Option<String>,
+    /// Signature scheme (e.g., "ed25519")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signature_scheme: Option<String>,
 }
 
 /// Lokale Registry-Struktur
@@ -93,6 +131,19 @@ impl Registry {
             registered_at: Utc::now().to_rfc3339(),
             signature: None,
             public_key: None,
+            // BLOB fields (v0.9) - initially None for backward compatibility
+            blob_manifest: None,
+            blob_proof: None,
+            blob_wasm: None,
+            blob_abi: None,
+            // Self-verify fields (v0.9) - initially None
+            selfverify_status: None,
+            selfverify_at: None,
+            verifier_name: None,
+            verifier_version: None,
+            // Key management fields (v0.10) - initially None
+            kid: None,
+            signature_scheme: None,
         };
         self.entries.push(entry);
         id
@@ -203,9 +254,14 @@ pub fn sign_entry(entry: &mut RegistryEntry, signing_key: &SigningKey) -> Result
     let sig_b64 = general_purpose::STANDARD.encode(signature.to_bytes());
     let pubkey_b64 = general_purpose::STANDARD.encode(signing_key.verifying_key().to_bytes());
 
-    // Update entry with signature
+    // Derive KID from public key (v0.10)
+    let kid = keys::derive_kid(&pubkey_b64)?;
+
+    // Update entry with signature and key metadata
     entry.signature = Some(sig_b64);
     entry.public_key = Some(pubkey_b64);
+    entry.kid = Some(kid);
+    entry.signature_scheme = Some("ed25519".to_string());
 
     Ok(())
 }
@@ -245,6 +301,42 @@ pub fn verify_entry_signature(entry: &RegistryEntry) -> Result<bool, Box<dyn Err
     verifying_key.verify(&entry_hash, &signature)?;
 
     Ok(true)
+}
+
+/// Validiert den Status eines Schlüssels für Registry-Operationen
+///
+/// # Argumente
+/// * `kid` - Key Identifier
+/// * `key_store_path` - Pfad zum Key Store Verzeichnis
+///
+/// # Rückgabe
+/// Ok(()) wenn Key aktiv, Err wenn nicht aktiv, retired, revoked oder nicht gefunden
+pub fn validate_key_status(kid: &str, key_store_path: &str) -> Result<(), Box<dyn Error>> {
+    use crate::keys::KeyStore;
+
+    let store = KeyStore::new(key_store_path)?;
+
+    match store.find_by_kid(kid)? {
+        Some(key_meta) => {
+            match key_meta.status.as_str() {
+                "active" => Ok(()),
+                "retired" => Err(format!(
+                    "Key {} is retired and cannot be used for new entries",
+                    kid
+                ).into()),
+                "revoked" => Err(format!(
+                    "Key {} is revoked and cannot be used",
+                    kid
+                ).into()),
+                other => Err(format!(
+                    "Key {} has unknown status: {}",
+                    kid,
+                    other
+                ).into()),
+            }
+        }
+        None => Err(format!("Key not found in store: {}", kid).into()),
+    }
 }
 
 /// Timestamp-Struktur (RFC3161-Mock)
@@ -579,7 +671,20 @@ impl SqliteRegistryStore {
                 timestamp_file TEXT,
                 registered_at TEXT NOT NULL,
                 signature TEXT,
-                public_key TEXT
+                public_key TEXT,
+                -- BLOB fields (v0.9)
+                blob_manifest TEXT,
+                blob_proof TEXT,
+                blob_wasm TEXT,
+                blob_abi TEXT,
+                -- Self-verification fields (v0.9)
+                selfverify_status TEXT,
+                selfverify_at TEXT,
+                verifier_name TEXT,
+                verifier_version TEXT,
+                -- Key management fields (v0.10)
+                kid TEXT,
+                signature_scheme TEXT
             );
 
             CREATE INDEX IF NOT EXISTS idx_registry_hashes
@@ -603,7 +708,10 @@ impl RegistryStore for SqliteRegistryStore {
     fn load(&self) -> Result<Registry, Box<dyn Error>> {
         let conn = self.conn.borrow();
         let mut stmt = conn.prepare(
-            "SELECT id, manifest_hash, proof_hash, timestamp_file, registered_at, signature, public_key
+            "SELECT id, manifest_hash, proof_hash, timestamp_file, registered_at, signature, public_key,
+                    blob_manifest, blob_proof, blob_wasm, blob_abi,
+                    selfverify_status, selfverify_at, verifier_name, verifier_version,
+                    kid, signature_scheme
              FROM registry_entries
              ORDER BY registered_at DESC"
         )?;
@@ -617,6 +725,19 @@ impl RegistryStore for SqliteRegistryStore {
                 registered_at: row.get(4)?,
                 signature: row.get(5).ok(),
                 public_key: row.get(6).ok(),
+                // BLOB fields (v0.9)
+                blob_manifest: row.get(7).ok(),
+                blob_proof: row.get(8).ok(),
+                blob_wasm: row.get(9).ok(),
+                blob_abi: row.get(10).ok(),
+                // Self-verify fields (v0.9)
+                selfverify_status: row.get(11).ok(),
+                selfverify_at: row.get(12).ok(),
+                verifier_name: row.get(13).ok(),
+                verifier_version: row.get(14).ok(),
+                // Key management fields (v0.10)
+                kid: row.get(15).ok(),
+                signature_scheme: row.get(16).ok(),
             })
         })?;
 
@@ -641,8 +762,12 @@ impl RegistryStore for SqliteRegistryStore {
         // Insert all entries
         for entry in &reg.entries {
             tx.execute(
-                "INSERT OR REPLACE INTO registry_entries(id, manifest_hash, proof_hash, timestamp_file, registered_at, signature, public_key)
-                 VALUES(?, ?, ?, ?, ?, ?, ?)",
+                "INSERT OR REPLACE INTO registry_entries(
+                    id, manifest_hash, proof_hash, timestamp_file, registered_at, signature, public_key,
+                    blob_manifest, blob_proof, blob_wasm, blob_abi,
+                    selfverify_status, selfverify_at, verifier_name, verifier_version,
+                    kid, signature_scheme
+                 ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 rusqlite::params![
                     &entry.id,
                     &entry.manifest_hash,
@@ -650,7 +775,17 @@ impl RegistryStore for SqliteRegistryStore {
                     &entry.timestamp_file,
                     &entry.registered_at,
                     &entry.signature,
-                    &entry.public_key
+                    &entry.public_key,
+                    &entry.blob_manifest,
+                    &entry.blob_proof,
+                    &entry.blob_wasm,
+                    &entry.blob_abi,
+                    &entry.selfverify_status,
+                    &entry.selfverify_at,
+                    &entry.verifier_name,
+                    &entry.verifier_version,
+                    &entry.kid,
+                    &entry.signature_scheme
                 ],
             )?;
         }
@@ -662,8 +797,12 @@ impl RegistryStore for SqliteRegistryStore {
     fn add_entry(&self, entry: RegistryEntry) -> Result<(), Box<dyn Error>> {
         let conn = self.conn.borrow();
         conn.execute(
-            "INSERT OR REPLACE INTO registry_entries(id, manifest_hash, proof_hash, timestamp_file, registered_at, signature, public_key)
-             VALUES(?, ?, ?, ?, ?, ?, ?)",
+            "INSERT OR REPLACE INTO registry_entries(
+                id, manifest_hash, proof_hash, timestamp_file, registered_at, signature, public_key,
+                blob_manifest, blob_proof, blob_wasm, blob_abi,
+                selfverify_status, selfverify_at, verifier_name, verifier_version,
+                kid, signature_scheme
+             ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             rusqlite::params![
                 &entry.id,
                 &entry.manifest_hash,
@@ -671,7 +810,17 @@ impl RegistryStore for SqliteRegistryStore {
                 &entry.timestamp_file,
                 &entry.registered_at,
                 &entry.signature,
-                &entry.public_key
+                &entry.public_key,
+                &entry.blob_manifest,
+                &entry.blob_proof,
+                &entry.blob_wasm,
+                &entry.blob_abi,
+                &entry.selfverify_status,
+                &entry.selfverify_at,
+                &entry.verifier_name,
+                &entry.verifier_version,
+                &entry.kid,
+                &entry.signature_scheme
             ],
         )?;
         Ok(())
@@ -680,7 +829,10 @@ impl RegistryStore for SqliteRegistryStore {
     fn find_by_hashes(&self, manifest_hash: &str, proof_hash: &str) -> Result<Option<RegistryEntry>, Box<dyn Error>> {
         let conn = self.conn.borrow();
         let mut stmt = conn.prepare(
-            "SELECT id, manifest_hash, proof_hash, timestamp_file, registered_at, signature, public_key
+            "SELECT id, manifest_hash, proof_hash, timestamp_file, registered_at, signature, public_key,
+                    blob_manifest, blob_proof, blob_wasm, blob_abi,
+                    selfverify_status, selfverify_at, verifier_name, verifier_version,
+                    kid, signature_scheme
              FROM registry_entries
              WHERE manifest_hash = ?1 AND proof_hash = ?2
              LIMIT 1"
@@ -697,6 +849,19 @@ impl RegistryStore for SqliteRegistryStore {
                 registered_at: row.get(4)?,
                 signature: row.get(5).ok(),
                 public_key: row.get(6).ok(),
+                // BLOB fields (v0.9)
+                blob_manifest: row.get(7).ok(),
+                blob_proof: row.get(8).ok(),
+                blob_wasm: row.get(9).ok(),
+                blob_abi: row.get(10).ok(),
+                // Self-verify fields (v0.9)
+                selfverify_status: row.get(11).ok(),
+                selfverify_at: row.get(12).ok(),
+                verifier_name: row.get(13).ok(),
+                verifier_version: row.get(14).ok(),
+                // Key management fields (v0.10)
+                kid: row.get(15).ok(),
+                signature_scheme: row.get(16).ok(),
             }));
         }
 
@@ -847,6 +1012,16 @@ mod tests {
             registered_at: chrono::Utc::now().to_rfc3339(),
             signature: None,
             public_key: None,
+            blob_manifest: None,
+            blob_proof: None,
+            blob_wasm: None,
+            blob_abi: None,
+            selfverify_status: None,
+            selfverify_at: None,
+            verifier_name: None,
+            verifier_version: None,
+            kid: None,
+            signature_scheme: None,
         };
 
         // Generate a signing key
@@ -875,6 +1050,16 @@ mod tests {
             registered_at: chrono::Utc::now().to_rfc3339(),
             signature: None,
             public_key: None,
+            blob_manifest: None,
+            blob_proof: None,
+            blob_wasm: None,
+            blob_abi: None,
+            selfverify_status: None,
+            selfverify_at: None,
+            verifier_name: None,
+            verifier_version: None,
+            kid: None,
+            signature_scheme: None,
         };
 
         let signing_key = ed25519_dalek::SigningKey::from_bytes(&[42u8; 32]);
@@ -899,6 +1084,16 @@ mod tests {
             registered_at: chrono::Utc::now().to_rfc3339(),
             signature: None,
             public_key: None,
+            blob_manifest: None,
+            blob_proof: None,
+            blob_wasm: None,
+            blob_abi: None,
+            selfverify_status: None,
+            selfverify_at: None,
+            verifier_name: None,
+            verifier_version: None,
+            kid: None,
+            signature_scheme: None,
         };
 
         // Verify should return Ok(false) for backward compatibility

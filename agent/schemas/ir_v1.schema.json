@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cap.example.com/schemas/ir_v1.schema.json",
+  "title": "CAP IR v1",
+  "description": "Intermediate Representation v1 schema for compiled policies",
+  "type": "object",
+  "required": ["ir_version", "policy_id", "policy_hash", "rules", "ir_hash"],
+  "properties": {
+    "ir_version": {
+      "const": "1.0",
+      "description": "IR version (must be 1.0)"
+    },
+    "policy_id": {
+      "type": "string",
+      "description": "Original policy identifier"
+    },
+    "policy_hash": {
+      "type": "string",
+      "pattern": "^sha3-256:[0-9a-f]{64}$",
+      "description": "SHA3-256 hash of the source policy"
+    },
+    "rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "op", "lhs", "rhs"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Rule identifier"
+          },
+          "op": {
+            "type": "string",
+            "enum": ["non_membership", "eq", "range_min"],
+            "description": "Operator type"
+          },
+          "lhs": {
+            "oneOf": [
+              {
+                "type": "object",
+                "required": ["var"],
+                "properties": {
+                  "var": {
+                    "type": "string",
+                    "description": "Variable reference"
+                  }
+                }
+              },
+              {
+                "description": "Literal value (any JSON type)"
+              }
+            ],
+            "description": "Left-hand side expression"
+          },
+          "rhs": {
+            "oneOf": [
+              {
+                "type": "object",
+                "required": ["var"],
+                "properties": {
+                  "var": {
+                    "type": "string",
+                    "description": "Variable reference"
+                  }
+                }
+              },
+              {
+                "description": "Literal value (any JSON type)"
+              }
+            ],
+            "description": "Right-hand side expression"
+          }
+        }
+      },
+      "description": "Compiled rules (sorted by ID for determinism)"
+    },
+    "adaptivity": {
+      "type": "object",
+      "properties": {
+        "predicates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "expr"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Predicate identifier"
+              },
+              "expr": {
+                "description": "Compiled predicate expression"
+              }
+            }
+          }
+        },
+        "activations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["when", "rules"],
+            "properties": {
+              "when": {
+                "type": "string",
+                "description": "Predicate ID"
+              },
+              "rules": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Rule IDs to activate"
+              }
+            }
+          }
+        }
+      },
+      "description": "Adaptive behavior configuration"
+    },
+    "ir_hash": {
+      "type": "string",
+      "pattern": "^sha3-256:[0-9a-f]{64}$",
+      "description": "SHA3-256 hash of the canonical IR (deterministic)"
+    }
+  }
+}

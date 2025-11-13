@@ -1,0 +1,28 @@
+# Rust
+/target
+**/*.rs.bk
+Cargo.lock
+
+# Output files
+context.json
+*.dat
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Logs
+*.log
+
+# TLS Certificates (secrets)
+config/tls/*.key
+config/tls/*.crt
+config/tls/*.pem
+!config/tls/.gitkeep
+
+# Environment
+.env
+.env.local

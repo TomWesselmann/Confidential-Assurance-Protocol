@@ -1,0 +1,18 @@
+{
+  "ir_version": "1.0",
+  "policy_id": "lksg.v1",
+  "policy_hash": "sha3-256:b98c3db55f874476dc749ea32b70bdf5369a0d7bc5364f236e034f1ddcd94638",
+  "rules": [
+    {
+      "id": "no_sanctions",
+      "op": "non_membership",
+      "lhs": {
+        "var": "supplier_hashes"
+      },
+      "rhs": {
+        "var": "sanctions_root"
+      }
+    }
+  ],
+  "ir_hash": "sha3-256:df3a3eeb7c72f6204131397e4b0a4b16235f1e20cc66102153ad6d4ee78f892c"
+}

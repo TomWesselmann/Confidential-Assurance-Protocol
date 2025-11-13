@@ -1,0 +1,20 @@
+# CAP Verifier API Configuration
+# Version: app.v1.0
+
+server:
+  bind: "0.0.0.0:8443"
+  log_level: "info"
+
+oauth:
+  issuer: "https://auth.example.com"
+  audience: "cap-verifier"
+  required_scopes:
+    - "verify:read"
+
+verification:
+  backend: "mock"  # mock | zkvm | halo2
+  timeout_seconds: 30
+
+policy:
+  cache_enabled: true
+  cache_ttl_seconds: 3600

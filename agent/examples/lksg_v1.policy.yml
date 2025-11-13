@@ -1,0 +1,16 @@
+id: lksg.v1
+version: "1.0"
+legal_basis:
+  - directive: "LkSG"
+description: "Minimal LkSG supplier check"
+inputs:
+  supplier_hashes:
+    type: array
+    items: hex
+  sanctions_root:
+    type: hex
+rules:
+  - id: no_sanctions
+    op: non_membership
+    lhs: supplier_hashes
+    rhs: sanctions_root

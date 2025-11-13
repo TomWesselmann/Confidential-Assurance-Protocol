@@ -1,0 +1,17 @@
+apiVersion: v2
+name: cap-verifier
+description: CAP Verifier API - Policy Compiler & Verification System
+type: application
+version: 0.11.0
+appVersion: "0.11.0"
+keywords:
+  - lksg
+  - compliance
+  - verification
+  - policy
+maintainers:
+  - name: CAP Engineering Team
+    email: engineering@cap-verifier.local
+sources:
+  - https://github.com/cap-verifier/agent
+icon: https://cap-verifier.local/icon.png

@@ -1,0 +1,33 @@
+# Build artifacts
+target/
+context.json
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+
+# Documentation
+*.md
+!README.md
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Tests
+tests/
+
+# Temporary files
+*.log
+*.tmp
+.DS_Store
+
+# Config
+config/tls/*.key
+config/tls/*.crt

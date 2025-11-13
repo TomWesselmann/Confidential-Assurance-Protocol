@@ -1,0 +1,110 @@
+{
+  "$schema": "sap-supplier-mock.v1",
+  "metadata": {
+    "source": "SAP S/4HANA Mock",
+    "extracted_at": "2025-11-07T11:00:00Z",
+    "total_count": 10
+  },
+  "suppliers": [
+    {
+      "LIFNR": "100001",
+      "NAME1": "Acme Steel GmbH",
+      "LAND1": "DE",
+      "ORT01": "Duisburg",
+      "STRAS": "Werksstraße 123",
+      "AUDIT_DATE": "2025-10-15",
+      "TIER": "1",
+      "UBO_COUNT": 2
+    },
+    {
+      "LIFNR": "100002",
+      "NAME1": "Global Logistics Inc",
+      "LAND1": "US",
+      "ORT01": "New York",
+      "STRAS": "5th Avenue 456",
+      "AUDIT_DATE": "2025-09-20",
+      "TIER": "2",
+      "UBO_COUNT": 1
+    },
+    {
+      "LIFNR": "100003",
+      "NAME1": "ChemSupply SA",
+      "LAND1": "FR",
+      "ORT01": "Lyon",
+      "STRAS": "Rue de la Chimie 78",
+      "AUDIT_DATE": "2025-11-01",
+      "TIER": "1",
+      "UBO_COUNT": 3
+    },
+    {
+      "LIFNR": "100004",
+      "NAME1": "TechParts Ltd",
+      "LAND1": "GB",
+      "ORT01": "London",
+      "STRAS": "Tech Street 99",
+      "AUDIT_DATE": "2025-08-10",
+      "TIER": "2",
+      "UBO_COUNT": 1
+    },
+    {
+      "LIFNR": "100005",
+      "NAME1": "Asian Components Co",
+      "LAND1": "CN",
+      "ORT01": "Shenzhen",
+      "STRAS": "Industrial Park Road 234",
+      "AUDIT_DATE": "2025-07-25",
+      "TIER": "3",
+      "UBO_COUNT": 2
+    },
+    {
+      "LIFNR": "100006",
+      "NAME1": "Nordic Metals AB",
+      "LAND1": "SE",
+      "ORT01": "Stockholm",
+      "STRAS": "Metalvägen 56",
+      "AUDIT_DATE": "2025-10-05",
+      "TIER": "1",
+      "UBO_COUNT": 2
+    },
+    {
+      "LIFNR": "100007",
+      "NAME1": "Italia Plastics SRL",
+      "LAND1": "IT",
+      "ORT01": "Milan",
+      "STRAS": "Via Plastica 12",
+      "AUDIT_DATE": "2025-09-15",
+      "TIER": "2",
+      "UBO_COUNT": 1
+    },
+    {
+      "LIFNR": "100008",
+      "NAME1": "Benelux Shipping BV",
+      "LAND1": "NL",
+      "ORT01": "Rotterdam",
+      "STRAS": "Havenstraat 345",
+      "AUDIT_DATE": "2025-10-20",
+      "TIER": "2",
+      "UBO_COUNT": 2
+    },
+    {
+      "LIFNR": "100009",
+      "NAME1": "Österreich Parts GmbH",
+      "LAND1": "AT",
+      "ORT01": "Vienna",
+      "STRAS": "Industriestraße 67",
+      "AUDIT_DATE": "2025-08-30",
+      "TIER": "1",
+      "UBO_COUNT": 1
+    },
+    {
+      "LIFNR": "100010",
+      "NAME1": "Swiss Precision AG",
+      "LAND1": "CH",
+      "ORT01": "Zurich",
+      "STRAS": "Präzisionsweg 89",
+      "AUDIT_DATE": "2025-11-02",
+      "TIER": "1",
+      "UBO_COUNT": 2
+    }
+  ]
+}

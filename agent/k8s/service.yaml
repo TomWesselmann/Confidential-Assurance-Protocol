@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: cap-verifier-api
+  namespace: cap-system
+spec:
+  selector:
+    app: cap-verifier-api
+  ports:
+  - port: 80
+    targetPort: 8080

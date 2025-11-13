@@ -1,0 +1,153 @@
+# Default values for cap-verifier
+# This is a YAML-formatted file.
+
+replicaCount: 2
+
+image:
+  repository: cap-verifier/api
+  pullPolicy: IfNotPresent
+  tag: "0.11.0"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "8080"
+  prometheus.io/path: "/metrics"
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+securityContext:
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: true
+  allowPrivilegeEscalation: false
+
+service:
+  type: ClusterIP
+  port: 8080
+  targetPort: 8080
+  annotations: {}
+
+ingress:
+  enabled: false
+  className: "nginx"
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+  hosts:
+    - host: cap-verifier.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: cap-verifier-tls
+      hosts:
+        - cap-verifier.local
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 512Mi
+  requests:
+    cpu: 250m
+    memory: 256Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - cap-verifier
+          topologyKey: kubernetes.io/hostname
+
+livenessProbe:
+  httpGet:
+    path: /healthz
+    port: 8080
+  initialDelaySeconds: 10
+  periodSeconds: 30
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /readyz
+    port: 8080
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+# Feature Flags
+features:
+  allow_embedded_ir: true
+  require_mtls: false
+  enable_prometheus_metrics: true
+
+# OAuth2 Configuration
+oauth2:
+  enabled: true
+  issuer: "https://idp.example.com"
+  audience: "cap-verifier"
+  jwks_url: "https://idp.example.com/.well-known/jwks.json"
+  jwks_cache_ttl_sec: 600
+
+# TLS Configuration
+tls:
+  enabled: false
+  require_mtls: false
+  tls_min_version: "1.2"
+  cipher_profile: "intermediate"
+
+# Rate Limiting
+rateLimit:
+  enabled: true
+  requests_per_minute: 60
+  burst: 100
+
+# Cache Configuration
+cache:
+  enabled: true
+  size: 1000
+  ttl_seconds: 3600
+
+# Secrets (use external-secrets or sealed-secrets in production)
+secrets:
+  oauth2_public_key: ""
+  tls_server_cert: ""
+  tls_server_key: ""
+  tls_client_ca: ""
+
+# Environment-specific configuration
+env:
+  - name: RUST_LOG
+    value: "info"
+  - name: RUST_BACKTRACE
+    value: "0"

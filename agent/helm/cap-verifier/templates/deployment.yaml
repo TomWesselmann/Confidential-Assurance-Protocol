@@ -1,0 +1,106 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "cap-verifier.fullname" . }}
+  labels:
+    {{- include "cap-verifier.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "cap-verifier.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "cap-verifier.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "cap-verifier.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: https
+              containerPort: 8443
+              protocol: TCP
+          env:
+            - name: SERVER_BIND
+              value: {{ .Values.config.serverBind | quote }}
+            - name: CONFIG_PATH
+              value: "/app/config/app.yaml"
+            - name: LOG_LEVEL
+              value: {{ .Values.config.logLevel | quote }}
+            - name: OAUTH_ISSUER
+              value: {{ .Values.config.oauth.issuer | quote }}
+            - name: OAUTH_AUDIENCE
+              value: {{ .Values.config.oauth.audience | quote }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: https
+              scheme: HTTP
+            {{- toYaml .Values.probes.liveness | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: https
+              scheme: HTTP
+            {{- toYaml .Values.probes.readiness | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: cfg
+              mountPath: /app/config
+              readOnly: true
+            - name: tls
+              mountPath: /etc/tls
+              readOnly: true
+            - name: mtls
+              mountPath: /etc/mtls
+              readOnly: true
+            - name: keys
+              mountPath: /etc/keys
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: cfg
+          configMap:
+            name: {{ include "cap-verifier.fullname" . }}-config
+        - name: tls
+          secret:
+            secretName: {{ .Values.secrets.tls.secretName }}
+        - name: mtls
+          secret:
+            secretName: {{ .Values.secrets.mtls.secretName }}
+        - name: keys
+          secret:
+            secretName: {{ .Values.secrets.agentKey.secretName }}
+        - name: tmp
+          emptyDir: {}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

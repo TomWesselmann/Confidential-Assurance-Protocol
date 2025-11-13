@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "cap-verifier.fullname" . }}-config
+  labels:
+    {{- include "cap-verifier.labels" . | nindent 4 }}
+data:
+  auth.yaml: |
+    issuer: {{ .Values.oauth2.issuer | quote }}
+    audience: {{ .Values.oauth2.audience | quote }}
+    jwks_url: {{ .Values.oauth2.jwks_url | quote }}
+    jwks_cache_ttl_sec: {{ .Values.oauth2.jwks_cache_ttl_sec }}
+    required_scopes:
+      verify: ["verify:run"]
+      policy_compile: ["policy:compile"]
+      policy_read: ["policy:read"]
+
+  tls.yaml: |
+    require_mtls: {{ .Values.tls.require_mtls }}
+    tls_min_version: {{ .Values.tls.tls_min_version | quote }}
+    cipher_profile: {{ .Values.tls.cipher_profile | quote }}
+    client_ca_bundle: "/etc/ssl/certs/client-ca.crt"
+    server_cert: "/etc/ssl/certs/server.crt"
+    server_key: "/etc/ssl/certs/server.key"
+    client_cert_validation: {{ if .Values.tls.require_mtls }}"required"{{ else }}"optional"{{ end }}
+    verify_client_san: {{ .Values.tls.require_mtls }}
+    allowed_client_sans:
+      - "*.cap-verifier.local"
+
+  features.yaml: |
+    allow_embedded_ir: {{ .Values.features.allow_embedded_ir }}
+    require_mtls: {{ .Values.features.require_mtls }}
+    enable_prometheus_metrics: {{ .Values.features.enable_prometheus_metrics }}
+
+  cache.yaml: |
+    enabled: {{ .Values.cache.enabled }}
+    size: {{ .Values.cache.size }}
+    ttl_seconds: {{ .Values.cache.ttl_seconds }}

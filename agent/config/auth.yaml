@@ -1,0 +1,17 @@
+# OAuth2 Authentication Configuration (Week 5)
+# RS256 JWT validation with JWKS support
+
+issuer: "https://idp.example.com"
+audience: "cap-verifier"
+jwks_url: "https://idp.example.com/.well-known/jwks.json"
+jwks_cache_ttl_sec: 600
+
+# Scope-to-endpoint mappings
+required_scopes:
+  verify: ["verify:run"]
+  policy_compile: ["policy:compile"]
+  policy_read: ["policy:read"]
+
+# Optional: Enable for development/testing
+# mock_mode: false
+# mock_public_key_path: "keys/mock_rsa.pub"

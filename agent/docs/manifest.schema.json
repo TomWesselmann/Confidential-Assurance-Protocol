@@ -1,0 +1,214 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/manifest.schema.json",
+  "title": "LkSG Compliance Manifest",
+  "description": "Schema for LkSG Proof Agent Compliance Manifests (v1.0) with Dual-Anchor Support (v0.9.0)",
+  "type": "object",
+  "required": [
+    "version",
+    "created_at",
+    "supplier_root",
+    "ubo_root",
+    "company_commitment_root",
+    "policy",
+    "audit",
+    "proof",
+    "signatures"
+  ],
+  "properties": {
+    "version": {
+      "type": "string",
+      "const": "manifest.v1.0",
+      "description": "Manifest schema version (must be 'manifest.v1.0')"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "RFC3339 timestamp of manifest creation"
+    },
+    "supplier_root": {
+      "type": "string",
+      "pattern": "^0x[0-9a-f]{64}$",
+      "description": "BLAKE3 Merkle root of supplier data (0x-prefixed, 64 hex chars)"
+    },
+    "ubo_root": {
+      "type": "string",
+      "pattern": "^0x[0-9a-f]{64}$",
+      "description": "BLAKE3 Merkle root of UBO data (0x-prefixed, 64 hex chars)"
+    },
+    "company_commitment_root": {
+      "type": "string",
+      "pattern": "^0x[0-9a-f]{64}$",
+      "description": "BLAKE3 combined commitment root (0x-prefixed, 64 hex chars)"
+    },
+    "policy": {
+      "type": "object",
+      "required": ["name", "version", "hash"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Policy name"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^[a-z0-9\\.]+$",
+          "description": "Policy version (e.g., 'lksg.v1')"
+        },
+        "hash": {
+          "type": "string",
+          "pattern": "^0x[0-9a-f]{64}$",
+          "description": "SHA3-256 hash of policy file (0x-prefixed, 64 hex chars)"
+        }
+      },
+      "additionalProperties": false
+    },
+    "audit": {
+      "type": "object",
+      "required": ["tail_digest", "events_count"],
+      "properties": {
+        "tail_digest": {
+          "type": "string",
+          "pattern": "^0x[0-9a-f]{64}$",
+          "description": "SHA3-256 hash of last audit event (0x-prefixed, 64 hex chars)"
+        },
+        "events_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of events in audit log"
+        }
+      },
+      "additionalProperties": false
+    },
+    "proof": {
+      "type": "object",
+      "required": ["type", "status"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["none", "mock", "zk", "halo2", "spartan", "risc0"],
+          "description": "Proof type"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["none", "ok", "failed"],
+          "description": "Proof status"
+        }
+      },
+      "additionalProperties": false
+    },
+    "signatures": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["alg", "signer", "pubkey_hex", "sig_hex"],
+        "properties": {
+          "alg": {
+            "type": "string",
+            "description": "Signature algorithm (e.g., 'ed25519')"
+          },
+          "signer": {
+            "type": "string",
+            "description": "Signer identifier"
+          },
+          "pubkey_hex": {
+            "type": "string",
+            "pattern": "^0x[0-9a-f]+$",
+            "description": "Public key (0x-prefixed hex)"
+          },
+          "sig_hex": {
+            "type": "string",
+            "pattern": "^0x[0-9a-f]+$",
+            "description": "Signature (0x-prefixed hex)"
+          }
+        },
+        "additionalProperties": false
+      },
+      "description": "Array of Ed25519 signatures"
+    },
+    "time_anchor": {
+      "type": "object",
+      "required": ["kind", "reference", "audit_tip_hex", "created_at"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["tsa", "blockchain", "file", "none"],
+          "description": "Type of time anchor"
+        },
+        "reference": {
+          "type": "string",
+          "description": "Reference path, URI, or identifier"
+        },
+        "audit_tip_hex": {
+          "type": "string",
+          "pattern": "^0x[0-9a-f]{64}$",
+          "description": "Audit chain tip at time of anchor (0x-prefixed, 64 hex chars)"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "RFC3339 timestamp of anchor creation"
+        },
+        "private": {
+          "type": "object",
+          "required": ["audit_tip_hex", "created_at"],
+          "properties": {
+            "audit_tip_hex": {
+              "type": "string",
+              "pattern": "^0x[0-9a-f]{64}$",
+              "description": "Private anchor audit tip (must match time_anchor.audit_tip_hex)"
+            },
+            "created_at": {
+              "type": "string",
+              "format": "date-time",
+              "description": "RFC3339 timestamp of private anchor creation"
+            }
+          },
+          "additionalProperties": false,
+          "description": "Private Anchor (Dual-Anchor v0.9.0, optional)"
+        },
+        "public": {
+          "type": "object",
+          "required": ["chain", "txid", "digest", "created_at"],
+          "properties": {
+            "chain": {
+              "type": "string",
+              "enum": ["ethereum", "hedera", "btc"],
+              "description": "Blockchain network"
+            },
+            "txid": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Transaction ID (format depends on chain)"
+            },
+            "digest": {
+              "type": "string",
+              "pattern": "^0x[0-9a-f]{64}$",
+              "description": "Hash of audit tip for on-chain notarization (0x-prefixed, 64 hex chars)"
+            },
+            "created_at": {
+              "type": "string",
+              "format": "date-time",
+              "description": "RFC3339 timestamp of public anchor creation"
+            }
+          },
+          "additionalProperties": false,
+          "description": "Public Anchor (Dual-Anchor v0.9.0, optional)"
+        }
+      },
+      "additionalProperties": false,
+      "description": "Time anchor with optional dual-anchor support (optional field)"
+    },
+    "sanctions_root": {
+      "type": "string",
+      "pattern": "^0x[0-9a-f]{64}$",
+      "description": "BLAKE3 root of sanctions list (optional, for ZK proofs)"
+    },
+    "jurisdiction_root": {
+      "type": "string",
+      "pattern": "^0x[0-9a-f]{64}$",
+      "description": "BLAKE3 root of jurisdiction list (optional, for ZK proofs)"
+    }
+  },
+  "additionalProperties": false
+}

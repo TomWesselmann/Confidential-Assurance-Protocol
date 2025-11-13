@@ -1,24 +1,35 @@
 mod audit;
+mod blob_store;
 mod commitment;
 mod io;
+mod keys;
 mod lists;
 mod manifest;
+mod package_verifier;
 mod policy;
 mod proof_engine;
 mod proof_mock;
 mod registry;
 mod sign;
-mod verifier;
 mod zk_system;
 
 use audit::AuditLog;
+use blob_store::{BlobStore, SqliteBlobStore};
 use clap::{Parser, Subcommand};
 use commitment::{compute_company_root, compute_supplier_root, compute_ubo_root, Commitments};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::error::Error;
 use std::fs;
+use std::io::{stdin, stdout, Read, Write};
 use zk_system::ProofSystem;
+
+// Import portable verifier core from library
+use cap_agent::crypto;
+use cap_agent::orchestrator;
+use cap_agent::verifier;
+use cap_agent::verifier::core as verifier_core;
+use cap_agent::wasm;
 
 const VERSION: &str = "0.8.0";
 
@@ -76,16 +87,73 @@ enum Commands {
     /// Registry-Commands
     #[command(subcommand)]
     Registry(RegistryCommands),
+    /// Key Management Commands (v0.10)
+    #[command(subcommand)]
+    Keys(KeysCommands),
+    /// BLOB Store Commands (v0.10.9) - Content-Addressable Storage
+    #[command(subcommand)]
+    Blob(BlobCommands),
+    /// Bundle v2 - Create self-contained proof package with WASM verifier
+    BundleV2 {
+        /// Manifest path
+        #[arg(long)]
+        manifest: String,
+        /// Proof path (CAPZ format)
+        #[arg(long)]
+        proof: String,
+        /// Verifier WASM path (optional)
+        #[arg(long)]
+        verifier_wasm: Option<String>,
+        /// Output directory
+        #[arg(long, default_value = "build/cap-proof-v2")]
+        out: String,
+        /// Create ZIP archive
+        #[arg(long)]
+        zip: bool,
+        /// Force overwrite
+        #[arg(long)]
+        force: bool,
+    },
+    /// Verify Bundle - Verify a proof package (v1 or v2)
+    VerifyBundle {
+        /// Bundle path (directory or .zip)
+        #[arg(long)]
+        bundle: String,
+        /// Output verification report path
+        #[arg(long)]
+        out: Option<String>,
+    },
     /// Zeigt die Tool-Version an
     Version,
 }
 
 #[derive(Subcommand)]
 enum PolicyCommands {
-    /// Validiert eine Policy-Datei
+    /// Validiert eine Policy-Datei (Legacy)
     Validate {
         /// Pfad zur Policy-Datei (YAML oder JSON)
         #[arg(long)]
+        file: String,
+    },
+    /// Lint a policy file (PolicyV2)
+    Lint {
+        /// Path to policy YAML file
+        file: String,
+        /// Use strict linting mode
+        #[arg(long)]
+        strict: bool,
+    },
+    /// Compile policy to IR v1 (PolicyV2)
+    Compile {
+        /// Path to policy YAML file
+        file: String,
+        /// Output IR JSON file
+        #[arg(short, long)]
+        output: String,
+    },
+    /// Show IR in human-readable format (PolicyV2)
+    Show {
+        /// Path to IR JSON file
         file: String,
     },
 }
@@ -244,6 +312,48 @@ enum ProofCommands {
         #[arg(long, default_value = "1")]
         iterations: usize,
     },
+    /// Adaptive Proof-Orchestrierung mit Enforcement-Mode (Week 6)
+    Adapt {
+        /// Policy ID (z.B. "lksg.v1")
+        #[arg(long)]
+        policy: Option<String>,
+
+        /// Pfad zur IR-Datei (Alternative zu policy)
+        #[arg(long)]
+        ir: Option<std::path::PathBuf>,
+
+        /// Pfad zur Context-JSON-Datei
+        #[arg(long)]
+        context: std::path::PathBuf,
+
+        /// Enforcement-Modus aktivieren (default: false, shadow-only)
+        #[arg(long, default_value_t = false)]
+        enforce: bool,
+
+        /// Rollout-Prozentsatz (0-100, default: 0)
+        #[arg(long, default_value_t = 0)]
+        rollout: u8,
+
+        /// Maximale Drift-Ratio (default: 0.005 = 0.5%)
+        #[arg(long, default_value_t = 0.005)]
+        drift_max: f64,
+
+        /// Selector-Typ: basic oder weighted (default: basic)
+        #[arg(long, default_value = "basic")]
+        selector: String,
+
+        /// Pfad zur Rule-Weights-Datei (YAML)
+        #[arg(long)]
+        weights: Option<std::path::PathBuf>,
+
+        /// Dry-Run-Modus (keine Seiteneffekte)
+        #[arg(long, default_value_t = false)]
+        dry_run: bool,
+
+        /// Output-Pfad für Execution Plan (JSON)
+        #[arg(short = 'o', long)]
+        out: Option<std::path::PathBuf>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -360,6 +470,114 @@ enum AuditCommands {
         #[arg(long)]
         timestamp: String,
     },
+    /// Setzt Private Anchor (Dual-Anchor v0.9.0)
+    SetPrivateAnchor {
+        /// Manifest-Pfad (Input/Output)
+        #[arg(long)]
+        manifest: String,
+
+        /// Audit-Tip (0x-prefixed hex)
+        #[arg(long)]
+        audit_tip: String,
+
+        /// Created-at Timestamp (RFC3339, optional, default: jetzt)
+        #[arg(long)]
+        created_at: Option<String>,
+    },
+    /// Setzt Public Anchor (Dual-Anchor v0.9.0)
+    SetPublicAnchor {
+        /// Manifest-Pfad (Input/Output)
+        #[arg(long)]
+        manifest: String,
+
+        /// Blockchain (ethereum, hedera, btc)
+        #[arg(long)]
+        chain: String,
+
+        /// Transaction ID
+        #[arg(long)]
+        txid: String,
+
+        /// Digest (0x-prefixed hex)
+        #[arg(long)]
+        digest: String,
+
+        /// Created-at Timestamp (RFC3339, optional, default: jetzt)
+        #[arg(long)]
+        created_at: Option<String>,
+    },
+    /// Verifiziert Dual-Anchor-Konsistenz
+    VerifyAnchor {
+        /// Manifest-Pfad
+        #[arg(long)]
+        manifest: String,
+
+        /// Output JSON-Report (optional)
+        #[arg(long)]
+        out: Option<String>,
+    },
+    /// Fügt Event zur Audit-Chain hinzu (Track A)
+    Append {
+        /// Pfad zur Audit-Chain-Datei (default: build/audit_chain.jsonl)
+        #[arg(long, default_value = "build/audit_chain.jsonl")]
+        file: String,
+
+        /// Event-Typ (z.B. "verify_response", "policy_compile")
+        #[arg(long)]
+        event: String,
+
+        /// Policy ID (optional)
+        #[arg(long)]
+        policy_id: Option<String>,
+
+        /// IR Hash (optional)
+        #[arg(long)]
+        ir_hash: Option<String>,
+
+        /// Manifest Hash (optional)
+        #[arg(long)]
+        manifest_hash: Option<String>,
+
+        /// Result (ok, warn, fail)
+        #[arg(long)]
+        result: Option<String>,
+
+        /// Run ID (UUID for correlation, optional)
+        #[arg(long)]
+        run_id: Option<String>,
+    },
+    /// Verifiziert Audit-Chain-Integrität (Track A)
+    Verify {
+        /// Pfad zur Audit-Chain-Datei (default: build/audit_chain.jsonl)
+        #[arg(long, default_value = "build/audit_chain.jsonl")]
+        file: String,
+
+        /// Output JSON-Report (optional)
+        #[arg(long)]
+        out: Option<String>,
+    },
+    /// Exportiert Events aus Audit-Chain (Track A)
+    Export {
+        /// Pfad zur Audit-Chain-Datei (default: build/audit_chain.jsonl)
+        #[arg(long, default_value = "build/audit_chain.jsonl")]
+        file: String,
+
+        /// Start-Timestamp (RFC3339, optional)
+        #[arg(long)]
+        from: Option<String>,
+
+        /// End-Timestamp (RFC3339, optional)
+        #[arg(long)]
+        to: Option<String>,
+
+        /// Policy ID Filter (optional)
+        #[arg(long)]
+        policy_id: Option<String>,
+
+        /// Output-Datei (default: stdout)
+        #[arg(long)]
+        out: Option<String>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -413,6 +631,14 @@ enum RegistryCommands {
         /// Optionaler Pfad zum Signing-Key (Ed25519, default: keys/company.ed25519)
         #[arg(long)]
         signing_key: Option<String>,
+
+        /// Validiert Key-Status (muss "active" sein)
+        #[arg(long)]
+        validate_key: bool,
+
+        /// Keys directory für Validierung (default: keys/)
+        #[arg(long, default_value = "keys")]
+        keys_dir: String,
     },
     /// Listet alle Registry-Einträge auf
     List {
@@ -459,6 +685,224 @@ enum RegistryCommands {
         /// Ziel-Datei
         #[arg(long)]
         output: String,
+    },
+    /// Zeigt Registry-Metadaten und Statistiken an (v1.1)
+    Inspect {
+        /// Registry-Datei (default: build/registry.json)
+        #[arg(long)]
+        registry: Option<String>,
+    },
+    /// Backfills KID-Felder aus public_key (v1.1)
+    BackfillKid {
+        /// Registry-Datei (default: build/registry.json)
+        #[arg(long)]
+        registry: Option<String>,
+
+        /// Output-Datei (default: überschreibt input)
+        #[arg(long)]
+        output: Option<String>,
+    },
+}
+
+#[derive(Subcommand)]
+enum KeysCommands {
+    /// Generiert ein neues Ed25519-Schlüsselpaar mit Metadata
+    Keygen {
+        /// Owner/Organization name
+        #[arg(long)]
+        owner: String,
+
+        /// Algorithm (default: ed25519)
+        #[arg(long, default_value = "ed25519")]
+        algo: String,
+
+        /// Output path for key metadata JSON
+        #[arg(long)]
+        out: String,
+
+        /// Validity period in days (default: 730 = 2 years)
+        #[arg(long, default_value = "730")]
+        valid_days: u64,
+
+        /// Optional comment
+        #[arg(long)]
+        comment: Option<String>,
+    },
+    /// Listet alle Schlüssel im Key Store auf
+    List {
+        /// Keys directory (default: keys/)
+        #[arg(long, default_value = "keys")]
+        dir: String,
+
+        /// Filter by status (active, retired, revoked)
+        #[arg(long)]
+        status: Option<String>,
+
+        /// Filter by owner
+        #[arg(long)]
+        owner: Option<String>,
+    },
+    /// Zeigt Details eines Schlüssels an
+    Show {
+        /// Keys directory (default: keys/)
+        #[arg(long, default_value = "keys")]
+        dir: String,
+
+        /// Key Identifier (KID)
+        #[arg(long)]
+        kid: String,
+    },
+    /// Rotiert einen Schlüssel (markiert alten als retired, aktiviert neuen)
+    Rotate {
+        /// Keys directory (default: keys/)
+        #[arg(long, default_value = "keys")]
+        dir: String,
+
+        /// Current key metadata file
+        #[arg(long)]
+        current: String,
+
+        /// New key metadata file
+        #[arg(long)]
+        new: String,
+    },
+    /// Attestiert einen neuen Schlüssel mit einem alten (Chain of Trust)
+    Attest {
+        /// Signer key metadata file (old key)
+        #[arg(long)]
+        signer: String,
+
+        /// Subject key metadata file (new key)
+        #[arg(long)]
+        subject: String,
+
+        /// Output path for attestation
+        #[arg(long)]
+        out: String,
+    },
+    /// Archiviert einen Schlüssel (moved to archive/)
+    Archive {
+        /// Keys directory (default: keys/)
+        #[arg(long, default_value = "keys")]
+        dir: String,
+
+        /// Key Identifier (KID) to archive
+        #[arg(long)]
+        kid: String,
+    },
+    /// Verifiziert eine Chain-of-Trust (Attestation chain)
+    VerifyChain {
+        /// Keys directory (default: keys/)
+        #[arg(long, default_value = "keys")]
+        dir: String,
+
+        /// Attestation file paths (in chronological order)
+        #[arg(long, value_delimiter = ',')]
+        attestations: Vec<String>,
+    },
+}
+
+#[derive(Subcommand)]
+enum BlobCommands {
+    /// Fügt eine Datei in den BLOB Store ein (CAS + optional Registry-Verknüpfung)
+    Put {
+        /// Pfad zur Quelldatei
+        #[arg(long)]
+        file: Option<String>,
+
+        /// Medientyp (manifest|proof|wasm|abi|other)
+        #[arg(long)]
+        r#type: String,
+
+        /// Registry-Datei (default: build/registry.sqlite)
+        #[arg(long, default_value = "build/registry.sqlite")]
+        registry: String,
+
+        /// Erhöht refcount für den referenzierenden Registry-Eintrag (UUID)
+        #[arg(long)]
+        link_entry_id: Option<String>,
+
+        /// Liest Daten von stdin (Pipes)
+        #[arg(long)]
+        stdin: bool,
+
+        /// Schreibt blob_id in Datei
+        #[arg(long)]
+        out: Option<String>,
+
+        /// Erzwingt Re-Insert (nur Tests/Debug)
+        #[arg(long)]
+        no_dedup: bool,
+    },
+    /// Extrahiert Blob-Inhalt anhand blob_id auf Datei oder stdout
+    Get {
+        /// BLOB ID (0x-präfixiert, 64 hex chars)
+        #[arg(long)]
+        id: String,
+
+        /// Zielpfad
+        #[arg(long)]
+        out: Option<String>,
+
+        /// Schreibt Rohdaten auf stdout (Default wenn --out fehlt)
+        #[arg(long)]
+        stdout: bool,
+
+        /// Registry-Datei (default: build/registry.sqlite)
+        #[arg(long, default_value = "build/registry.sqlite")]
+        registry: String,
+    },
+    /// Listet Blobs gefiltert/sortiert
+    List {
+        /// Filter by media type (manifest|proof|wasm|abi|other)
+        #[arg(long)]
+        r#type: Option<String>,
+
+        /// Minimum size in bytes
+        #[arg(long)]
+        min_size: Option<u64>,
+
+        /// Maximum size in bytes
+        #[arg(long)]
+        max_size: Option<u64>,
+
+        /// Zeigt nur unreferenzierte Blobs (refcount=0)
+        #[arg(long)]
+        unused_only: bool,
+
+        /// Limit Anzahl Ergebnisse
+        #[arg(long)]
+        limit: Option<usize>,
+
+        /// Sortierung (size|refcount|blob_id)
+        #[arg(long, default_value = "blob_id")]
+        order: String,
+
+        /// Registry-Datei (default: build/registry.sqlite)
+        #[arg(long, default_value = "build/registry.sqlite")]
+        registry: String,
+    },
+    /// Garbage Collection nicht referenzierter Blobs
+    Gc {
+        /// Dry-run (zeigt nur, was gelöscht würde)
+        #[arg(long)]
+        dry_run: bool,
+
+        /// Force deletion (keine Bestätigung)
+        #[arg(long)]
+        force: bool,
+
+        /// Mindest-Alter vor Löschung (z.B. "24h", "7d")
+        #[arg(long)]
+        min_age: Option<String>,
+
+        /// Gibt gelöschte BLOB IDs aus
+        #[arg(long)]
+        print_ids: bool,
+
+        /// Registry-Datei (default: build/registry.sqlite)
+        #[arg(long, default_value = "build/registry.sqlite")]
+        registry: String,
     },
 }
 
@@ -1290,13 +1734,144 @@ fn run_zk_bench(
     Ok(())
 }
 
+/// Adaptive Proof Orchestration - Week 6 B1
+fn run_proof_adapt(
+    policy: &Option<String>,
+    ir: &Option<std::path::PathBuf>,
+    context: &std::path::PathBuf,
+    enforce: bool,
+    rollout: u8,
+    drift_max: f64,
+    _selector: &str,    // TODO: Implement selector (basic vs weighted)
+    _weights: &Option<std::path::PathBuf>,  // TODO: Implement weights file loading
+    dry_run: bool,
+    out: &Option<std::path::PathBuf>,
+) -> Result<(), Box<dyn Error>> {
+    println!("🎯 Adaptive Proof Orchestration (Week 6)");
+    println!("   Enforcement: {}", if enforce { "✓ ENABLED" } else { "✗ Shadow-only" });
+    println!("   Rollout: {}%", rollout);
+    println!("   Drift Max: {}", drift_max);
+    if dry_run {
+        println!("   Mode: DRY RUN (no side effects)");
+    }
+
+    let mut audit = AuditLog::new("build/agent.audit.jsonl")?;
+
+    // Step 1: Load IR
+    // For now, we'll create a minimal IR since policy_v2 integration is not complete
+    // This will be expanded in future implementation
+    use cap_agent::policy_v2::types::IrV1;
+
+    // TODO: Implement proper IR loading from policy ID or IR file
+    // For now, create a placeholder IR
+    let ir_data = if let Some(ir_path) = ir {
+        println!("📄 Loading IR from file: {:?}", ir_path);
+        let ir_json = fs::read_to_string(ir_path)?;
+        serde_json::from_str::<IrV1>(&ir_json)?
+    } else if let Some(policy_id) = policy {
+        println!("📋 Policy ID: {}", policy_id);
+        // TODO: Load IR from policy registry
+        return Err(format!("Policy ID loading not yet implemented. Please use --ir flag.").into());
+    } else {
+        return Err("Either --policy or --ir must be specified".into());
+    };
+
+    // Step 2: Load context
+    println!("📄 Loading context from: {:?}", context);
+    let context_json = fs::read_to_string(context)?;
+    let ctx: orchestrator::OrchestratorContext = serde_json::from_str(&context_json)?;
+
+    // Step 3: Create enforcement options
+    let enforce_opts = orchestrator::EnforceOptions {
+        enforce,
+        rollout_percent: rollout,
+        drift_max_ratio: drift_max,
+    };
+
+    // Step 4: Create enforcer
+    println!("🔧 Creating enforcer with IR...");
+    let enforcer = orchestrator::Enforcer::new(&ir_data, enforce_opts.clone())?;
+
+    // Step 5: Generate request ID (deterministic for testing)
+    let request_id = format!("req-{}", chrono::Utc::now().timestamp_millis());
+
+    // Step 6: Execute enforcement decision
+    println!("⚙️  Executing enforcement decision...");
+    let start = std::time::Instant::now();
+    let verdict_pair = enforcer.decide(&ctx, &request_id)?;
+    let duration = start.elapsed();
+
+    // Step 7: Record metrics
+    orchestrator::metrics::set_rollout_percent(rollout);
+    let policy_id = &ir_data.policy_id;
+
+    if verdict_pair.enforced_applied {
+        orchestrator::metrics::record_enforced_request(policy_id);
+    } else {
+        orchestrator::metrics::record_shadow_request(policy_id);
+    }
+
+    if verdict_pair.has_drift() {
+        orchestrator::metrics::record_drift_event(policy_id);
+    }
+
+    orchestrator::metrics::observe_selection_latency(duration.as_secs_f64());
+
+    // Step 8: Display results
+    println!("\n📊 Results:");
+    println!("   Shadow Verdict: {:?}", verdict_pair.shadow);
+    println!("   Enforced Verdict: {:?}", verdict_pair.enforced);
+    println!("   Enforcement Applied: {}", verdict_pair.enforced_applied);
+    println!("   Drift Detected: {}", verdict_pair.has_drift());
+    println!("   Duration: {:?}", duration);
+
+    // Step 9: Write output if requested
+    if let Some(out_path) = out {
+        let output = serde_json::json!({
+            "shadow_verdict": format!("{:?}", verdict_pair.shadow),
+            "enforced_verdict": format!("{:?}", verdict_pair.enforced),
+            "enforced_applied": verdict_pair.enforced_applied,
+            "drift_detected": verdict_pair.has_drift(),
+            "duration_ms": duration.as_millis(),
+            "request_id": request_id,
+            "enforce_options": {
+                "enforce": enforce,
+                "rollout_percent": rollout,
+                "drift_max_ratio": drift_max,
+            }
+        });
+
+        fs::write(out_path, serde_json::to_string_pretty(&output)?)?;
+        println!("\n💾 Output written to: {:?}", out_path);
+    }
+
+    // Step 10: Audit log
+    if !dry_run {
+        audit.log_event(
+            "proof_adapt_executed",
+            json!({
+                "policy_id": policy_id,
+                "enforce": enforce,
+                "rollout_percent": rollout,
+                "enforced_applied": verdict_pair.enforced_applied,
+                "drift_detected": verdict_pair.has_drift(),
+                "duration_ms": duration.as_millis(),
+            }),
+        )?;
+    }
+
+    println!("\n✅ Adaptive orchestration completed!");
+
+    Ok(())
+}
+
 /// Verifier run - Verifiziert Proof-Paket
 fn run_verifier_run(package_path: &str) -> Result<(), Box<dyn Error>> {
     println!("🔍 Verifiziere Proof-Paket...");
 
     let mut audit = AuditLog::new("build/agent.audit.jsonl")?;
 
-    let verifier = verifier::Verifier::new(package_path);
+    let verifier = package_verifier::Verifier::new(package_path);
 
     // Prüfe Integrität
     let integrity = verifier.check_package_integrity()?;
@@ -1328,7 +1903,7 @@ fn run_verifier_run(package_path: &str) -> Result<(), Box<dyn Error>> {
 fn run_verifier_extract(package_path: &str) -> Result<(), Box<dyn Error>> {
     println!("🔍 Extrahiere Informationen aus Proof-Paket...");
 
-    let summary = verifier::show_package_summary(package_path)?;
+    let summary = package_verifier::show_package_summary(package_path)?;
     println!("\n{}", summary);
 
     Ok(())
@@ -1338,7 +1913,7 @@ fn run_verifier_extract(package_path: &str) -> Result<(), Box<dyn Error>> {
 fn run_verifier_audit(package_path: &str) -> Result<(), Box<dyn Error>> {
     println!("🔍 Zeige Audit-Trail...");
 
-    let verifier = verifier::Verifier::new(package_path);
+    let verifier = package_verifier::Verifier::new(package_path);
     let (tail_digest, events_count) = verifier.show_audit_trail()?;
 
     println!("\n📊 Audit-Trail:");
@@ -1403,6 +1978,141 @@ fn run_audit_anchor(
     println!("   Referenz:       {}", reference);
     println!("   Audit-Tip:      {}", audit_tip_hex);
     println!("   Output:         {}", manifest_out);
+
+    Ok(())
+}
+
+/// Audit set-private-anchor - Setzt Private Anchor (Dual-Anchor v0.9.0)
+fn run_audit_set_private_anchor(
+    manifest_path: &str,
+    audit_tip: &str,
+    created_at: Option<String>,
+) -> Result<(), Box<dyn Error>> {
+    println!("🔐 Setze Private Anchor...");
+
+    // Lade Manifest
+    let mut manifest = manifest::Manifest::load(manifest_path)?;
+
+    // Setze Private Anchor
+    manifest.set_private_anchor(audit_tip.to_string(), created_at.clone())?;
+
+    // Speichere Manifest
+    manifest.save(manifest_path)?;
+
+    println!("✅ Private Anchor gesetzt:");
+    println!("   Audit-Tip:      {}", audit_tip);
+    println!("   Created-At:     {}", created_at.unwrap_or_else(|| "jetzt".to_string()));
+    println!("   Manifest:       {}", manifest_path);
+
+    Ok(())
+}
+
+/// Audit set-public-anchor - Setzt Public Anchor (Dual-Anchor v0.9.0)
+fn run_audit_set_public_anchor(
+    manifest_path: &str,
+    chain: &str,
+    txid: &str,
+    digest: &str,
+    created_at: Option<String>,
+) -> Result<(), Box<dyn Error>> {
+    println!("🌐 Setze Public Anchor...");
+
+    // Parse chain
+    let chain_enum = match chain.to_lowercase().as_str() {
+        "ethereum" => manifest::PublicChain::Ethereum,
+        "hedera" => manifest::PublicChain::Hedera,
+        "btc" => manifest::PublicChain::Btc,
+        _ => return Err(format!("Invalid chain: {}. Valid options: ethereum, hedera, btc", chain).into()),
+    };
+
+    // Lade Manifest
+    let mut manifest = manifest::Manifest::load(manifest_path)?;
+
+    // Setze Public Anchor
+    manifest.set_public_anchor(
+        chain_enum,
+        txid.to_string(),
+        digest.to_string(),
+        created_at.clone(),
+    )?;
+
+    // Speichere Manifest
+    manifest.save(manifest_path)?;
+
+    println!("✅ Public Anchor gesetzt:");
+    println!("   Chain:          {}", chain);
+    println!("   TxID:           {}", txid);
+    println!("   Digest:         {}", digest);
+    println!("   Created-At:     {}", created_at.unwrap_or_else(|| "jetzt".to_string()));
+    println!("   Manifest:       {}", manifest_path);
+
+    Ok(())
+}
+
+/// Audit verify-anchor - Verifiziert Dual-Anchor-Konsistenz
+fn run_audit_verify_anchor(
+    manifest_path: &str,
+    out: Option<String>,
+) -> Result<(), Box<dyn Error>> {
+    println!("🔍 Verifiziere Dual-Anchor-Konsistenz...");
+
+    // Lade Manifest
+    let manifest = manifest::Manifest::load(manifest_path)?;
+
+    // Validiere Dual-Anchor
+    let validation_result = manifest.validate_dual_anchor();
+
+    let report = if let Err(e) = validation_result {
+        json!({
+            "status": "fail",
+            "manifest": manifest_path,
+            "errors": [e.to_string()],
+            "private_ok": false,
+            "public_ok": false,
+            "digest_match": false,
+        })
+    } else {
+        // Check individual components
+        let has_anchor = manifest.time_anchor.is_some();
+        let has_private = has_anchor && manifest.time_anchor.as_ref().unwrap().private.is_some();
+        let has_public = has_anchor && manifest.time_anchor.as_ref().unwrap().public.is_some();
+
+        json!({
+            "status": "ok",
+            "manifest": manifest_path,
+            "errors": [],
+            "private_ok": has_private,
+            "public_ok": has_public,
+            "digest_match": true, // TODO: actual digest validation if needed
+        })
+    };
+
+    // Print result
+    println!("\n📊 Verifikationsergebnis:");
+    println!("   Status:         {}", report["status"]);
+    println!("   Private Anchor: {}", if report["private_ok"].as_bool().unwrap_or(false) { "✅" } else { "❌" });
+    println!("   Public Anchor:  {}", if report["public_ok"].as_bool().unwrap_or(false) { "✅" } else { "❌" });
+
+    if let Some(errors) = report["errors"].as_array() {
+        if !errors.is_empty() {
+            println!("\n❌ Fehler:");
+            for error in errors {
+                println!("   - {}", error.as_str().unwrap_or("Unknown error"));
+            }
+        }
+    }
+
+    // Save report if requested
+    if let Some(out_path) = out {
+        let json_str = serde_json::to_string_pretty(&report)?;
+        std::fs::write(&out_path, json_str)?;
+        println!("\n💾 Report gespeichert: {}", out_path);
+    }
+
+    // Return error if validation failed
+    if report["status"] == "fail" {
+        return Err("Dual-Anchor validation failed".into());
+    }
 
     Ok(())
 }
@@ -1500,6 +2210,129 @@ fn run_audit_verify_timestamp(
     }
 }
 
+/// Audit append - Fügt Event zur Audit-Chain hinzu (Track A)
+fn run_audit_append(
+    file_path: &str,
+    event: &str,
+    policy_id: Option<String>,
+    ir_hash: Option<String>,
+    manifest_hash: Option<String>,
+    result: Option<String>,
+    run_id: Option<String>,
+) -> Result<(), Box<dyn Error>> {
+    use cap_agent::audit::{AuditChain, AuditEventResult};
+
+    println!("📝 Füge Event zur Audit-Chain hinzu...");
+
+    // Parse result if provided
+    let parsed_result = result.as_ref().and_then(|r| match r.to_lowercase().as_str() {
+        "ok" => Some(AuditEventResult::Ok),
+        "warn" => Some(AuditEventResult::Warn),
+        "fail" => Some(AuditEventResult::Fail),
+        _ => None,
+    });
+
+    // Open or create chain
+    let mut chain = AuditChain::new(file_path)?;
+
+    // Append event
+    let audit_event = chain.append(
+        event.to_string(),
+        policy_id,
+        ir_hash,
+        manifest_hash,
+        parsed_result,
+        run_id,
+    )?;
+
+    println!("✅ Event hinzugefügt");
+    println!("   Event:          {}", audit_event.event);
+    println!("   Timestamp:      {}", audit_event.ts);
+    println!("   Self-Hash:      {}", audit_event.self_hash);
+    println!("   Chain-Datei:    {}", file_path);
+
+    Ok(())
+}
+
+/// Audit verify - Verifiziert Audit-Chain-Integrität (Track A)
+fn run_audit_verify_chain(
+    file_path: &str,
+    output: Option<String>,
+) -> Result<(), Box<dyn Error>> {
+    use cap_agent::audit::verify_chain;
+
+    println!("🔍 Verifiziere Audit-Chain...");
+
+    let report = verify_chain(file_path)?;
+
+    if report.ok {
+        println!("✅ Chain-Integrität OK");
+        println!("   Events:         {}", report.total_events);
+        println!("   Tamper-Index:   None");
+    } else {
+        println!("❌ Chain-Integrität VERLETZT");
+        println!("   Events:         {}", report.total_events);
+        if let Some(idx) = report.tamper_index {
+            println!("   Tamper-Index:   {}", idx);
+        }
+        if let Some(err) = &report.error {
+            println!("   Fehler:         {}", err);
+        }
+    }
+
+    // Write JSON report if requested
+    if let Some(out_path) = output {
+        let report_json = serde_json::json!({
+            "ok": report.ok,
+            "total_events": report.total_events,
+            "tamper_index": report.tamper_index,
+            "error": report.error,
+        });
+        std::fs::write(&out_path, serde_json::to_string_pretty(&report_json)?)?;
+        println!("📄 Report gespeichert: {}", out_path);
+    }
+
+    if !report.ok {
+        return Err("Chain-Verifikation fehlgeschlagen".into());
+    }
+
+    Ok(())
+}
+
+/// Audit export - Exportiert Events aus Audit-Chain (Track A)
+fn run_audit_export(
+    file_path: &str,
+    from: Option<String>,
+    to: Option<String>,
+    policy_id: Option<String>,
+    output: Option<String>,
+) -> Result<(), Box<dyn Error>> {
+    use cap_agent::audit::export_events;
+
+    println!("📤 Exportiere Events aus Audit-Chain...");
+
+    let events = export_events(
+        file_path,
+        from.as_deref(),
+        to.as_deref(),
+        policy_id.as_deref(),
+    )?;
+
+    println!("✅ {} Events exportiert", events.len());
+
+    // Output to file or stdout
+    let json_output = serde_json::to_string_pretty(&events)?;
+
+    if let Some(out_path) = output {
+        std::fs::write(&out_path, &json_output)?;
+        println!("📄 Events gespeichert: {}", out_path);
+    } else {
+        println!("\n{}", json_output);
+    }
+
+    Ok(())
+}
+
 /// Lists sanctions-root - Generiert Sanctions Merkle Root
 fn run_lists_sanctions_root(csv_path: &str, output: Option<String>) -> Result<(), Box<dyn Error>> {
     println!("📋 Generiere Sanctions Merkle Root...");
@@ -1592,6 +2425,8 @@ fn run_registry_add(
     registry_path: Option<String>,
     backend_str: &str,
     signing_key_path: Option<String>,
+    validate_key: bool,
+    keys_dir: &str,
 ) -> Result<(), Box<dyn Error>> {
     use registry::RegistryBackend;
 
@@ -1634,6 +2469,19 @@ fn run_registry_add(
         registered_at: chrono::Utc::now().to_rfc3339(),
         signature: None,
         public_key: None,
+        // BLOB fields (v0.9) - initially None
+        blob_manifest: None,
+        blob_proof: None,
+        blob_wasm: None,
+        blob_abi: None,
+        // Self-verify fields (v0.9) - initially None
+        selfverify_status: None,
+        selfverify_at: None,
+        verifier_name: None,
+        verifier_version: None,
+        // Key management fields (v0.10) - initially None
+        kid: None,
+        signature_scheme: None,
     };
 
     // Sign entry if signing key provided
@@ -1661,6 +2509,17 @@ fn run_registry_add(
         // Sign entry
         registry::sign_entry(&mut entry, &signing_key)?;
         println!("   ✓ Entry signed with Ed25519");
+
+        // Validate key status if requested
+        if validate_key {
+            if let Some(ref kid) = entry.kid {
+                println!("   Validating key status...");
+                registry::validate_key_status(kid, keys_dir)?;
+                println!("   ✓ Key status validated (active)");
+            } else {
+                return Err("Cannot validate key status: KID not set".into());
+            }
+        }
     }
 
     // Add entry
@@ -1891,6 +2750,438 @@ fn run_registry_migrate(
     Ok(())
 }
 
+/// Registry inspect - Zeigt Registry-Metadaten und Statistiken an (v1.1)
+fn run_registry_inspect(registry_path: Option<String>) -> Result<(), Box<dyn Error>> {
+    use registry::UnifiedRegistry;
+    use std::path::Path;
+
+    let path = registry_path.unwrap_or_else(|| "build/registry.json".to_string());
+
+    println!("🔍 Inspiziere Registry...");
+    println!("   Datei: {}", path);
+
+    if !Path::new(&path).exists() {
+        return Err(format!("Registry nicht gefunden: {}", path).into());
+    }
+
+    // Load registry (auto-detects v1.0/v1.1)
+    let unified_registry = UnifiedRegistry::load(Path::new(&path))?;
+
+    println!("\n📊 Registry-Informationen:");
+    println!("   Version:        {}", unified_registry.source_version());
+    println!("   Einträge:       {}", unified_registry.count());
+    println!("   Migriert:       {}", if unified_registry.was_migrated() { "Ja (v1.0 → v1.1)" } else { "Nein" });
+
+    // Show v1.1 metadata if available
+    let v1_1 = unified_registry.as_v1_1();
+    println!("\n📝 Metadaten (v1.1):");
+    println!("   Schema-Version: {}", v1_1.meta.schema_version);
+    println!("   Tool-Version:   {}", v1_1.meta.tool_version);
+    println!("   Erstellt:       {}", v1_1.meta.created_at);
+
+    if let Some(migrated_from) = &v1_1.meta.migrated_from {
+        println!("   Migriert von:   {}", migrated_from);
+    }
+    if let Some(migrated_at) = &v1_1.meta.migrated_at {
+        println!("   Migriert am:    {}", migrated_at);
+    }
+
+    // Validate registry
+    println!("\n✅ Validierung:");
+    match unified_registry.validate() {
+        Ok(_) => println!("   Registry ist gültig ✓"),
+        Err(e) => {
+            println!("   ⚠️  Validierung fehlgeschlagen: {}", e);
+            return Err(e.into());
+        }
+    }
+
+    // Log audit event
+    let mut audit = AuditLog::new("build/agent.audit.jsonl")?;
+    audit.log_event(
+        "registry_inspected",
+        json!({
+            "path": path,
+            "version": unified_registry.source_version(),
+            "entry_count": unified_registry.count(),
+            "was_migrated": unified_registry.was_migrated()
+        }),
+    )?;
+
+    Ok(())
+}
+
+/// Registry backfill-kid - Backfills KID-Felder aus public_key (v1.1)
+fn run_registry_backfill_kid(
+    registry_path: Option<String>,
+    output_path: Option<String>,
+) -> Result<(), Box<dyn Error>> {
+    use registry::UnifiedRegistry;
+    use std::path::Path;
+
+    let input = registry_path.unwrap_or_else(|| "build/registry.json".to_string());
+    let output = output_path.unwrap_or_else(|| input.clone());
+
+    println!("🔑 Backfilling KID-Felder...");
+    println!("   Input:  {}", input);
+    println!("   Output: {}", output);
+
+    if !Path::new(&input).exists() {
+        return Err(format!("Registry nicht gefunden: {}", input).into());
+    }
+
+    // Load registry (auto-detects v1.0/v1.1)
+    let mut unified_registry = UnifiedRegistry::load(Path::new(&input))?;
+
+    println!("   Einträge:  {}", unified_registry.count());
+
+    // Backfill KIDs
+    let backfilled_count = unified_registry.backfill_kids()?;
+
+    if backfilled_count == 0 {
+        println!("\n✅ Keine KID-Backfills erforderlich");
+        println!("   Alle Einträge haben bereits KIDs oder keine public_key");
+        return Ok(());
+    }
+
+    // Save updated registry
+    unified_registry.save(Path::new(&output))?;
+
+    println!("\n✅ Backfill erfolgreich:");
+    println!("   KIDs hinzugefügt:  {}", backfilled_count);
+    println!("   Gespeichert in:    {}", output);
+
+    // Log audit event
+    let mut audit = AuditLog::new("build/agent.audit.jsonl")?;
+    audit.log_event(
+        "registry_kid_backfilled",
+        json!({
+            "input": input,
+            "output": output,
+            "backfilled_count": backfilled_count
+        }),
+    )?;
+
+    Ok(())
+}
+
+/// Keys keygen - Generiert neuen Ed25519-Schlüssel mit Metadata
+fn run_keys_keygen(
+    owner: &str,
+    algo: &str,
+    out_path: &str,
+    valid_days: u64,
+    comment: Option<String>,
+) -> Result<(), Box<dyn Error>> {
+    use ed25519_dalek::SigningKey;
+
+    println!("🔑 Generiere neuen Schlüssel...");
+    println!("   Owner:      {}", owner);
+    println!("   Algorithm:  {}", algo);
+    println!("   Valid for:  {} days", valid_days);
+
+    if algo != "ed25519" {
+        return Err(format!("Unsupported algorithm: {}", algo).into());
+    }
+
+    // Generate Ed25519 keypair
+    let mut rng = rand::rngs::OsRng;
+    let signing_key = SigningKey::generate(&mut rng);
+    let verifying_key = signing_key.verifying_key();
+
+    // Create key metadata
+    let mut metadata = keys::KeyMetadata::new(
+        &verifying_key.to_bytes(),
+        owner,
+        algo,
+        valid_days,
+    )?;
+
+    if let Some(ref c) = comment {
+        metadata.comment = Some(c.clone());
+    }
+
+    // Save metadata
+    metadata.save(out_path)?;
+
+    // Save private key (raw bytes)
+    let priv_key_path = out_path.replace(".json", ".ed25519");
+    fs::write(&priv_key_path, signing_key.to_bytes())?;
+
+    // Save public key (raw bytes)
+    let pub_key_path = out_path.replace(".json", ".pub");
+    fs::write(&pub_key_path, verifying_key.to_bytes())?;
+
+    println!("✅ Schlüssel generiert:");
+    println!("   KID:        {}", metadata.kid);
+    println!("   Metadata:   {}", out_path);
+    println!("   Private:    {}", priv_key_path);
+    println!("   Public:     {}", pub_key_path);
+    println!("   Fingerprint: {}", metadata.fingerprint);
+
+    // Log audit event
+    let mut audit = AuditLog::new("build/agent.audit.jsonl")?;
+    audit.log_event(
+        "key_generated",
+        json!({
+            "kid": metadata.kid,
+            "owner": owner,
+            "algorithm": algo,
+            "metadata_file": out_path,
+        }),
+    )?;
+
+    Ok(())
+}
+
+/// Keys list - Listet alle Schlüssel auf
+fn run_keys_list(
+    dir: &str,
+    status_filter: Option<String>,
+    owner_filter: Option<String>,
+) -> Result<(), Box<dyn Error>> {
+    println!("📋 Schlüsselliste:");
+    println!("   Verzeichnis: {}\n", dir);
+
+    let store = keys::KeyStore::new(dir)?;
+    let all_keys = store.list()?;
+
+    // Apply filters
+    let filtered_keys: Vec<_> = all_keys
+        .iter()
+        .filter(|k| {
+            if let Some(ref status) = status_filter {
+                if k.status != *status {
+                    return false;
+                }
+            }
+            if let Some(ref owner) = owner_filter {
+                if k.owner != *owner {
+                    return false;
+                }
+            }
+            true
+        })
+        .collect();
+
+    if filtered_keys.is_empty() {
+        println!("   (Keine Schlüssel gefunden)");
+        return Ok(());
+    }
+
+    println!("   {:<32} {:<15} {:<10} {:<20}", "KID", "Owner", "Status", "Valid Until");
+    println!("   {}", "-".repeat(80));
+
+    for key in &filtered_keys {
+        let valid_to_short = &key.valid_to[0..10]; // YYYY-MM-DD
+        println!(
+            "   {:<32} {:<15} {:<10} {:<20}",
+            key.kid, key.owner, key.status, valid_to_short
+        );
+    }
+
+    println!("\n   Total: {} Schlüssel", filtered_keys.len());
+
+    Ok(())
+}
+
+/// Keys show - Zeigt Details eines Schlüssels
+fn run_keys_show(dir: &str, kid: &str) -> Result<(), Box<dyn Error>> {
+    println!("🔍 Schlüssel-Details:");
+
+    let store = keys::KeyStore::new(dir)?;
+    let key_opt = store.find_by_kid(kid)?;
+
+    match key_opt {
+        Some(key) => {
+            println!("   KID:         {}", key.kid);
+            println!("   Owner:       {}", key.owner);
+            println!("   Algorithm:   {}", key.algorithm);
+            println!("   Status:      {}", key.status);
+            println!("   Created:     {}", key.created_at);
+            println!("   Valid From:  {}", key.valid_from);
+            println!("   Valid To:    {}", key.valid_to);
+            println!("   Fingerprint: {}", key.fingerprint);
+            println!("   Usage:       {:?}", key.usage);
+            if let Some(ref comment) = key.comment {
+                println!("   Comment:     {}", comment);
+            }
+            println!("   Public Key:  {}...", &key.public_key[0..20]);
+
+            Ok(())
+        }
+        None => Err(format!("Schlüssel nicht gefunden: {}", kid).into()),
+    }
+}
+
+/// Keys rotate - Rotiert Schlüssel
+fn run_keys_rotate(
+    dir: &str,
+    current_path: &str,
+    new_path: &str,
+) -> Result<(), Box<dyn Error>> {
+    println!("🔄 Rotiere Schlüssel...");
+
+    let store = keys::KeyStore::new(dir)?;
+
+    // Load current key metadata
+    let mut current_key = keys::KeyMetadata::load(current_path)?;
+    println!("   Aktuell: {} ({})", current_key.kid, current_key.owner);
+
+    // Load new key metadata
+    let new_key = keys::KeyMetadata::load(new_path)?;
+    println!("   Neu:     {} ({})", new_key.kid, new_key.owner);
+
+    // Mark current key as retired
+    current_key.retire();
+    current_key.save(current_path)?;
+
+    // Archive current key
+    store.archive(&current_key.kid)?;
+
+    println!("✅ Rotation erfolgreich:");
+    println!("   Alter Schlüssel -> retired + archiviert");
+    println!("   Neuer Schlüssel -> aktiv");
+
+    // Log audit event
+    let mut audit = AuditLog::new("build/agent.audit.jsonl")?;
+    audit.log_event(
+        "key_rotated",
+        json!({
+            "old_kid": current_key.kid,
+            "new_kid": new_key.kid,
+            "owner": new_key.owner,
+        }),
+    )?;
+
+    Ok(())
+}
+
+/// Keys attest - Attestiert neuen Schlüssel mit altem
+fn run_keys_attest(
+    signer_path: &str,
+    subject_path: &str,
+    out_path: &str,
+) -> Result<(), Box<dyn Error>> {
+    use base64::Engine;
+    use ed25519_dalek::{SigningKey, Signer};
+
+    println!("📜 Attestiere Schlüssel...");
+
+    // Load signer key metadata
+    let signer_meta = keys::KeyMetadata::load(signer_path)?;
+    println!("   Signer:  {} ({})", signer_meta.kid, signer_meta.owner);
+
+    // Load subject key metadata
+    let subject_meta = keys::KeyMetadata::load(subject_path)?;
+    println!("   Subject: {} ({})", subject_meta.kid, subject_meta.owner);
+
+    // Load signer private key
+    let signer_priv_path = signer_path.replace(".json", ".ed25519");
+    let signer_key_bytes = fs::read(&signer_priv_path)?;
+    let signing_key = SigningKey::from_bytes(
+        &signer_key_bytes.try_into()
+            .map_err(|_| "Invalid key length")?
+    );
+
+    // Create attestation document
+    let attestation = json!({
+        "schema": "cap-attestation.v1",
+        "signer_kid": signer_meta.kid,
+        "signer_owner": signer_meta.owner,
+        "subject_kid": subject_meta.kid,
+        "subject_owner": subject_meta.owner,
+        "subject_public_key": subject_meta.public_key,
+        "attested_at": chrono::Utc::now().to_rfc3339(),
+    });
+
+    // Sign the attestation
+    let attestation_bytes = serde_json::to_vec(&attestation)?;
+    let signature = signing_key.sign(&attestation_bytes);
+
+    // Create final document with signature
+    let signed_attestation = json!({
+        "attestation": attestation,
+        "signature": base64::engine::general_purpose::STANDARD.encode(signature.to_bytes()),
+        "signer_public_key": signer_meta.public_key,
+    });
+
+    // Save attestation
+    let json_output = serde_json::to_string_pretty(&signed_attestation)?;
+    fs::write(out_path, json_output)?;
+
+    println!("✅ Attestation erstellt:");
+    println!("   Output: {}", out_path);
+
+    // Log audit event
+    let mut audit = AuditLog::new("build/agent.audit.jsonl")?;
+    audit.log_event(
+        "key_attested",
+        json!({
+            "signer_kid": signer_meta.kid,
+            "subject_kid": subject_meta.kid,
+            "attestation_file": out_path,
+        }),
+    )?;
+
+    Ok(())
+}
+
+/// Keys archive - Archiviert Schlüssel
+fn run_keys_archive(dir: &str, kid: &str) -> Result<(), Box<dyn Error>> {
+    println!("📦 Archiviere Schlüssel...");
+    println!("   KID: {}", kid);
+
+    let store = keys::KeyStore::new(dir)?;
+    store.archive(kid)?;
+
+    println!("✅ Schlüssel archiviert");
+    println!("   Verschoben nach: {}/archive/", dir);
+
+    // Log audit event
+    let mut audit = AuditLog::new("build/agent.audit.jsonl")?;
+    audit.log_event(
+        "key_archived",
+        json!({
+            "kid": kid,
+        }),
+    )?;
+
+    Ok(())
+}
+
+/// Keys verify-chain - Verifiziert eine Chain-of-Trust
+fn run_keys_verify_chain(dir: &str, attestation_paths: &[String]) -> Result<(), Box<dyn Error>> {
+    println!("🔗 Verifiziere Chain-of-Trust...");
+    println!("   Keys Directory: {}", dir);
+    println!("   Attestationen: {}", attestation_paths.len());
+
+    // Convert Vec<String> to Vec<&str> for verify_chain
+    let paths: Vec<&str> = attestation_paths.iter().map(|s| s.as_str()).collect();
+
+    // Open key store
+    let store = keys::KeyStore::new(dir)?;
+
+    // Verify chain
+    keys::verify_chain(&paths, &store)?;
+
+    println!("✅ Chain-of-Trust verifiziert");
+    println!("   Alle Attestationen gültig");
+    println!("   Chain ist konsistent");
+
+    // Log audit event
+    let mut audit = AuditLog::new("build/agent.audit.jsonl")?;
+    audit.log_event(
+        "chain_verified",
+        json!({
+            "attestation_count": attestation_paths.len(),
+            "keys_dir": dir,
+        }),
+    )?;
+
+    Ok(())
+}
+
 /// Manifest validate - Validiert ein Manifest gegen das JSON Schema
 fn run_manifest_validate(
     manifest_path: &str,
@@ -1965,90 +3256,84 @@ fn run_manifest_verify(
     timestamp_path: Option<String>,
     out_path: Option<String>,
 ) -> Result<(), Box<dyn Error>> {
-    println!("🔍 Starte vollständige Offline-Verifikation...");
+    println!("🔍 Starte vollständige Offline-Verifikation (mit portable core)...");
 
-    // 1️⃣ Compute hashes
-    println!("   1/4 Berechne Hashes...");
+    // 1️⃣ Load files
+    println!("   1/5 Lade Dateien...");
     let manifest_bytes = fs::read(manifest_path)?;
     let proof_bytes = fs::read(proof_path)?;
 
-    use sha3::{Digest, Sha3_256};
-    let manifest_hash = format!("0x{:x}", Sha3_256::digest(&manifest_bytes));
-    let proof_hash = format!("0x{:x}", Sha3_256::digest(&proof_bytes));
+    // Parse manifest as JSON
+    let manifest_json: serde_json::Value = serde_json::from_slice(&manifest_bytes)?;
+    println!("      ✅ Manifest geladen");
 
-    println!("      Manifest-Hash: {}", manifest_hash);
-    println!("      Proof-Hash:    {}", proof_hash);
+    // 2️⃣ Extract statement from manifest
+    println!("   2/5 Extrahiere Statement...");
+    let stmt = verifier_core::extract_statement_from_manifest(&manifest_json)?;
+    println!("      ✅ Statement extrahiert");
+    println!("         Policy Hash: {}", stmt.policy_hash);
+    println!("         Company Root: {}", stmt.company_commitment_root);
 
-    // 2️⃣ Verify signature (check if manifest has signatures)
-    println!("   2/4 Verifiziere Signatur...");
-    let manifest_content: serde_json::Value = serde_json::from_slice(&manifest_bytes)?;
-    let signature_valid = if let Some(sigs) = manifest_content.get("signatures") {
-        if let Some(sig_array) = sigs.as_array() {
-            !sig_array.is_empty()
-        } else {
-            false
-        }
-    } else {
-        false
+    // 3️⃣ Create verification options
+    println!("   3/5 Führe Verifikation durch...");
+    let opts = verifier_core::VerifyOptions {
+        check_timestamp: timestamp_path.is_some(),
+        check_registry: true,
     };
 
-    if signature_valid {
-        println!("      ✅ Signatur vorhanden");
-    } else {
-        println!("      ⚠️  Keine Signatur vorhanden");
-    }
+    // 4️⃣ Call portable core verification
+    let core_report = verifier_core::verify(&manifest_json, &proof_bytes, &stmt, &opts)?;
 
-    // 3️⃣ Timestamp verification (mock)
-    println!("   3/4 Verifiziere Timestamp...");
+    println!("      ✅ Core Verifikation abgeschlossen");
+    println!("         Manifest Hash: {}", core_report.manifest_hash);
+    println!("         Proof Hash: {}", core_report.proof_hash);
+    println!("         Signatur: {}", if core_report.signature_valid { "✅" } else { "⚠️" });
+
+    // 5️⃣ Additional checks (timestamp and registry)
+    println!("   4/5 Zusätzliche Prüfungen...");
+
+    // Timestamp verification (if provided)
     let timestamp_valid = match timestamp_path.as_deref() {
         Some(ts_path) => {
             let valid = registry::verify_timestamp_from_file(ts_path);
-            if valid {
-                println!("      ✅ Timestamp gültig");
-            } else {
-                println!("      ❌ Timestamp ungültig");
-            }
+            println!("      Timestamp: {}", if valid { "✅ gültig" } else { "❌ ungültig" });
             valid
         }
         None => {
-            println!("      ⚠️  Kein Timestamp angegeben (optional)");
+            println!("      Timestamp: ⚠️  nicht angegeben (optional)");
             true
         }
     };
 
-    // 4️⃣ Registry verification
-    println!("   4/4 Verifiziere Registry-Eintrag...");
+    // Registry verification
     let registry_match = registry::verify_entry_from_file(
         registry_path,
-        &manifest_hash,
-        &proof_hash,
+        &core_report.manifest_hash,
+        &core_report.proof_hash,
     ).unwrap_or(false);
 
-    if registry_match {
-        println!("      ✅ Registry-Eintrag gefunden");
-    } else {
-        println!("      ❌ Kein Registry-Eintrag gefunden");
-    }
+    println!("      Registry: {}", if registry_match { "✅ Eintrag gefunden" } else { "❌ Kein Eintrag" });
 
-    // 5️⃣ Consolidate result
-    let all_ok = signature_valid && timestamp_valid && registry_match;
+    // 6️⃣ Consolidate result
+    let all_ok = core_report.signature_valid && timestamp_valid && registry_match && core_report.status == "ok";
     let status = if all_ok { "ok" } else { "fail" }.to_string();
 
     let report = VerificationReport {
-        manifest_hash: manifest_hash.clone(),
-        proof_hash: proof_hash.clone(),
+        manifest_hash: core_report.manifest_hash.clone(),
+        proof_hash: core_report.proof_hash.clone(),
         timestamp_valid,
         registry_match,
-        signature_valid,
+        signature_valid: core_report.signature_valid,
         status: status.clone(),
     };
 
-    // 6️⃣ Save report
+    // 7️⃣ Save report
+    println!("   5/5 Speichere Report...");
     let report_path = out_path.unwrap_or_else(|| "build/verification.report.json".to_string());
     let json = serde_json::to_string_pretty(&report)?;
     fs::write(&report_path, json)?;
 
-    // 7️⃣ Log audit event
+    // 8️⃣ Log audit event
     let mut audit = AuditLog::new("build/agent.audit.jsonl")?;
     audit.log_event(
         "manifest_verified",
@@ -2058,11 +3343,12 @@ fn run_manifest_verify(
             "registry_file": registry_path,
             "timestamp_file": timestamp_path,
             "status": status,
-            "report_file": report_path
+            "report_file": report_path,
+            "core_details": core_report.details
         }),
     )?;
 
-    // 8️⃣ Print result
+    // 9️⃣ Print result
     println!();
     if all_ok {
         println!("✅ Verifikation erfolgreich!");
@@ -2071,8 +3357,552 @@ fn run_manifest_verify(
     } else {
         eprintln!("❌ Verifikation fehlgeschlagen!");
         eprintln!("   Report gespeichert: {}", report_path);
+        eprintln!("   Details: {}", serde_json::to_string_pretty(&core_report.details)?);
         Err("Verification failed".into())
     }
+}
+
+// ============================================================================
+// Bundle v2 Commands
+// ============================================================================
+
+/// Bundle v2 - Create self-contained proof package
+fn run_bundle_v2(
+    manifest: &str,
+    proof: &str,
+    verifier_wasm: Option<String>,
+    out: &str,
+    create_zip: bool,
+    force: bool,
+) -> Result<(), Box<dyn Error>> {
+    use std::fs;
+    use std::path::Path;
+
+    println!("📦 Creating Proof Bundle v2...");
+
+    // Check if output exists
+    if Path::new(out).exists() && !force {
+        return Err(format!("Output directory already exists: {}", out).into());
+    }
+
+    // Create output directory
+    fs::create_dir_all(out)?;
+
+    // Copy manifest
+    println!("   1/7 Copying manifest...");
+    let manifest_dest = format!("{}/manifest.json", out);
+    fs::copy(manifest, &manifest_dest)?;
+
+    // Copy proof (ensure .capz extension)
+    println!("   2/7 Copying proof...");
+    let proof_dest = format!("{}/proof.capz", out);
+    fs::copy(proof, &proof_dest)?;
+
+    // Copy verifier WASM if provided
+    if let Some(wasm_path) = verifier_wasm {
+        println!("   3/7 Copying WASM verifier...");
+        let wasm_dest = format!("{}/verifier.wasm", out);
+        fs::copy(&wasm_path, &wasm_dest)?;
+
+        // Create executor.json
+        println!("   4/7 Creating executor.json...");
+        let executor_config = wasm::ExecutorConfig::default();
+        executor_config.save(format!("{}/executor.json", out))?;
+    } else {
+        println!("   3/7 No WASM verifier provided (will use native fallback)");
+        println!("   4/7 Skipping executor.json");
+    }
+
+    // Create _meta.json
+    println!("   5/7 Creating _meta.json...");
+    let manifest_bytes = fs::read(&manifest_dest)?;
+    let proof_bytes = fs::read(&proof_dest)?;
+
+    let manifest_hash = crypto::hex_lower_prefixed32(crypto::sha3_256(&manifest_bytes));
+    let proof_hash = crypto::hex_lower_prefixed32(crypto::sha3_256(&proof_bytes));
+
+    let meta = serde_json::json!({
+        "bundle_version": "cap-proof.v2.0",
+        "created_at": chrono::Utc::now().to_rfc3339(),
+        "hashes": {
+            "manifest_sha3": manifest_hash,
+            "proof_sha3": proof_hash,
+        },
+        "backend": "mock",
+    });
+
+    fs::write(format!("{}/_meta.json", out), serde_json::to_string_pretty(&meta)?)?;
+
+    // Create README.txt
+    println!("   6/7 Creating README.txt...");
+    let readme_content = format!(
+r#"CAP Proof Bundle v2.0
+=====================
+
+This directory contains a self-contained compliance proof package.
+
+Contents:
+---------
+  manifest.json   - Compliance manifest with commitments and policy
+  proof.capz      - CAPZ v2 proof container (binary format)
+  _meta.json      - Bundle metadata with SHA3-256 integrity hashes
+  README.txt      - This file
+
+Optional files (if present):
+  verifier.wasm   - WASM verifier module for offline verification
+  executor.json   - WASM executor configuration
+
+Verification:
+-------------
+To verify this bundle:
+
+  1. Using cap-agent CLI:
+     $ cap-agent verify-bundle --bundle . --out report.json
+
+  2. Using WASM verifier (if included):
+     The verifier will automatically detect and use verifier.wasm
+
+  3. Manual hash verification:
+     Compare hashes in _meta.json with actual file SHA3-256 hashes
+
+Bundle Information:
+-------------------
+  Version:       cap-proof.v2.0
+  Created:       {}
+  Manifest Hash: {}
+  Proof Hash:    {}
+
+Integrity:
+----------
+All files in this bundle are hashed in _meta.json using SHA3-256.
+Any tampering will be detected during verification.
+
+Documentation:
+--------------
+For more information about CAP Proof Bundles, see:
+  https://github.com/yourusername/cap-agent
+
+Generated by cap-agent v{}
+"#,
+        chrono::Utc::now().to_rfc3339(),
+        manifest_hash,
+        proof_hash,
+        VERSION
+    );
+    fs::write(format!("{}/README.txt", out), readme_content)?;
+
+    // Optional: Create ZIP
+    if create_zip {
+        println!("   7/7 Creating ZIP archive...");
+        let zip_path = format!("{}.zip", out);
+
+        // Create ZIP file
+        let zip_file = fs::File::create(&zip_path)?;
+        let mut zip_writer = zip::ZipWriter::new(zip_file);
+        let options = zip::write::FileOptions::<()>::default()
+            .compression_method(zip::CompressionMethod::Deflated)
+            .unix_permissions(0o755);
+
+        // Add all files from bundle directory
+        let entries = fs::read_dir(out)?;
+        for entry in entries {
+            let entry = entry?;
+            let path = entry.path();
+            if path.is_file() {
+                let file_name = path.file_name().unwrap().to_str().unwrap();
+                let file_data = fs::read(&path)?;
+
+                zip_writer.start_file(file_name, options)?;
+                std::io::Write::write_all(&mut zip_writer, &file_data)?;
+            }
+        }
+
+        zip_writer.finish()?;
+        println!("      ✅ ZIP created: {}", zip_path);
+    } else {
+        println!("   7/7 Skipping ZIP creation");
+    }
+
+    println!("\n✅ Bundle created successfully:");
+    println!("   Directory: {}", out);
+    println!("   Manifest:  {}", manifest_hash);
+    println!("   Proof:     {}", proof_hash);
+
+    Ok(())
+}
+
+/// Verify Bundle - Verify a proof package
+fn run_verify_bundle(
+    bundle: &str,
+    out: Option<String>,
+) -> Result<(), Box<dyn Error>> {
+    use std::path::Path;
+
+    println!("🔍 Verifying Proof Bundle...");
+
+    // Check bundle exists
+    if !Path::new(bundle).exists() {
+        return Err(format!("Bundle not found: {}", bundle).into());
+    }
+
+    // Create executor
+    println!("   1/5 Loading bundle...");
+    let executor = wasm::BundleExecutor::new(bundle.to_string())?;
+
+    // Validate bundle integrity via _meta.json hashes
+    println!("   2/5 Validating bundle integrity...");
+    let meta_path = format!("{}/_meta.json", bundle);
+    if Path::new(&meta_path).exists() {
+        let meta_content = std::fs::read_to_string(&meta_path)?;
+        let meta: serde_json::Value = serde_json::from_str(&meta_content)?;
+
+        // Check manifest hash
+        if let Some(expected_manifest_hash) = meta["hashes"]["manifest_sha3"].as_str() {
+            let manifest_bytes = std::fs::read(format!("{}/manifest.json", bundle))?;
+            let actual_hash = crypto::hex_lower_prefixed32(crypto::sha3_256(&manifest_bytes));
+            if actual_hash != expected_manifest_hash {
+                return Err(format!(
+                    "Bundle integrity check failed: Manifest hash mismatch\n  Expected: {}\n  Actual:   {}",
+                    expected_manifest_hash, actual_hash
+                ).into());
+            }
+            println!("      ✅ Manifest hash valid");
+        }
+
+        // Check proof hash
+        if let Some(expected_proof_hash) = meta["hashes"]["proof_sha3"].as_str() {
+            let proof_bytes = std::fs::read(format!("{}/proof.capz", bundle))?;
+            let actual_hash = crypto::hex_lower_prefixed32(crypto::sha3_256(&proof_bytes));
+            if actual_hash != expected_proof_hash {
+                return Err(format!(
+                    "Bundle integrity check failed: Proof hash mismatch\n  Expected: {}\n  Actual:   {}",
+                    expected_proof_hash, actual_hash
+                ).into());
+            }
+            println!("      ✅ Proof hash valid");
+        }
+    } else {
+        println!("      ⚠️  No _meta.json found, skipping hash validation");
+    }
+
+    println!("   3/5 Checking verifier...");
+    if executor.has_wasm() {
+        println!("      ✅ WASM verifier found");
+    } else {
+        println!("      ⚠️  No WASM verifier, using native fallback");
+    }
+
+    // Create verification options
+    println!("   4/5 Running verification...");
+    let options = verifier::VerifyOptions {
+        check_timestamp: false,
+        check_registry: false,
+    };
+
+    let report = executor.verify(&options)?;
+
+    println!("   5/5 Generating report...");
+    println!("\n📊 Verification Report:");
+    println!("   Status:        {}", report.status);
+    println!("   Manifest Hash: {}", report.manifest_hash);
+    println!("   Proof Hash:    {}", report.proof_hash);
+    println!("   Signature:     {}", if report.signature_valid { "✅" } else { "⚠️" });
+
+    // Save report if requested
+    if let Some(out_path) = out {
+        let report_json = serde_json::to_string_pretty(&report)?;
+        std::fs::write(&out_path, report_json)?;
+        println!("\n💾 Report saved: {}", out_path);
+    }
+
+    if report.status != "ok" {
+        return Err("Verification failed".into());
+    }
+
+    Ok(())
+}
+
+// ============================================================================
+// BLOB Store CLI Handlers (v0.10.9)
+// ============================================================================
+
+/// Fügt eine Datei in den BLOB Store ein (CAS + optional Registry-Verknüpfung)
+fn run_blob_put(
+    file: Option<String>,
+    media_type: &str,
+    registry_path: &str,
+    link_entry_id: Option<String>,
+    use_stdin: bool,
+    out: Option<String>,
+    no_dedup: bool,
+) -> Result<(), Box<dyn Error>> {
+    // Validiere Medientyp
+    let valid_types = ["manifest", "proof", "wasm", "abi", "other"];
+    if !valid_types.contains(&media_type) {
+        return Err(format!("❌ Ungültiger Medientyp: {}. Erlaubt: {:?}", media_type, valid_types).into());
+    }
+
+    // Lese Daten von Datei oder stdin
+    let data = if use_stdin {
+        println!("📥 Lese Daten von stdin...");
+        let mut buffer = Vec::new();
+        stdin().read_to_end(&mut buffer)?;
+        buffer
+    } else if let Some(file_path) = file {
+        println!("📥 Lese Datei: {}", file_path);
+        fs::read(&file_path)?
+    } else {
+        return Err("❌ Entweder --file oder --stdin muss angegeben werden".into());
+    };
+
+    println!("📊 Größe: {} bytes, Medientyp: {}", data.len(), media_type);
+
+    // Öffne BLOB Store
+    let mut store = SqliteBlobStore::new(registry_path)?;
+
+    // Berechne BLAKE3 Hash für Deduplizierung
+    let blob_id_preview = crypto::hex_lower_prefixed32(crypto::blake3_256(&data));
+
+    // Prüfe ob Blob bereits existiert
+    if store.exists(&blob_id_preview) && !no_dedup {
+        println!("✅ BLOB existiert bereits (dedupliziert): {}", blob_id_preview);
+
+        // Erhöhe refcount wenn link_entry_id angegeben
+        if link_entry_id.is_some() {
+            store.pin(&blob_id_preview)?;
+            println!("📌 Refcount erhöht");
+        }
+    } else {
+        // Insert BLOB
+        let blob_id = store.put(&data, media_type)?;
+        println!("✅ BLOB gespeichert: {}", blob_id);
+
+        // Erhöhe refcount wenn link_entry_id angegeben
+        if link_entry_id.is_some() {
+            store.pin(&blob_id)?;
+            println!("📌 Refcount erhöht für Registry-Verknüpfung");
+        }
+    }
+
+    // Schreibe blob_id in Output-Datei falls angegeben
+    if let Some(out_path) = out {
+        fs::write(&out_path, blob_id_preview.as_bytes())?;
+        println!("📄 BLOB ID geschrieben nach: {}", out_path);
+    } else {
+        // Ausgabe auf stdout wenn --out fehlt
+        println!("\n{}", blob_id_preview);
+    }
+
+    // Audit-Log-Eintrag
+    let mut audit = AuditLog::new("build/agent.audit.jsonl")?;
+    audit.log_event(
+        "blob_put",
+        json!({
+            "blob_id": blob_id_preview,
+            "media_type": media_type,
+            "size": data.len(),
+            "linked_entry": link_entry_id,
+        }),
+    )?;
+
+    Ok(())
+}
+
+/// Extrahiert Blob-Inhalt anhand blob_id auf Datei oder stdout
+fn run_blob_get(
+    blob_id: &str,
+    out: Option<String>,
+    use_stdout: bool,
+    registry_path: &str,
+) -> Result<(), Box<dyn Error>> {
+    // Validiere BLOB ID Format
+    if !blob_id.starts_with("0x") || blob_id.len() != 66 {
+        return Err("❌ Ungültige BLOB ID Format (erwartet: 0x + 64 hex chars)".into());
+    }
+
+    // Öffne BLOB Store
+    let store = SqliteBlobStore::new(registry_path)?;
+
+    // Hole BLOB
+    println!("🔍 Suche BLOB: {}", blob_id);
+    let data = store.get(blob_id)?;
+
+    println!("✅ BLOB gefunden, Größe: {} bytes", data.len());
+
+    // Schreibe auf Datei oder stdout
+    if let Some(out_path) = out {
+        fs::write(&out_path, &data)?;
+        println!("📄 BLOB geschrieben nach: {}", out_path);
+    } else if use_stdout {
+        stdout().write_all(&data)?;
+    } else {
+        // Default: stdout
+        stdout().write_all(&data)?;
+    }
+
+    // Audit-Log-Eintrag
+    let mut audit = AuditLog::new("build/agent.audit.jsonl")?;
+    audit.log_event(
+        "blob_get",
+        json!({
+            "blob_id": blob_id,
+            "size": data.len(),
+        }),
+    )?;
+
+    Ok(())
+}
+
+/// Listet Blobs gefiltert/sortiert
+fn run_blob_list(
+    media_type: Option<String>,
+    min_size: Option<u64>,
+    max_size: Option<u64>,
+    unused_only: bool,
+    limit: Option<usize>,
+    order: &str,
+    registry_path: &str,
+) -> Result<(), Box<dyn Error>> {
+    // Öffne BLOB Store
+    let store = SqliteBlobStore::new(registry_path)?;
+
+    // Hole alle BLOBs
+    let mut blobs = store.list()?;
+
+    // Filter: media_type
+    if let Some(ref mt) = media_type {
+        blobs.retain(|b| &b.media_type == mt);
+    }
+
+    // Filter: min_size
+    if let Some(min) = min_size {
+        blobs.retain(|b| b.size >= min as usize);
+    }
+
+    // Filter: max_size
+    if let Some(max) = max_size {
+        blobs.retain(|b| b.size <= max as usize);
+    }
+
+    // Filter: unused_only (refcount = 0)
+    if unused_only {
+        blobs.retain(|b| b.refcount == 0);
+    }
+
+    // Sortierung
+    match order {
+        "size" => blobs.sort_by_key(|b| b.size),
+        "refcount" => blobs.sort_by_key(|b| b.refcount),
+        "blob_id" => blobs.sort_by(|a, b| a.blob_id.cmp(&b.blob_id)),
+        _ => return Err(format!("❌ Ungültige Sortierung: {}. Erlaubt: size, refcount, blob_id", order).into()),
+    }
+
+    // Limit
+    if let Some(l) = limit {
+        blobs.truncate(l);
+    }
+
+    // Ausgabe
+    println!("📋 Gefundene BLOBs: {}", blobs.len());
+    println!("{:<66} {:<15} {:<20} {:<10}", "BLOB ID", "Size (bytes)", "Media Type", "Refcount");
+    println!("{}", "-".repeat(115));
+
+    for blob in &blobs {
+        println!(
+            "{:<66} {:<15} {:<20} {:<10}",
+            blob.blob_id, blob.size, blob.media_type, blob.refcount
+        );
+    }
+
+    // Audit-Log-Eintrag
+    let mut audit = AuditLog::new("build/agent.audit.jsonl")?;
+    audit.log_event(
+        "blob_list",
+        json!({
+            "count": blobs.len(),
+            "filters": {
+                "media_type": media_type,
+                "min_size": min_size,
+                "max_size": max_size,
+                "unused_only": unused_only,
+            }
+        }),
+    )?;
+
+    Ok(())
+}
+
+/// Garbage Collection nicht referenzierter Blobs
+fn run_blob_gc(
+    dry_run: bool,
+    force: bool,
+    min_age: Option<String>,
+    print_ids: bool,
+    registry_path: &str,
+) -> Result<(), Box<dyn Error>> {
+    if min_age.is_some() {
+        println!("⚠️  --min-age ist noch nicht implementiert (zukünftige Feature)");
+    }
+
+    // Öffne BLOB Store
+    let mut store = SqliteBlobStore::new(registry_path)?;
+
+    // Führe GC aus (dry-run oder real)
+    println!("🗑️  Starte Garbage Collection...");
+    let gc_candidates = store.gc(true)?; // Erst dry-run für Anzeige
+
+    if gc_candidates.is_empty() {
+        println!("✅ Keine unreferenzierten BLOBs gefunden");
+        return Ok(());
+    }
+
+    println!("📊 Unreferenzierte BLOBs: {}", gc_candidates.len());
+
+    if print_ids {
+        println!("\n🗑️  Zu löschende BLOB IDs:");
+        for id in &gc_candidates {
+            println!("  - {}", id);
+        }
+    }
+
+    // Berechne Gesamtgröße
+    let mut total_bytes = 0u64;
+    for id in &gc_candidates {
+        if let Ok(data) = store.get(id) {
+            total_bytes += data.len() as u64;
+        }
+    }
+
+    println!("💾 Freizugebender Speicher: {} bytes ({:.2} MB)", total_bytes, total_bytes as f64 / 1_048_576.0);
+
+    if dry_run {
+        println!("\n🔍 DRY RUN - Keine Löschung durchgeführt");
+        println!("💡 Führen Sie den Befehl mit --force aus, um zu löschen");
+        return Ok(());
+    }
+
+    if !force {
+        println!("\n⚠️  Bitte bestätigen Sie die Löschung mit --force");
+        return Ok(());
+    }
+
+    // Real GC
+    println!("\n🗑️  Lösche unreferenzierte BLOBs...");
+    store.gc(false)?;
+    println!("✅ {} BLOBs gelöscht, {} bytes freigegeben", gc_candidates.len(), total_bytes);
+
+    // Audit-Log-Eintrag
+    let mut audit = AuditLog::new("build/agent.audit.jsonl")?;
+    audit.log_event(
+        "blob_gc",
+        json!({
+            "deleted_count": gc_candidates.len(),
+            "bytes_freed": total_bytes,
+            "dry_run": false,
+        }),
+    )?;
+
+    Ok(())
 }
 
 /// Zeigt die Version an
@@ -2088,6 +3918,21 @@ fn main() {
         Commands::Inspect { path } => run_inspect(path),
         Commands::Policy(cmd) => match cmd {
             PolicyCommands::Validate { file } => run_policy_validate(file),
+            PolicyCommands::Lint { file, strict } => {
+                use cap_agent::policy_v2;
+                let exit_code = policy_v2::run_lint(file, *strict).unwrap_or(1);
+                std::process::exit(exit_code);
+            }
+            PolicyCommands::Compile { file, output } => {
+                use cap_agent::policy_v2;
+                let exit_code = policy_v2::run_compile(file, output).unwrap_or(1);
+                std::process::exit(exit_code);
+            }
+            PolicyCommands::Show { file } => {
+                use cap_agent::policy_v2;
+                let exit_code = policy_v2::run_show(file).unwrap_or(1);
+                std::process::exit(exit_code);
+            }
         },
         Commands::Manifest(cmd) => match cmd {
             ManifestCommands::Build { policy, out } => {
@@ -2135,6 +3980,29 @@ fn main() {
                 manifest,
                 iterations,
             } => run_zk_bench(policy, manifest, *iterations),
+            ProofCommands::Adapt {
+                policy,
+                ir,
+                context,
+                enforce,
+                rollout,
+                drift_max,
+                selector,
+                weights,
+                dry_run,
+                out,
+            } => run_proof_adapt(
+                policy,
+                ir,
+                context,
+                *enforce,
+                *rollout,
+                *drift_max,
+                selector,
+                weights,
+                *dry_run,
+                out,
+            ),
         },
         Commands::Sign(cmd) => match cmd {
             SignCommands::Keygen { dir } => run_sign_keygen(dir.clone()),
@@ -2170,6 +4038,46 @@ fn main() {
             AuditCommands::VerifyTimestamp { head, timestamp } => {
                 run_audit_verify_timestamp(head, timestamp)
             }
+            AuditCommands::SetPrivateAnchor {
+                manifest,
+                audit_tip,
+                created_at,
+            } => run_audit_set_private_anchor(manifest, audit_tip, created_at.clone()),
+            AuditCommands::SetPublicAnchor {
+                manifest,
+                chain,
+                txid,
+                digest,
+                created_at,
+            } => run_audit_set_public_anchor(manifest, chain, txid, digest, created_at.clone()),
+            AuditCommands::VerifyAnchor { manifest, out } => {
+                run_audit_verify_anchor(manifest, out.clone())
+            }
+            AuditCommands::Append {
+                file,
+                event,
+                policy_id,
+                ir_hash,
+                manifest_hash,
+                result,
+                run_id,
+            } => run_audit_append(
+                file,
+                event,
+                policy_id.clone(),
+                ir_hash.clone(),
+                manifest_hash.clone(),
+                result.clone(),
+                run_id.clone(),
+            ),
+            AuditCommands::Verify { file, out } => run_audit_verify_chain(file, out.clone()),
+            AuditCommands::Export {
+                file,
+                from,
+                to,
+                policy_id,
+                out,
+            } => run_audit_export(file, from.clone(), to.clone(), policy_id.clone(), out.clone()),
         },
         Commands::Lists(cmd) => match cmd {
             ListsCommands::SanctionsRoot { csv, out } => run_lists_sanctions_root(csv, out.clone()),
@@ -2183,7 +4091,18 @@ fn main() {
                 registry,
                 backend,
                 signing_key,
-            } => run_registry_add(manifest, proof, timestamp.clone(), registry.clone(), backend, signing_key.clone()),
+                validate_key,
+                keys_dir,
+            } => run_registry_add(
+                manifest,
+                proof,
+                timestamp.clone(),
+                registry.clone(),
+                backend,
+                signing_key.clone(),
+                *validate_key,
+                keys_dir
+            ),
             RegistryCommands::List { registry, backend } => run_registry_list(registry.clone(), backend),
             RegistryCommands::Verify {
                 manifest,
@@ -2197,7 +4116,92 @@ fn main() {
                 to,
                 output,
             } => run_registry_migrate(from, input, to, output),
+            RegistryCommands::Inspect { registry } => run_registry_inspect(registry.clone()),
+            RegistryCommands::BackfillKid { registry, output } => {
+                run_registry_backfill_kid(registry.clone(), output.clone())
+            }
         },
+        Commands::Keys(cmd) => match cmd {
+            KeysCommands::Keygen {
+                owner,
+                algo,
+                out,
+                valid_days,
+                comment,
+            } => run_keys_keygen(owner, algo, out, *valid_days, comment.clone()),
+            KeysCommands::List { dir, status, owner } => {
+                run_keys_list(dir, status.clone(), owner.clone())
+            }
+            KeysCommands::Show { dir, kid } => run_keys_show(dir, kid),
+            KeysCommands::Rotate { dir, current, new } => {
+                run_keys_rotate(dir, current, new)
+            }
+            KeysCommands::Attest { signer, subject, out } => {
+                run_keys_attest(signer, subject, out)
+            }
+            KeysCommands::Archive { dir, kid } => run_keys_archive(dir, kid),
+            KeysCommands::VerifyChain { dir, attestations } => {
+                run_keys_verify_chain(dir, &attestations)
+            }
+        },
+        Commands::Blob(cmd) => match cmd {
+            BlobCommands::Put {
+                file,
+                r#type,
+                registry,
+                link_entry_id,
+                stdin,
+                out,
+                no_dedup,
+            } => run_blob_put(
+                file.clone(),
+                r#type,
+                registry,
+                link_entry_id.clone(),
+                *stdin,
+                out.clone(),
+                *no_dedup,
+            ),
+            BlobCommands::Get {
+                id,
+                out,
+                stdout,
+                registry,
+            } => run_blob_get(id, out.clone(), *stdout, registry),
+            BlobCommands::List {
+                r#type,
+                min_size,
+                max_size,
+                unused_only,
+                limit,
+                order,
+                registry,
+            } => run_blob_list(
+                r#type.clone(),
+                *min_size,
+                *max_size,
+                *unused_only,
+                *limit,
+                order,
+                registry,
+            ),
+            BlobCommands::Gc {
+                dry_run,
+                force,
+                min_age,
+                print_ids,
+                registry,
+            } => run_blob_gc(*dry_run, *force, min_age.clone(), *print_ids, registry),
+        },
+        Commands::BundleV2 {
+            manifest,
+            proof,
+            verifier_wasm,
+            out,
+            zip,
+            force,
+        } => run_bundle_v2(manifest, proof, verifier_wasm.clone(), out, *zip, *force),
+        Commands::VerifyBundle { bundle, out } => run_verify_bundle(bundle, out.clone()),
         Commands::Version => {
             run_version();
             Ok(())

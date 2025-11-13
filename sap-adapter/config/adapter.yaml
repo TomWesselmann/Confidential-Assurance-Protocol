@@ -1,0 +1,62 @@
+# SAP Adapter Configuration
+# Version: v0.3.0 (Week 3: Security-Härtung)
+
+# Verifier API Settings
+verifier:
+  base_url: "https://verifier.local:8443"
+  require_mtls: true              # Pilot default: ON, Dev: OFF
+  timeout_ms: 5000
+  accept_invalid_certs: false     # Dev only! Production: false
+
+# SAP OData Settings
+sap:
+  odata_base: "https://sapdev.local/odata"
+  auth_type: "oauth2_client_credentials"  # oauth2_client_credentials | basic
+  writeback:
+    mode: "z_table"              # z_table | bp_extension
+    z_service: "/sap/opu/odata/Z_CAP_SUPPLIER_STATUS_SRV/StatusSet"
+
+# Security Settings
+security:
+  hash_algo: "blake3"
+  redact_logs: true               # No PII in logs
+  tls_min_version: "1.2"          # 1.3 bevorzugt, aber 1.2 erlaubt
+  ciphers_profile: "secure"       # Mozilla Modern compatibility
+
+# Crypto Settings
+crypto:
+  sign_key_path: "keys/adapter.ed25519"
+  key_rotation_enabled: true
+
+# Rate Limiting
+rate_limit:
+  enabled: true
+  global_rps: 100                 # Global requests per second
+  client_rps: 20                  # Per-client requests per second
+
+# Metrics Settings
+metrics:
+  enabled: true
+  bind: "0.0.0.0:9464"            # Prometheus metrics endpoint
+  export_interval_seconds: 15
+
+# Audit Log Settings
+audit:
+  enabled: true
+  log_path: "/var/log/cap/audit.log"
+  hash_chain: "sha3-256"          # SHA3-256 hash chain for integrity
+  append_only: true
+
+# Batch Processing
+run:
+  batch_size: 100
+  idempotency_key_template: "${DATE}_${BATCH_NO}"  # e.g., "2025-11-09_001"
+  max_retries: 3
+  retry_backoff_ms: 1000
+
+# Demo Mode Settings
+demo:
+  enabled: false
+  dataset: "examples/suppliers_demo.json"  # 50 suppliers (1 FAIL, 2 WARN)
+  auto_fail_supplier_id: "100050"          # Simulated sanction hit
+  auto_warn_supplier_ids: ["100025", "100040"]  # Simulated warnings

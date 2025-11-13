@@ -1,0 +1,122 @@
+# Prometheus Alert Rules for CAP Verifier API (Week 5)
+# Production monitoring and SLO enforcement
+
+groups:
+  - name: cap_verifier_slo
+    interval: 30s
+    rules:
+      # Alert: High Error Rate (> 1% over 5 minutes)
+      - alert: HighErrorRate
+        expr: |
+          (
+            rate(cap_verifier_requests_total{result="fail"}[5m])
+            /
+            (rate(cap_verifier_requests_total[5m]) > 0)
+          ) * 100 > 1
+        for: 5m
+        labels:
+          severity: critical
+          component: cap-verifier
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value | humanizePercentage }} (threshold: 1%)"
+
+      # Alert: High p95 Latency (> 500ms over 5 minutes)
+      - alert: HighP95Latency
+        expr: |
+          histogram_quantile(0.95, rate(cap_verifier_request_duration_seconds_bucket[5m])) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          component: cap-verifier
+        annotations:
+          summary: "High p95 latency detected"
+          description: "p95 latency is {{ $value | humanizeDuration }} (threshold: 500ms)"
+
+      # Alert: 5xx Spike (> 10 errors in 1 minute)
+      - alert: FivexxSpike
+        expr: |
+          increase(cap_verifier_requests_total{result="fail"}[1m]) > 10
+        for: 1m
+        labels:
+          severity: critical
+          component: cap-verifier
+        annotations:
+          summary: "5xx error spike detected"
+          description: "{{ $value }} failed requests in the last minute (threshold: 10)"
+
+      # Alert: Low Cache Hit Rate (< 80%)
+      - alert: LowCacheHitRate
+        expr: |
+          cap_cache_hit_ratio < 0.8
+        for: 10m
+        labels:
+          severity: warning
+          component: cap-verifier
+        annotations:
+          summary: "Low cache hit rate detected"
+          description: "Cache hit rate is {{ $value | humanizePercentage }} (threshold: 80%)"
+
+      # Alert: High Auth Failure Rate
+      - alert: HighAuthFailureRate
+        expr: |
+          rate(cap_auth_token_validation_failures_total[5m]) > 5
+        for: 5m
+        labels:
+          severity: warning
+          component: cap-verifier-auth
+        annotations:
+          summary: "High authentication failure rate"
+          description: "{{ $value | humanize }} auth failures per second (threshold: 5/sec)"
+
+      # Alert: No Traffic (service down or not receiving requests)
+      - alert: NoTraffic
+        expr: |
+          rate(cap_verifier_requests_total[5m]) == 0
+        for: 5m
+        labels:
+          severity: critical
+          component: cap-verifier
+        annotations:
+          summary: "No traffic detected"
+          description: "Service has not received any requests in the last 5 minutes"
+
+      # Alert: High p99 Latency (> 1 second)
+      - alert: HighP99Latency
+        expr: |
+          histogram_quantile(0.99, rate(cap_verifier_request_duration_seconds_bucket[5m])) > 1.0
+        for: 5m
+        labels:
+          severity: critical
+          component: cap-verifier
+        annotations:
+          summary: "High p99 latency detected"
+          description: "p99 latency is {{ $value | humanizeDuration }} (threshold: 1s)"
+
+  - name: cap_verifier_capacity
+    interval: 1m
+    rules:
+      # Alert: Request Rate Spike (> 100 RPS sustained)
+      - alert: HighRequestRate
+        expr: |
+          rate(cap_verifier_requests_total[1m]) > 100
+        for: 2m
+        labels:
+          severity: info
+          component: cap-verifier
+        annotations:
+          summary: "High request rate detected"
+          description: "Request rate is {{ $value | humanize }} req/sec (capacity threshold: 100 RPS)"
+
+      # Alert: Cache Size Warning (not a direct metric, but conceptual)
+      # Note: In production, add cache_entries_count metric
+      - alert: CacheSizeWarning
+        expr: |
+          cap_cache_hit_ratio < 0.5
+        for: 30m
+        labels:
+          severity: info
+          component: cap-verifier
+        annotations:
+          summary: "Cache may be undersized"
+          description: "Cache hit rate has been below 50% for 30 minutes, consider increasing cache size"

@@ -1,0 +1,678 @@
+openapi: 3.0.3
+info:
+  title: CAP Verifier API
+  version: 0.11.0
+  description: |
+    REST API for verifying supply chain compliance proofs (LkSG).
+
+    **Authentication:** OAuth2 Client Credentials Flow with JWT Bearer tokens.
+  contact:
+    name: CAP Team
+    email: cap-team@example.com
+  license:
+    name: Proprietary
+servers:
+  - url: https://cap-verifier.example.com
+    description: Production
+  - url: http://localhost:8080
+    description: Local Development
+
+security:
+  - oauth2: []
+
+tags:
+  - name: health
+    description: Health and readiness checks
+  - name: policy
+    description: Policy management
+  - name: verification
+    description: Proof verification
+
+paths:
+  /healthz:
+    get:
+      tags:
+        - health
+      summary: Health check
+      description: Returns server health status (no authentication required)
+      security: []
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /readyz:
+    get:
+      tags:
+        - health
+      summary: Readiness check
+      description: Returns service readiness status (no authentication required)
+      security: []
+      responses:
+        '200':
+          description: Service is ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessResponse'
+
+  /policy/compile:
+    post:
+      tags:
+        - policy
+      summary: Compile and validate policy
+      description: Validates a policy and returns its hash
+      security:
+        - oauth2: [policy:compile]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PolicyCompileRequest'
+      responses:
+        '200':
+          description: Policy compiled successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PolicyCompileResponse'
+        '400':
+          description: Invalid policy
+        '401':
+          description: Unauthorized
+
+  /policy/{id}:
+    get:
+      tags:
+        - policy
+      summary: Retrieve policy by hash
+      description: Returns a previously compiled policy
+      security:
+        - oauth2: [policy:read]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^0x[a-f0-9]{64}$'
+          description: Policy hash (SHA3-256, hex-encoded)
+      responses:
+        '200':
+          description: Policy retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PolicyGetResponse'
+        '404':
+          description: Policy not found
+        '401':
+          description: Unauthorized
+
+  /policy/v2/compile:
+    post:
+      tags:
+        - policy
+      summary: Compile PolicyV2 to IR v1
+      description: |
+        Compiles a PolicyV2 YAML/JSON to intermediate representation (IR v1) with structured linting.
+        Supports both Base64-encoded YAML and direct JSON input.
+      security:
+        - oauth2: [policy:compile]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PolicyV2CompileRequest'
+            examples:
+              yaml_input:
+                summary: Base64-encoded YAML input
+                value:
+                  policy_yaml: "aWQ6IGxrc2cudjEKdmVyc2lvbjogIjEuMCIKbGVnYWxfYmFzaXM6CiAgLSBkaXJlY3RpdmU6ICJMS3NHIgo="
+                  lint_mode: "strict"
+                  persist: true
+              json_input:
+                summary: Direct JSON input
+                value:
+                  policy:
+                    id: "lksg.v1"
+                    version: "1.0"
+                    legal_basis:
+                      - directive: "LkSG"
+                    description: "Test Policy"
+                    inputs:
+                      supplier_hashes:
+                        type: array
+                        items: hex
+                    rules:
+                      - id: "no_sanctions"
+                        op: "non_membership"
+                        lhs: "supplier_hashes"
+                        rhs: "sanctions_root"
+                  lint_mode: "strict"
+                  persist: true
+      responses:
+        '200':
+          description: Policy compiled successfully (possibly with warnings)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PolicyV2CompileResponse'
+          headers:
+            ETag:
+              description: IR hash for caching
+              schema:
+                type: string
+                example: '"ir:sha3-256:df3a3eeb7c72f6204131397e4b0a4b16235f1e20cc66102153ad6d4ee78f892c"'
+        '400':
+          description: Invalid request (malformed YAML/JSON)
+        '401':
+          description: Unauthorized
+        '409':
+          description: Policy conflict (ID already exists with different hash)
+        '422':
+          description: Validation errors (strict mode)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PolicyV2CompileResponse'
+
+  /policy/v2/{id}:
+    get:
+      tags:
+        - policy
+      summary: Retrieve PolicyV2 by ID
+      description: Returns a previously compiled PolicyV2 with IR and supports ETag caching
+      security:
+        - oauth2: [policy:read]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-z0-9\\._-]+$'
+          description: Policy ID (e.g., "lksg.v1")
+        - name: If-None-Match
+          in: header
+          required: false
+          schema:
+            type: string
+          description: ETag for conditional request
+          example: '"ir:sha3-256:df3a3eeb7c72f6204131397e4b0a4b16235f1e20cc66102153ad6d4ee78f892c"'
+      responses:
+        '200':
+          description: Policy retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PolicyV2GetResponse'
+          headers:
+            ETag:
+              description: IR hash for caching
+              schema:
+                type: string
+        '304':
+          description: Not Modified (ETag matches)
+        '404':
+          description: Policy not found
+        '401':
+          description: Unauthorized
+
+  /verify:
+    post:
+      tags:
+        - verification
+      summary: Verify proof package
+      description: Verifies a supply chain compliance proof with optional adaptive mode
+      security:
+        - oauth2: [verify:run]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyRequest'
+      responses:
+        '200':
+          description: Verification completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerifyResponse'
+        '400':
+          description: Invalid request
+        '401':
+          description: Unauthorized
+
+components:
+  securitySchemes:
+    oauth2:
+      type: oauth2
+      description: OAuth2 Client Credentials flow with RS256 JWT tokens
+      flows:
+        clientCredentials:
+          tokenUrl: https://auth.example.com/oauth/token
+          scopes:
+            # Verification scopes
+            verify:run: Execute proof verification
+            verify:admin: Administrative verification operations (enforce, drift analysis)
+
+            # Policy scopes
+            policy:compile: Compile and validate policies
+            policy:read: Read compiled policies and IR
+            policy:write: Create and update policies
+            policy:delete: Delete policies
+
+            # Backup & Restore scopes (Week 6 - Track D1)
+            backup:create: Create backups
+            backup:read: Read backup metadata
+            backup:restore: Restore from backups
+            backup:delete: Delete backups
+
+            # Key Management scopes (Week 6 - Track D2)
+            keys:rotate: Initiate key rotation
+            keys:read: Read key metadata
+            keys:revoke: Revoke keys
+
+            # Monitoring scopes (Week 6)
+            metrics:read: Read Prometheus metrics
+            metrics:write: Modify metrics configuration
+
+            # Admin scopes
+            admin:full: Full administrative access (backup, restore, key rotation, metrics)
+
+  schemas:
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: "OK"
+        version:
+          type: string
+          example: "0.11.0"
+        build_hash:
+          type: string
+          nullable: true
+
+    ReadinessResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: "OK"
+        checks:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              status:
+                type: string
+
+    PolicyCompileRequest:
+      type: object
+      required:
+        - policy
+      properties:
+        policy:
+          $ref: '#/components/schemas/Policy'
+
+    PolicyCompileResponse:
+      type: object
+      properties:
+        policy_hash:
+          type: string
+          pattern: '^0x[a-f0-9]{64}$'
+        policy_info:
+          $ref: '#/components/schemas/PolicyInfo'
+        status:
+          type: string
+          example: "compiled"
+
+    PolicyGetResponse:
+      type: object
+      properties:
+        policy_hash:
+          type: string
+        policy:
+          $ref: '#/components/schemas/Policy'
+
+    Policy:
+      type: object
+      required:
+        - version
+        - name
+        - created_at
+        - constraints
+      properties:
+        version:
+          type: string
+          example: "lksg.v1"
+        name:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        constraints:
+          type: object
+        notes:
+          type: string
+
+    PolicyInfo:
+      type: object
+      properties:
+        name:
+          type: string
+        version:
+          type: string
+        hash:
+          type: string
+
+    VerifyRequest:
+      type: object
+      required:
+        - policy_id
+        - context
+        - backend
+      properties:
+        policy_id:
+          type: string
+        context:
+          type: object
+        backend:
+          type: string
+          enum: [mock, zkvm, halo2]
+        options:
+          type: object
+
+    VerifyResponse:
+      type: object
+      properties:
+        result:
+          type: string
+          enum: [ok, fail]
+        manifest_hash:
+          type: string
+        proof_hash:
+          type: string
+        trace:
+          type: object
+          nullable: true
+        signature:
+          type: string
+          nullable: true
+        timestamp:
+          type: string
+          nullable: true
+        report:
+          $ref: '#/components/schemas/VerifyReport'
+
+    VerifyReport:
+      type: object
+      properties:
+        status:
+          type: string
+        manifest_hash:
+          type: string
+        proof_hash:
+          type: string
+        signature_valid:
+          type: boolean
+        details:
+          type: array
+          items:
+            type: string
+
+    # PolicyV2 Schemas (Week 3)
+
+    PolicyV2CompileRequest:
+      type: object
+      properties:
+        policy_yaml:
+          type: string
+          description: Base64-encoded PolicyV2 YAML
+          example: "aWQ6IGxrc2cudjEKdmVyc2lvbjogIjEuMCIK..."
+        policy:
+          $ref: '#/components/schemas/PolicyV2'
+        lint_mode:
+          type: string
+          enum: [strict, relaxed]
+          default: strict
+          description: Lint mode (strict enforces all errors, relaxed allows some)
+        persist:
+          type: boolean
+          default: false
+          description: Whether to persist policy in store
+      oneOf:
+        - required: [policy_yaml]
+        - required: [policy]
+
+    PolicyV2CompileResponse:
+      type: object
+      required:
+        - policy_id
+        - lints
+        - stored
+      properties:
+        policy_id:
+          type: string
+          pattern: '^[a-z0-9\\._-]+$'
+          example: "lksg.v1"
+        policy_hash:
+          type: string
+          pattern: '^sha3-256:[a-f0-9]{64}$'
+          example: "sha3-256:b98c3db55f874476dc749ea32b70bdf5369a0d7bc5364f236e034f1ddcd94638"
+        ir:
+          $ref: '#/components/schemas/IRv1'
+        ir_hash:
+          type: string
+          pattern: '^sha3-256:[a-f0-9]{64}$'
+          example: "sha3-256:df3a3eeb7c72f6204131397e4b0a4b16235f1e20cc66102153ad6d4ee78f892c"
+        lints:
+          type: array
+          items:
+            $ref: '#/components/schemas/LintDiagnostic'
+        stored:
+          type: boolean
+        etag:
+          type: string
+          description: ETag for caching (format W/"ir:<ir_hash>")
+          example: '"ir:sha3-256:df3a3eeb7c72f6204131397e4b0a4b16235f1e20cc66102153ad6d4ee78f892c"'
+
+    PolicyV2GetResponse:
+      type: object
+      required:
+        - policy_id
+        - policy_hash
+        - ir
+        - ir_hash
+        - etag
+      properties:
+        policy_id:
+          type: string
+        policy_hash:
+          type: string
+          pattern: '^sha3-256:[a-f0-9]{64}$'
+        ir:
+          $ref: '#/components/schemas/IRv1'
+        ir_hash:
+          type: string
+          pattern: '^sha3-256:[a-f0-9]{64}$'
+        etag:
+          type: string
+
+    PolicyV2:
+      type: object
+      required:
+        - id
+        - version
+        - legal_basis
+        - inputs
+        - rules
+      properties:
+        id:
+          type: string
+          pattern: '^[a-z0-9\\._-]+$'
+          description: Unique policy identifier
+          example: "lksg.v1"
+        version:
+          type: string
+          description: Policy version (semver-like)
+          example: "1.0"
+        legal_basis:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/LegalBasis'
+        description:
+          type: string
+          description: Optional policy description
+        inputs:
+          type: object
+          description: Input variable definitions
+          additionalProperties:
+            $ref: '#/components/schemas/InputDefinition'
+        rules:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/Rule'
+        adaptivity:
+          $ref: '#/components/schemas/Adaptivity'
+
+    LegalBasis:
+      type: object
+      required:
+        - directive
+      properties:
+        directive:
+          type: string
+          example: "LkSG"
+        article:
+          type: string
+          example: "§3"
+
+    InputDefinition:
+      type: object
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          enum: [hex, array, number, string]
+        items:
+          type: string
+          description: For array types, specifies item type
+
+    Rule:
+      type: object
+      required:
+        - id
+        - op
+        - lhs
+        - rhs
+      properties:
+        id:
+          type: string
+          pattern: '^[a-z0-9_]+$'
+          description: Unique rule identifier
+        op:
+          type: string
+          enum: [non_membership, eq, range_min]
+          description: Operator type
+        lhs:
+          description: Left-hand side expression (variable reference or literal)
+        rhs:
+          description: Right-hand side expression (variable reference or literal)
+
+    Adaptivity:
+      type: object
+      properties:
+        predicates:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              expr:
+                type: object
+        activations:
+          type: array
+          items:
+            type: object
+            required:
+              - when
+              - rules
+            properties:
+              when:
+                type: string
+                description: Predicate ID
+              rules:
+                type: array
+                items:
+                  type: string
+                description: Rule IDs to activate
+
+    IRv1:
+      type: object
+      required:
+        - ir_version
+        - policy_id
+        - policy_hash
+        - rules
+        - ir_hash
+      properties:
+        ir_version:
+          type: string
+          enum: ["1.0"]
+          description: IR version (must be exactly "1.0")
+        policy_id:
+          type: string
+          description: Original policy identifier
+        policy_hash:
+          type: string
+          pattern: '^sha3-256:[a-f0-9]{64}$'
+          description: SHA3-256 hash of source PolicyV2
+        rules:
+          type: array
+          description: Compiled rules (sorted by ID)
+          items:
+            $ref: '#/components/schemas/Rule'
+        adaptivity:
+          $ref: '#/components/schemas/Adaptivity'
+        ir_hash:
+          type: string
+          pattern: '^sha3-256:[a-f0-9]{64}$'
+          description: SHA3-256 hash of canonical IR JSON
+
+    LintDiagnostic:
+      type: object
+      required:
+        - code
+        - level
+        - message
+      properties:
+        code:
+          type: string
+          pattern: '^(E|W)[0-9]{4}$'
+          description: Lint error/warning code
+          example: "E1002"
+        level:
+          type: string
+          enum: [error, warning]
+        message:
+          type: string
+          example: "missing `legal_basis`"
+        rule_id:
+          type: string
+          nullable: true
+          description: Associated rule ID (if applicable)

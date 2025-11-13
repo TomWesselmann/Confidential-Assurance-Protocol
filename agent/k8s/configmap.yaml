@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cap-config
+  namespace: cap-system
+data:
+  RUST_LOG: "info,cap_agent=debug"
+  CAP_BIND_ADDRESS: "0.0.0.0:8080"

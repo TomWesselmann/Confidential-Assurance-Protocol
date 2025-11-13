@@ -1,0 +1,37 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: cap-verifier-network-policy
+  namespace: default
+  labels:
+    app: cap-verifier
+spec:
+  podSelector:
+    matchLabels:
+      app: cap-verifier
+
+  policyTypes:
+    - Ingress
+    - Egress
+
+  # Allow incoming traffic only on HTTPS port
+  ingress:
+    - from:
+        - podSelector: {}  # Allow from same namespace
+        - namespaceSelector:
+            matchLabels:
+              name: ingress  # Allow from ingress namespace
+      ports:
+        - protocol: TCP
+          port: 8443
+
+  # Deny all outgoing traffic (offline-first design)
+  # Add exceptions if needed (e.g., DNS, OAuth2 validation)
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              k8s-app: kube-dns  # Allow DNS queries
+      ports:
+        - protocol: UDP
+          port: 53

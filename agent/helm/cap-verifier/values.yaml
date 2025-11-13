@@ -1,0 +1,139 @@
+# Default values for cap-verifier Helm Chart
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 2
+
+image:
+  repository: registry.example.com/cap/verifier
+  pullPolicy: IfNotPresent
+  tag: "v1.0.0"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 65532  # nonroot user from distroless
+  capabilities:
+    drop:
+      - ALL
+
+service:
+  type: ClusterIP
+  port: 443
+  targetPort: 8443
+
+ingress:
+  enabled: false
+  className: "nginx"
+  annotations: {}
+    # cert-manager.io/cluster-issuer: letsencrypt-prod
+    # nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+  hosts:
+    - host: cap-verifier.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+    # - secretName: cap-verifier-tls
+    #   hosts:
+    #     - cap-verifier.example.com
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# Application Configuration
+config:
+  serverBind: "0.0.0.0:8443"
+  logLevel: "info"
+  oauth:
+    issuer: "https://auth.example.com"
+    audience: "cap-verifier"
+    requiredScopes:
+      - "verify:read"
+  verification:
+    backend: "mock"
+    timeoutSeconds: 30
+  policy:
+    cacheEnabled: true
+    cacheTtlSeconds: 3600
+
+# Health & Readiness Probes
+probes:
+  readiness:
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+  liveness:
+    initialDelaySeconds: 10
+    periodSeconds: 30
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+# Network Policy
+networkPolicy:
+  enabled: true
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector: {}
+        - namespaceSelector:
+            matchLabels:
+              name: ingress
+      ports:
+        - protocol: TCP
+          port: 8443
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+
+# Secrets (must be created manually or via external-secrets)
+secrets:
+  tls:
+    secretName: cap-verifier-tls
+  mtls:
+    secretName: cap-verifier-mtls
+  agentKey:
+    secretName: cap-agent-key

@@ -1,0 +1,59 @@
+# Rust
+/target/
+**/*.rs.bk
+*.pdb
+
+# Cargo
+Cargo.lock
+
+# Build artifacts
+/build/*.sqlite
+/build/*.sqlite-*
+/build/registry.*
+/build/*.audit.jsonl
+/build/agent.audit.jsonl
+/build/commitments.json
+/build/manifest*.json
+/build/proof*.dat
+/build/proof*.json
+/build/signature.json
+/build/timestamp*.tsr
+/build/verification*.json
+/build/cap-proof*/
+/build/sbom.json
+
+# Keep documentation and reports
+!/build/SBOM_README.md
+!/build/CI_TEST_RESULTS.md
+!/build/audit-report.json
+!/build/licenses.txt
+!/build/dependencies-direct.txt
+
+# Keys and secrets
+/keys/*.ed25519
+/keys/*.pub
+/keys/archive/
+/keys/trusted/
+/secrets/
+*.pem
+*.key
+*.crt
+
+# Examples output
+/examples/*.root
+/examples/*.sqlite
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+/tmp/

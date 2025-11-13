@@ -1,0 +1,68 @@
+# Staging Environment Values
+
+replicaCount: 2
+
+image:
+  tag: "stage-0.11.0"
+  pullPolicy: IfNotPresent
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 512Mi
+  requests:
+    cpu: 250m
+    memory: 256Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-staging"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  hosts:
+    - host: cap-verifier-stage.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: cap-verifier-stage-tls
+      hosts:
+        - cap-verifier-stage.example.com
+
+features:
+  allow_embedded_ir: true
+  require_mtls: false  # Optional mTLS in staging
+  enable_prometheus_metrics: true
+
+oauth2:
+  enabled: true
+  issuer: "https://idp-stage.example.com"
+  audience: "cap-verifier-stage"
+  jwks_url: "https://idp-stage.example.com/.well-known/jwks.json"
+  jwks_cache_ttl_sec: 600
+
+tls:
+  enabled: true
+  require_mtls: false
+  tls_min_version: "1.2"
+  cipher_profile: "intermediate"
+
+rateLimit:
+  enabled: true
+  requests_per_minute: 100
+  burst: 200
+
+env:
+  - name: RUST_LOG
+    value: "info,cap_agent=debug"
+  - name: RUST_BACKTRACE
+    value: "1"
+  - name: ENVIRONMENT
+    value: "staging"

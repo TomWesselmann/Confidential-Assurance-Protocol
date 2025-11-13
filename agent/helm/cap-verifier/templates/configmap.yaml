@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "cap-verifier.fullname" . }}-config
+  labels:
+    {{- include "cap-verifier.labels" . | nindent 4 }}
+data:
+  oauth_issuer: {{ .Values.config.oauth.issuer | quote }}
+  oauth_audience: {{ .Values.config.oauth.audience | quote }}
+
+  app.yaml: |
+    version: "app.v1.0"
+
+    server:
+      bind: {{ .Values.config.serverBind | quote }}
+      log_level: {{ .Values.config.logLevel | quote }}
+
+    oauth:
+      issuer: {{ .Values.config.oauth.issuer | quote }}
+      audience: {{ .Values.config.oauth.audience | quote }}
+      required_scopes:
+        {{- range .Values.config.oauth.requiredScopes }}
+        - {{ . | quote }}
+        {{- end }}
+
+    verification:
+      backend: {{ .Values.config.verification.backend | quote }}
+      timeout_seconds: {{ .Values.config.verification.timeoutSeconds }}
+
+    policy:
+      cache_enabled: {{ .Values.config.policy.cacheEnabled }}
+      cache_ttl_seconds: {{ .Values.config.policy.cacheTtlSeconds }}

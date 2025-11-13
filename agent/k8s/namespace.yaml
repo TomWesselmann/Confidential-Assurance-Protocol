@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cap-system
+  labels:
+    name: cap-system
+    environment: production
+    team: cap-team
+  annotations:
+    description: "CAP (Confidential Assurance Protocol) System Namespace"

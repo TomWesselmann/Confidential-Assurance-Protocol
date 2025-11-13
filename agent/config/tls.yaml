@@ -1,0 +1,33 @@
+# TLS/mTLS Configuration (Week 5)
+# Production-grade transport security
+
+# Require mutual TLS (client certificates)
+require_mtls: true
+
+# Minimum TLS version (1.2 or 1.3)
+tls_min_version: "1.2"
+
+# Cipher suite profile
+# - "modern": TLS 1.3 only, strongest ciphers
+# - "intermediate": TLS 1.2+, broad compatibility
+# - "legacy": TLS 1.0+, maximum compatibility (not recommended)
+cipher_profile: "modern"
+
+# Client CA bundle (for mTLS verification)
+client_ca_bundle: "/etc/ssl/clients/ca.crt"
+
+# Server certificate and private key
+server_cert: "/etc/ssl/certs/server.crt"
+server_key: "/etc/ssl/private/server.key"
+
+# Optional: Client certificate validation
+# - "required": Reject connections without valid client cert
+# - "optional": Accept both mTLS and regular TLS
+# - "none": No client cert validation
+client_cert_validation: "required"
+
+# Optional: Verify client certificate SAN (Subject Alternative Name)
+verify_client_san: true
+allowed_client_sans:
+  - "client.cap-verifier.local"
+  - "*.cap-verifier.local"
