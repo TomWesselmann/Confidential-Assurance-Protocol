@@ -27,7 +27,7 @@ fn create_mock_entry(id: usize) -> RegistryEntry {
         id: format!("proof_{:05}", id),
         manifest_hash: format!("0x{:064x}", id),
         proof_hash: format!("0x{:064x}", id + 1000000),
-        timestamp_file: if id % 3 == 0 {
+        timestamp_file: if id.is_multiple_of(3) {
             Some(format!("timestamp_{}.tsr", id))
         } else {
             None
@@ -35,6 +35,16 @@ fn create_mock_entry(id: usize) -> RegistryEntry {
         registered_at: chrono::Utc::now().to_rfc3339(),
         signature: None,
         public_key: None,
+        kid: None,
+        signature_scheme: None,
+        blob_manifest: None,
+        blob_proof: None,
+        blob_wasm: None,
+        blob_abi: None,
+        selfverify_status: None,
+        selfverify_at: None,
+        verifier_name: None,
+        verifier_version: None,
     }
 }
 

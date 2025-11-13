@@ -8,9 +8,10 @@ pub mod schema;
 pub mod v1_0;
 
 // Re-export v1.0 types (for backward compatibility and migration)
+#[allow(unused_imports)]
 pub use v1_0::{
     compute_file_hash, open_store, sign_entry, validate_key_status, verify_entry_from_file,
-    verify_entry_signature, verify_timestamp_from_file, RegistryBackend, RegistryEntry,
+    verify_entry_signature, verify_timestamp_from_file, Registry, RegistryBackend, RegistryEntry,
     Timestamp,
 };
 

@@ -3,7 +3,7 @@
 //! Testet die End-to-End-Migration von v1.0 zu v1.1 Format.
 
 use cap_agent::registry::{
-    migrate_to_v1_1, Registry as RegistryV1_0, RegistryEntry as RegistryEntryV1_0, UnifiedRegistry,
+    migrate_to_v1_1, Registry, RegistryEntry, UnifiedRegistry,
 };
 use std::io::Write;
 use tempfile::NamedTempFile;
@@ -11,7 +11,7 @@ use tempfile::NamedTempFile;
 #[test]
 fn test_migrate_empty_v1_0_registry() {
     // Create empty v1.0 registry
-    let v1_0 = RegistryV1_0::new();
+    let v1_0 = Registry::new();
 
     // Migrate to v1.1
     let v1_1 = migrate_to_v1_1(v1_0, "test-tool").unwrap();
@@ -27,7 +27,7 @@ fn test_migrate_empty_v1_0_registry() {
 #[test]
 fn test_migrate_v1_0_with_entries() {
     // Create v1.0 registry with entries
-    let mut v1_0 = RegistryV1_0::new();
+    let mut v1_0 = Registry::new();
     v1_0.add_entry("0xabc123".to_string(), "0xdef456".to_string(), None);
     v1_0.add_entry("0x111222".to_string(), "0x333444".to_string(), None);
 
@@ -138,8 +138,8 @@ fn test_unified_registry_loads_v1_1_json() {
 #[test]
 fn test_migration_preserves_optional_fields() {
     // Create v1.0 entry with optional fields
-    let mut v1_0 = RegistryV1_0::new();
-    let entry = RegistryEntryV1_0 {
+    let mut v1_0 = Registry::new();
+    let entry = RegistryEntry {
         id: "test_001".to_string(),
         manifest_hash: "0xabc".to_string(),
         proof_hash: "0xdef".to_string(),
@@ -181,7 +181,7 @@ fn test_migration_preserves_optional_fields() {
 #[test]
 fn test_save_and_reload_preserves_migration_metadata() {
     // Create and migrate v1.0 registry
-    let mut v1_0 = RegistryV1_0::new();
+    let mut v1_0 = Registry::new();
     v1_0.add_entry("0xabc".to_string(), "0xdef".to_string(), None);
 
     let temp_file = NamedTempFile::new().unwrap();
@@ -267,10 +267,10 @@ fn test_backfill_kid_skips_existing() {
 #[test]
 fn test_migration_idempotency() {
     // Create two identical v1.0 registries
-    let mut v1_0_first = RegistryV1_0::new();
+    let mut v1_0_first = Registry::new();
     v1_0_first.add_entry("0xabc".to_string(), "0xdef".to_string(), None);
 
-    let mut v1_0_second = RegistryV1_0::new();
+    let mut v1_0_second = Registry::new();
     v1_0_second.add_entry("0xabc".to_string(), "0xdef".to_string(), None);
 
     // Migrate both
@@ -296,7 +296,7 @@ fn test_migration_idempotency() {
 #[test]
 fn test_validation_after_migration() {
     // Create v1.0 registry
-    let mut v1_0 = RegistryV1_0::new();
+    let mut v1_0 = Registry::new();
     v1_0.add_entry("0xabc".to_string(), "0xdef".to_string(), None);
 
     // Migrate
@@ -309,7 +309,7 @@ fn test_validation_after_migration() {
 #[test]
 fn test_large_registry_migration() {
     // Create v1.0 registry with many entries
-    let mut v1_0 = RegistryV1_0::new();
+    let mut v1_0 = Registry::new();
 
     for i in 0..100 {
         v1_0.add_entry(
