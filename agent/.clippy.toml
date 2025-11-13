@@ -1,0 +1,17 @@
+# Clippy Configuration for CAP Agent
+#
+# This file documents intentional lint suppressions and project-specific
+# lint configurations.
+
+# Allow zombie processes in integration tests (intentional pattern)
+# Integration tests spawn subprocesses that are managed by the test framework
+# or OS cleanup, not by explicit wait() calls.
+#
+# Note: Individual tests should still use #[allow(clippy::zombie_processes)]
+# to document the intentional pattern.
+
+# Performance-oriented borrows in hot paths
+# Some borrows that clippy flags as "needless" are kept for:
+# - Explicit lifetime documentation
+# - Performance in hot paths
+# - API consistency
