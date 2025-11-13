@@ -1807,7 +1807,11 @@ fn run_proof_adapt(
     } else if let Some(policy_id) = policy {
         println!("📋 Policy ID: {}", policy_id);
         // TODO: Load IR from policy registry
-        return Err("Policy ID loading not yet implemented. Please use --ir flag.".to_string().into());
+        return Err(
+            "Policy ID loading not yet implemented. Please use --ir flag."
+                .to_string()
+                .into(),
+        );
     } else {
         return Err("Either --policy or --ir must be specified".into());
     };

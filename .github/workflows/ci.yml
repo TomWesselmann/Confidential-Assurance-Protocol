@@ -29,19 +29,19 @@ jobs:
           toolchain: stable
 
       - name: Cache cargo registry
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.cargo/registry
           key: ${{ runner.os }}-cargo-registry-${{ hashFiles('agent/Cargo.lock') }}
 
       - name: Cache cargo index
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.cargo/git
           key: ${{ runner.os }}-cargo-git-${{ hashFiles('agent/Cargo.lock') }}
 
       - name: Cache cargo build
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: agent/target
           key: ${{ runner.os }}-cargo-build-${{ hashFiles('agent/Cargo.lock') }}
@@ -69,7 +69,7 @@ jobs:
           components: clippy
 
       - name: Cache cargo build
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: agent/target
           key: ${{ runner.os }}-cargo-clippy-${{ hashFiles('agent/Cargo.lock') }}
@@ -111,7 +111,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Cache cargo build
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: agent/target
           key: ${{ runner.os }}-cargo-release-${{ hashFiles('agent/Cargo.lock') }}
@@ -120,7 +120,7 @@ jobs:
         run: cargo build --release --verbose
 
       - name: Upload binary
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: cap-agent-binary
           path: agent/target/release/cap-agent

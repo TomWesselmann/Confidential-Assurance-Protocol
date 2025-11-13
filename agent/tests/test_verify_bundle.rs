@@ -72,7 +72,9 @@ fn test_verify_bundle_native_fallback_ok() {
     fs::remove_dir_all(&bundle_path).ok();
     let output = std::process::Command::new("cargo")
         .args([
-            "run", "--bin", "cap-agent",
+            "run",
+            "--bin",
+            "cap-agent",
             "--",
             "bundle-v2",
             "--manifest",
@@ -90,7 +92,15 @@ fn test_verify_bundle_native_fallback_ok() {
 
     // Verify bundle (should use native fallback, no verifier.wasm)
     let output = std::process::Command::new("cargo")
-        .args(["run", "--bin", "cap-agent", "--", "verify-bundle", "--bundle", &bundle_path])
+        .args([
+            "run",
+            "--bin",
+            "cap-agent",
+            "--",
+            "verify-bundle",
+            "--bundle",
+            &bundle_path,
+        ])
         .output()
         .expect("Failed to execute verify-bundle");
 
@@ -120,7 +130,15 @@ fn test_verify_bundle_missing_files_fail() {
 
     // Try to verify (should fail - missing manifest.json and proof.capz)
     let output = std::process::Command::new("cargo")
-        .args(["run", "--bin", "cap-agent", "--", "verify-bundle", "--bundle", &bundle_path])
+        .args([
+            "run",
+            "--bin",
+            "cap-agent",
+            "--",
+            "verify-bundle",
+            "--bundle",
+            &bundle_path,
+        ])
         .output()
         .expect("Failed to execute verify-bundle");
 
@@ -151,7 +169,9 @@ fn test_verify_bundle_hash_mismatch() {
     fs::remove_dir_all(&bundle_path).ok();
     let output = std::process::Command::new("cargo")
         .args([
-            "run", "--bin", "cap-agent",
+            "run",
+            "--bin",
+            "cap-agent",
             "--",
             "bundle-v2",
             "--manifest",
@@ -219,7 +239,9 @@ fn test_verify_bundle_complete_structure() {
     fs::remove_dir_all(&bundle_path).ok();
     std::process::Command::new("cargo")
         .args([
-            "run", "--bin", "cap-agent",
+            "run",
+            "--bin",
+            "cap-agent",
             "--",
             "bundle-v2",
             "--manifest",
@@ -279,7 +301,9 @@ fn test_executor_detects_no_wasm() {
     fs::remove_dir_all(&bundle_path).ok();
     std::process::Command::new("cargo")
         .args([
-            "run", "--bin", "cap-agent",
+            "run",
+            "--bin",
+            "cap-agent",
             "--",
             "bundle-v2",
             "--manifest",
@@ -323,7 +347,9 @@ fn test_executor_native_verification() {
     fs::remove_dir_all(&bundle_path).ok();
     std::process::Command::new("cargo")
         .args([
-            "run", "--bin", "cap-agent",
+            "run",
+            "--bin",
+            "cap-agent",
             "--",
             "bundle-v2",
             "--manifest",

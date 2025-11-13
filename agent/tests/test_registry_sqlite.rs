@@ -19,7 +19,9 @@ fn test_sqlite_roundtrip() {
     // Use CLI to add entry with SQLite backend
     let output = Command::new("cargo")
         .args([
-            "run", "--bin", "cap-agent",
+            "run",
+            "--bin",
+            "cap-agent",
             "--",
             "registry",
             "add",
@@ -44,7 +46,9 @@ fn test_sqlite_roundtrip() {
             // List entries
             let list_output = Command::new("cargo")
                 .args([
-                    "run", "--bin", "cap-agent",
+                    "run",
+                    "--bin",
+                    "cap-agent",
                     "--",
                     "registry",
                     "list",
@@ -77,7 +81,9 @@ fn test_sqlite_error_on_corrupt_db() {
     // Try to open the corrupted database via CLI
     let output = Command::new("cargo")
         .args([
-            "run", "--bin", "cap-agent",
+            "run",
+            "--bin",
+            "cap-agent",
             "--",
             "registry",
             "list",
@@ -120,7 +126,9 @@ fn test_migrate_empty_registry() {
     // Migrate empty registry
     let output = Command::new("cargo")
         .args([
-            "run", "--bin", "cap-agent",
+            "run",
+            "--bin",
+            "cap-agent",
             "--",
             "registry",
             "migrate",
@@ -148,7 +156,9 @@ fn test_migrate_empty_registry() {
     // Verify it can be read back
     let list_output = Command::new("cargo")
         .args([
-            "run", "--bin", "cap-agent",
+            "run",
+            "--bin",
+            "cap-agent",
             "--",
             "registry",
             "list",
@@ -187,7 +197,9 @@ fn test_duplicate_entry_handling() {
     // Add entry first time
     let output1 = Command::new("cargo")
         .args([
-            "run", "--bin", "cap-agent",
+            "run",
+            "--bin",
+            "cap-agent",
             "--",
             "registry",
             "add",
@@ -206,7 +218,9 @@ fn test_duplicate_entry_handling() {
     // Add same entry second time (should replace due to INSERT OR REPLACE)
     let output2 = Command::new("cargo")
         .args([
-            "run", "--bin", "cap-agent",
+            "run",
+            "--bin",
+            "cap-agent",
             "--",
             "registry",
             "add",
@@ -227,7 +241,9 @@ fn test_duplicate_entry_handling() {
         // List should show entries (possibly 2 if ID generation differs)
         let list_output = Command::new("cargo")
             .args([
-                "run", "--bin", "cap-agent",
+                "run",
+                "--bin",
+                "cap-agent",
                 "--",
                 "registry",
                 "list",
@@ -274,7 +290,9 @@ fn test_sqlite_wal_mode() {
     // Add entry to trigger WAL file creation
     let output = Command::new("cargo")
         .args([
-            "run", "--bin", "cap-agent",
+            "run",
+            "--bin",
+            "cap-agent",
             "--",
             "registry",
             "add",

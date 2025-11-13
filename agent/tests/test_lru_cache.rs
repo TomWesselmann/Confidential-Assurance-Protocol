@@ -37,8 +37,8 @@ rules:
             i, i, i
         );
 
-        let policy: PolicyV2 = parse_yaml_str(&policy_yaml)
-            .unwrap_or_else(|_| panic!("Failed to parse policy {}", i));
+        let policy: PolicyV2 =
+            parse_yaml_str(&policy_yaml).unwrap_or_else(|_| panic!("Failed to parse policy {}", i));
 
         let policy_hash = format!("sha3-256:policy_hash_{:04}", i);
         let ir_hash = format!("sha3-256:ir_hash_{:04}", i);

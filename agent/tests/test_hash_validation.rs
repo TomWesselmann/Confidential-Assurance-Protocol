@@ -70,7 +70,9 @@ fn test_hash_validation_detects_manifest_tampering() {
     fs::remove_dir_all(&bundle_path).ok();
     let output = std::process::Command::new("cargo")
         .args(&[
-            "run", "--bin", "cap-agent",
+            "run",
+            "--bin",
+            "cap-agent",
             "--",
             "bundle-v2",
             "--manifest",
@@ -99,7 +101,15 @@ fn test_hash_validation_detects_manifest_tampering() {
 
     // Try to verify (should fail due to hash mismatch)
     let output = std::process::Command::new("cargo")
-        .args(&["run", "--bin", "cap-agent", "--", "verify-bundle", "--bundle", &bundle_path])
+        .args(&[
+            "run",
+            "--bin",
+            "cap-agent",
+            "--",
+            "verify-bundle",
+            "--bundle",
+            &bundle_path,
+        ])
         .output()
         .expect("Failed to execute verify-bundle");
 
@@ -137,7 +147,9 @@ fn test_hash_validation_detects_proof_tampering() {
     fs::remove_dir_all(&bundle_path).ok();
     let output = std::process::Command::new("cargo")
         .args(&[
-            "run", "--bin", "cap-agent",
+            "run",
+            "--bin",
+            "cap-agent",
             "--",
             "bundle-v2",
             "--manifest",
@@ -164,7 +176,15 @@ fn test_hash_validation_detects_proof_tampering() {
 
     // Try to verify (should fail due to hash mismatch)
     let output = std::process::Command::new("cargo")
-        .args(&["run", "--bin", "cap-agent", "--", "verify-bundle", "--bundle", &bundle_path])
+        .args(&[
+            "run",
+            "--bin",
+            "cap-agent",
+            "--",
+            "verify-bundle",
+            "--bundle",
+            &bundle_path,
+        ])
         .output()
         .expect("Failed to execute verify-bundle");
 
@@ -202,7 +222,9 @@ fn test_hash_validation_passes_for_valid_bundle() {
     fs::remove_dir_all(&bundle_path).ok();
     let output = std::process::Command::new("cargo")
         .args(&[
-            "run", "--bin", "cap-agent",
+            "run",
+            "--bin",
+            "cap-agent",
             "--",
             "bundle-v2",
             "--manifest",
@@ -220,7 +242,15 @@ fn test_hash_validation_passes_for_valid_bundle() {
 
     // Verify without tampering (should succeed)
     let output = std::process::Command::new("cargo")
-        .args(&["run", "--bin", "cap-agent", "--", "verify-bundle", "--bundle", &bundle_path])
+        .args(&[
+            "run",
+            "--bin",
+            "cap-agent",
+            "--",
+            "verify-bundle",
+            "--bundle",
+            &bundle_path,
+        ])
         .output()
         .expect("Failed to execute verify-bundle");
 

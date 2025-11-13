@@ -2,9 +2,7 @@
 //!
 //! Testet die End-to-End-Migration von v1.0 zu v1.1 Format.
 
-use cap_agent::registry::{
-    migrate_to_v1_1, Registry, RegistryEntry, UnifiedRegistry,
-};
+use cap_agent::registry::{migrate_to_v1_1, Registry, RegistryEntry, UnifiedRegistry};
 use std::io::Write;
 use tempfile::NamedTempFile;
 

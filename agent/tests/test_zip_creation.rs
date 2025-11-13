@@ -71,7 +71,9 @@ fn test_create_bundle_with_zip() {
     // Create bundle with ZIP
     let output = std::process::Command::new("cargo")
         .args([
-            "run", "--bin", "cap-agent",
+            "run",
+            "--bin",
+            "cap-agent",
             "--",
             "bundle-v2",
             "--manifest",
@@ -130,7 +132,9 @@ fn test_zip_contains_all_files() {
     // Create bundle with ZIP
     std::process::Command::new("cargo")
         .args([
-            "run", "--bin", "cap-agent",
+            "run",
+            "--bin",
+            "cap-agent",
             "--",
             "bundle-v2",
             "--manifest",
@@ -195,7 +199,9 @@ fn test_zip_extract_and_verify() {
     // Create bundle with ZIP
     std::process::Command::new("cargo")
         .args([
-            "run", "--bin", "cap-agent",
+            "run",
+            "--bin",
+            "cap-agent",
             "--",
             "bundle-v2",
             "--manifest",
