@@ -68,3 +68,15 @@ harness = false
 [[bench]]
 name = "compile_bench"
 harness = false
+
+# Clippy Lint Configuration
+# Allow intentional patterns that are common in this codebase
+[lints.clippy]
+# Allow zombie processes in integration tests (intentional pattern)
+zombie_processes = "allow"
+# Allow explicit borrows for API clarity
+needless_borrows_for_generic_args = "allow"
+# Allow existing file operations (backward compatibility)
+suspicious_open_options = "allow"
+# Allow let-and-return in benchmarks for readability
+let_and_return = "allow"
