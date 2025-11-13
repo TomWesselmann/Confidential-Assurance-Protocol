@@ -14,7 +14,7 @@ fn test_zk_backend_architecture_exists() {
     println!("✅ NotImplementedZk stub for future backends");
 
     // Architecture is ready for CLI integration
-    assert!(true, "ZK backend architecture successfully implemented");
+    // (println! messages document success)
 }
 
 #[test]
@@ -29,7 +29,8 @@ fn test_backend_components_ready_for_cli() {
     println!("  - backend_from_cli('halo2') → Ok(ZkBackend::Halo2)");
     println!("  - backend_from_cli('invalid') → Err");
 
-    assert!(true, "All backend components ready for CLI --backend flag");
+    // All backend components ready for CLI --backend flag
+    // (println! messages document success)
 }
 
 #[test]
@@ -42,5 +43,6 @@ fn test_future_backend_integration_path() {
     println!("4. Update CLI help text with new backend name");
     println!("5. Add backend-specific tests");
 
-    assert!(true, "Integration path documented");
+    // Integration path documented
+    // (println! messages document the path)
 }

@@ -3,9 +3,9 @@
 //! End-to-End Tests für Orchestrator + Enforcer + Drift Analysis
 
 use cap_agent::orchestrator::{
-    Enforcer, EnforceOptions, OrchestratorContext, DriftAnalyzer, Verdict, VerdictPair,
+    DriftAnalyzer, EnforceOptions, Enforcer, OrchestratorContext, Verdict, VerdictPair,
 };
-use cap_agent::policy_v2::types::{IrV1, IrRule, IrExpression};
+use cap_agent::policy_v2::types::{IrExpression, IrRule, IrV1};
 use std::collections::HashMap;
 use std::time::Duration;
 
@@ -14,18 +14,23 @@ fn create_test_ir_multi_rules() -> IrV1 {
     IrV1 {
         ir_version: "1.0".to_string(),
         policy_id: "test_enforce.v1".to_string(),
-        policy_hash: "sha3-256:0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890".to_string(),
+        policy_hash: "sha3-256:0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
+            .to_string(),
         rules: vec![
             IrRule {
                 id: "supplier_check".to_string(),
                 op: "eq".to_string(),
-                lhs: IrExpression::Var { var: "supplier_hash".to_string() },
+                lhs: IrExpression::Var {
+                    var: "supplier_hash".to_string(),
+                },
                 rhs: IrExpression::Literal(serde_json::Value::String("0xabc".to_string())),
             },
             IrRule {
                 id: "ubo_check".to_string(),
                 op: "ne".to_string(),
-                lhs: IrExpression::Var { var: "ubo_hash".to_string() },
+                lhs: IrExpression::Var {
+                    var: "ubo_hash".to_string(),
+                },
                 rhs: IrExpression::Literal(serde_json::Value::String("0xsanctioned".to_string())),
             },
         ],
@@ -106,11 +111,7 @@ fn test_orchestrator_enforce_with_drift_tracking() {
     // Simuliere mehrere Requests
     for i in 0..10 {
         let result = enforcer.decide(&ctx, &format!("request-{}", i)).unwrap();
-        drift_analyzer.record_verdict_pair(
-            &result,
-            ir.policy_id.clone(),
-            format!("request-{}", i),
-        );
+        drift_analyzer.record_verdict_pair(&result, ir.policy_id.clone(), format!("request-{}", i));
     }
 
     // Prüfe Drift-Statistiken
@@ -141,11 +142,7 @@ fn test_orchestrator_enforce_canary_rollout() {
     let mut enforced_count = 0;
     for i in 0..100 {
         let result = enforcer.decide(&ctx, &format!("canary-{}", i)).unwrap();
-        drift_analyzer.record_verdict_pair(
-            &result,
-            ir.policy_id.clone(),
-            format!("canary-{}", i),
-        );
+        drift_analyzer.record_verdict_pair(&result, ir.policy_id.clone(), format!("canary-{}", i));
 
         if result.enforced_applied {
             enforced_count += 1;
@@ -154,7 +151,7 @@ fn test_orchestrator_enforce_canary_rollout() {
 
     // Bei 25% Rollout erwarten wir ca. 25 von 100 (mit Toleranz)
     assert!(
-        enforced_count >= 10 && enforced_count <= 40,
+        (10..=40).contains(&enforced_count),
         "Expected ~25% rollout, got {}%",
         enforced_count
     );
@@ -187,11 +184,7 @@ fn test_orchestrator_enforce_drift_detection() {
             }
         };
 
-        drift_analyzer.record_verdict_pair(
-            &pair,
-            "test.v1".to_string(),
-            format!("req-{}", i),
-        );
+        drift_analyzer.record_verdict_pair(&pair, "test.v1".to_string(), format!("req-{}", i));
     }
 
     let stats = drift_analyzer.stats_5m();
@@ -218,14 +211,14 @@ fn test_orchestrator_enforce_rolling_window() {
     for i in 0..50 {
         let pair = VerdictPair {
             shadow: Verdict::Ok,
-            enforced: if i % 10 == 0 { Verdict::Fail } else { Verdict::Ok },
+            enforced: if i % 10 == 0 {
+                Verdict::Fail
+            } else {
+                Verdict::Ok
+            },
             enforced_applied: true,
         };
-        drift_analyzer.record_verdict_pair(
-            &pair,
-            "test.v1".to_string(),
-            format!("req-{}", i),
-        );
+        drift_analyzer.record_verdict_pair(&pair, "test.v1".to_string(), format!("req-{}", i));
     }
 
     // Custom window query
@@ -263,11 +256,7 @@ fn test_orchestrator_enforce_request_rate() {
             enforced: Verdict::Ok,
             enforced_applied: true,
         };
-        drift_analyzer.record_verdict_pair(
-            &pair,
-            "test.v1".to_string(),
-            format!("req-{}", i),
-        );
+        drift_analyzer.record_verdict_pair(&pair, "test.v1".to_string(), format!("req-{}", i));
     }
 
     let request_rate = drift_analyzer.request_rate_5m();

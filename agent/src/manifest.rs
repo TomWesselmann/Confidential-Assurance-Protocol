@@ -37,8 +37,8 @@ pub struct SignatureInfo {
 /// Private Anchor (lokaler Audit-Tip)
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct TimeAnchorPrivate {
-    pub audit_tip_hex: String,  // 0x-prefixed SHA3-256 hash
-    pub created_at: String,     // RFC3339 Timestamp
+    pub audit_tip_hex: String, // 0x-prefixed SHA3-256 hash
+    pub created_at: String,    // RFC3339 Timestamp
 }
 
 /// Public Chain Enum für Blockchain-Anker
@@ -55,18 +55,18 @@ pub enum PublicChain {
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct TimeAnchorPublic {
     pub chain: PublicChain,
-    pub txid: String,           // Transaction ID (format depends on chain)
-    pub digest: String,         // 0x-prefixed hash of audit_tip for on-chain notarization
-    pub created_at: String,     // RFC3339 Timestamp
+    pub txid: String,       // Transaction ID (format depends on chain)
+    pub digest: String,     // 0x-prefixed hash of audit_tip for on-chain notarization
+    pub created_at: String, // RFC3339 Timestamp
 }
 
 /// Zeitanker für externe Timestamps (Dual-Anchor Support v0.9.0)
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TimeAnchor {
-    pub kind: String,           // "tsa", "blockchain", "file", "none"
-    pub reference: String,       // Pfad, TxID oder URI
-    pub audit_tip_hex: String,  // Audit-Chain-Tip zum Zeitpunkt des Anchors
-    pub created_at: String,     // RFC3339 Timestamp
+    pub kind: String,          // "tsa", "blockchain", "file", "none"
+    pub reference: String,     // Pfad, TxID oder URI
+    pub audit_tip_hex: String, // Audit-Chain-Tip zum Zeitpunkt des Anchors
+    pub created_at: String,    // RFC3339 Timestamp
 
     // Dual-Anchor Fields (v0.9.0, optional, additive)
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -147,7 +147,8 @@ impl Manifest {
         let file = File::open(path)?;
         let reader = BufReader::new(file);
 
-        let mut last_digest = "0x0000000000000000000000000000000000000000000000000000000000000000".to_string();
+        let mut last_digest =
+            "0x0000000000000000000000000000000000000000000000000000000000000000".to_string();
         let mut count: u64 = 0;
 
         for line in reader.lines() {
@@ -226,8 +227,14 @@ impl Manifest {
     ///
     /// # Errors
     /// Returns error if time_anchor is not initialized or if audit_tip doesn't match
-    pub fn set_private_anchor(&mut self, audit_tip_hex: String, created_at: Option<String>) -> Result<(), Box<dyn Error>> {
-        let anchor = self.time_anchor.as_mut()
+    pub fn set_private_anchor(
+        &mut self,
+        audit_tip_hex: String,
+        created_at: Option<String>,
+    ) -> Result<(), Box<dyn Error>> {
+        let anchor = self
+            .time_anchor
+            .as_mut()
             .ok_or("time_anchor must be initialized before setting private anchor")?;
 
         // Consistency check: private.audit_tip_hex must match time_anchor.audit_tip_hex
@@ -235,7 +242,8 @@ impl Manifest {
             return Err(format!(
                 "Private audit_tip_hex ({}) does not match time_anchor.audit_tip_hex ({})",
                 audit_tip_hex, anchor.audit_tip_hex
-            ).into());
+            )
+            .into());
         }
 
         anchor.private = Some(TimeAnchorPrivate {
@@ -263,7 +271,9 @@ impl Manifest {
         digest: String,
         created_at: Option<String>,
     ) -> Result<(), Box<dyn Error>> {
-        let anchor = self.time_anchor.as_mut()
+        let anchor = self
+            .time_anchor
+            .as_mut()
             .ok_or("time_anchor must be initialized before setting public anchor")?;
 
         anchor.public = Some(TimeAnchorPublic {
@@ -292,17 +302,17 @@ impl Manifest {
                 return Err(format!(
                     "Private anchor audit_tip_hex mismatch: expected {}, got {}",
                     anchor.audit_tip_hex, private.audit_tip_hex
-                ).into());
+                )
+                .into());
             }
         }
 
         // Check public anchor format (basic validation)
         if let Some(public) = &anchor.public {
             if !public.digest.starts_with("0x") || public.digest.len() != 66 {
-                return Err(format!(
-                    "Public anchor digest has invalid format: {}",
-                    public.digest
-                ).into());
+                return Err(
+                    format!("Public anchor digest has invalid format: {}", public.digest).into(),
+                );
             }
             if public.txid.is_empty() {
                 return Err("Public anchor txid cannot be empty".into());

@@ -5,7 +5,6 @@
 /// Note: Actual TLS termination can be handled by:
 /// - axum-server with rustls (native Rust TLS)
 /// - Ingress/Reverse proxy (nginx, envoy, traefik)
-
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -149,7 +148,9 @@ impl TlsConfig {
     /// Check if client certificate is required
     pub fn is_client_cert_required(&self) -> bool {
         self.require_mtls
-            || self.parse_client_cert_validation().unwrap_or(ClientCertValidation::None)
+            || self
+                .parse_client_cert_validation()
+                .unwrap_or(ClientCertValidation::None)
                 == ClientCertValidation::Required
     }
 
@@ -170,8 +171,7 @@ impl TlsConfig {
             }
 
             // Wildcard match (*.example.com)
-            if allowed_san.starts_with("*.") {
-                let domain_suffix = &allowed_san[2..]; // Remove "*."
+            if let Some(domain_suffix) = allowed_san.strip_prefix("*.") {
                 // Ensure there's at least one character before the domain suffix
                 // So "*.example.com" matches "foo.example.com" but NOT "example.com"
                 if san.ends_with(domain_suffix) && san.len() > domain_suffix.len() {
@@ -216,11 +216,11 @@ allowed_client_sans:
 "#;
 
         let config: TlsConfig = serde_yaml::from_str(config_yaml).unwrap();
-        assert_eq!(config.require_mtls, true);
+        assert!(config.require_mtls);
         assert_eq!(config.tls_min_version, "1.2");
         assert_eq!(config.cipher_profile, "modern");
         assert_eq!(config.client_cert_validation, "required");
-        assert_eq!(config.verify_client_san, true);
+        assert!(config.verify_client_san);
         assert_eq!(config.allowed_client_sans.len(), 2);
     }
 

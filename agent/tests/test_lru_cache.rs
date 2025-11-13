@@ -1,10 +1,12 @@
+use cap_agent::api::policy_compiler::{
+    test_cache_contains, test_clear_cache, test_get_cache_size, test_insert_policy,
+    test_touch_policy,
+};
 /// LRU Cache Eviction Tests - Week 4
 ///
 /// Tests that verify the LRU cache correctly evicts least-recently-used entries
 /// when the cache reaches its capacity (1000 entries).
-
-use cap_agent::policy_v2::{parse_yaml_str, PolicyV2, IrV1};
-use cap_agent::api::policy_compiler::{test_clear_cache, test_get_cache_size, test_insert_policy, test_cache_contains, test_touch_policy};
+use cap_agent::policy_v2::{parse_yaml_str, IrV1, PolicyV2};
 
 #[test]
 #[ignore] // Requires significant time (inserting 1000+ policies)
@@ -36,7 +38,7 @@ rules:
         );
 
         let policy: PolicyV2 = parse_yaml_str(&policy_yaml)
-            .expect(&format!("Failed to parse policy {}", i));
+            .unwrap_or_else(|_| panic!("Failed to parse policy {}", i));
 
         let policy_hash = format!("sha3-256:policy_hash_{:04}", i);
         let ir_hash = format!("sha3-256:ir_hash_{:04}", i);
@@ -58,8 +60,7 @@ rules:
     // Verify cache size is at limit (1000)
     let cache_size = test_get_cache_size();
     assert_eq!(
-        cache_size,
-        1000,
+        cache_size, 1000,
         "Cache should maintain exactly 1000 entries"
     );
 
@@ -192,7 +193,10 @@ rules:
     );
 
     println!("✅ LRU Cache Eviction Order Test - PASSED");
-    println!("   Recently accessed entries retained: {}/10", recently_accessed_still_present);
+    println!(
+        "   Recently accessed entries retained: {}/10",
+        recently_accessed_still_present
+    );
     println!("   Old entries evicted: {}/20", old_policies_evicted);
 }
 

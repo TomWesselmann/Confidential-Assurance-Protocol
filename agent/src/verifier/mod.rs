@@ -14,9 +14,5 @@ pub mod core;
 
 // Re-export main types for convenience
 pub use core::{
-    ProofStatement,
-    VerifyOptions,
-    VerifyReport,
-    extract_statement_from_manifest,
-    verify,
+    extract_statement_from_manifest, verify, ProofStatement, VerifyOptions, VerifyReport,
 };

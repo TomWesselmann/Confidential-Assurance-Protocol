@@ -1,7 +1,6 @@
 /// Integration tests for Dual-Anchor Schema (v0.9.0)
 ///
 /// Tests CLI commands for private and public anchor operations.
-
 use std::fs;
 use std::process::Command;
 
@@ -53,7 +52,7 @@ fn cli_set_private_anchor_ok() {
 
     // Run CLI command
     let output = Command::new("cargo")
-        .args(&[
+        .args([
             "run",
             "--",
             "audit",
@@ -95,7 +94,7 @@ fn cli_set_private_anchor_mismatch_fails() {
 
     // Try to set private anchor with wrong_tip (should fail)
     let output = Command::new("cargo")
-        .args(&[
+        .args([
             "run",
             "--",
             "audit",
@@ -136,7 +135,7 @@ fn cli_set_public_anchor_ethereum_ok() {
 
     // Run CLI command
     let output = Command::new("cargo")
-        .args(&[
+        .args([
             "run",
             "--",
             "audit",
@@ -182,7 +181,7 @@ fn cli_verify_anchor_ok() {
 
     // Set private anchor
     Command::new("cargo")
-        .args(&[
+        .args([
             "run",
             "--",
             "audit",
@@ -197,7 +196,7 @@ fn cli_verify_anchor_ok() {
 
     // Set public anchor
     Command::new("cargo")
-        .args(&[
+        .args([
             "run",
             "--",
             "audit",
@@ -216,7 +215,7 @@ fn cli_verify_anchor_ok() {
 
     // Verify dual-anchor
     let output = Command::new("cargo")
-        .args(&[
+        .args([
             "run",
             "--",
             "audit",

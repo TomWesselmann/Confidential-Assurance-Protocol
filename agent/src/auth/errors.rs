@@ -1,7 +1,6 @@
 /// OAuth2 Authentication Errors (Week 5)
 ///
 /// Fail-closed error handling without PII leakage
-
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq)]

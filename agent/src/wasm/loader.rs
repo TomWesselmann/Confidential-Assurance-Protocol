@@ -1,7 +1,6 @@
 /// WASM Loader mit Sandbox und Limits
 ///
 /// Lädt WASM-Module mit konfigurierbaren Sicherheitsgrenzen.
-
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use wasmtime::*;
@@ -96,7 +95,9 @@ impl WasmVerifier {
         // Get verify function
         let verify_func = instance
             .get_typed_func::<(i32, i32, i32, i32, i32, i32), i32>(&mut store, "verify")
-            .map_err(|_| anyhow!("WASM module must export 'verify' function with correct signature"))?;
+            .map_err(|_| {
+                anyhow!("WASM module must export 'verify' function with correct signature")
+            })?;
 
         // Allocate memory in WASM for inputs
         let alloc_func = instance
@@ -151,8 +152,7 @@ impl WasmVerifier {
         let mut result_data = vec![0u8; result_len];
         memory.read(&store, (result_ptr + 4) as usize, &mut result_data)?;
 
-        String::from_utf8(result_data)
-            .map_err(|e| anyhow!("Result is not valid UTF-8: {}", e))
+        String::from_utf8(result_data).map_err(|e| anyhow!("Result is not valid UTF-8: {}", e))
     }
 
     /// Get remaining fuel (if fuel metering enabled)

@@ -157,12 +157,17 @@ impl Policy {
                 match root_key.as_str() {
                     "sanctions_root" => {
                         if sanctions_root.is_none() {
-                            return Err("POLICY_E_MISSING_PUBLIC_INPUT: sanctions_root erforderlich".into());
+                            return Err(
+                                "POLICY_E_MISSING_PUBLIC_INPUT: sanctions_root erforderlich".into(),
+                            );
                         }
                     }
                     "jurisdiction_root" => {
                         if jurisdiction_root.is_none() {
-                            return Err("POLICY_E_MISSING_PUBLIC_INPUT: jurisdiction_root erforderlich".into());
+                            return Err(
+                                "POLICY_E_MISSING_PUBLIC_INPUT: jurisdiction_root erforderlich"
+                                    .into(),
+                            );
                         }
                     }
                     _ => {
@@ -348,10 +353,14 @@ notes: "Test notes"
         // Test: Sanctions-Root fehlt -> sollte fehlschlagen
         let result = policy.check_required_statement_roots(&None, &None);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("POLICY_E_MISSING_PUBLIC_INPUT"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("POLICY_E_MISSING_PUBLIC_INPUT"));
 
         // Test: Sanctions-Root vorhanden -> sollte OK sein
-        let result_ok = policy.check_required_statement_roots(&Some("0xsanctions".to_string()), &None);
+        let result_ok =
+            policy.check_required_statement_roots(&Some("0xsanctions".to_string()), &None);
         assert!(result_ok.is_ok());
     }
 }

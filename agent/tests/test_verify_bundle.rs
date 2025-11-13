@@ -1,10 +1,9 @@
+use serde_json::Value;
 /// Integration tests for Bundle v2 verification
 ///
 /// Tests verify-bundle command with native fallback and hash validation.
-
 use std::fs;
 use std::path::Path;
-use serde_json::Value;
 
 /// Helper: Create minimal test manifest
 fn create_test_manifest(path: &str) -> Result<(), Box<dyn std::error::Error>> {
@@ -72,7 +71,7 @@ fn test_verify_bundle_native_fallback_ok() {
     // Create bundle first
     fs::remove_dir_all(&bundle_path).ok();
     let output = std::process::Command::new("cargo")
-        .args(&[
+        .args([
             "run",
             "--",
             "bundle-v2",
@@ -91,13 +90,7 @@ fn test_verify_bundle_native_fallback_ok() {
 
     // Verify bundle (should use native fallback, no verifier.wasm)
     let output = std::process::Command::new("cargo")
-        .args(&[
-            "run",
-            "--",
-            "verify-bundle",
-            "--bundle",
-            &bundle_path,
-        ])
+        .args(["run", "--", "verify-bundle", "--bundle", &bundle_path])
         .output()
         .expect("Failed to execute verify-bundle");
 
@@ -127,13 +120,7 @@ fn test_verify_bundle_missing_files_fail() {
 
     // Try to verify (should fail - missing manifest.json and proof.capz)
     let output = std::process::Command::new("cargo")
-        .args(&[
-            "run",
-            "--",
-            "verify-bundle",
-            "--bundle",
-            &bundle_path,
-        ])
+        .args(["run", "--", "verify-bundle", "--bundle", &bundle_path])
         .output()
         .expect("Failed to execute verify-bundle");
 
@@ -163,7 +150,7 @@ fn test_verify_bundle_hash_mismatch() {
     // Create bundle
     fs::remove_dir_all(&bundle_path).ok();
     let output = std::process::Command::new("cargo")
-        .args(&[
+        .args([
             "run",
             "--",
             "bundle-v2",
@@ -188,12 +175,14 @@ fn test_verify_bundle_hash_mismatch() {
 
     // Tamper with manifest
     let manifest_bundle_path = format!("{}/manifest.json", bundle_path);
-    let mut manifest: Value = serde_json::from_str(
-        &fs::read_to_string(&manifest_bundle_path).unwrap()
-    ).unwrap();
+    let mut manifest: Value =
+        serde_json::from_str(&fs::read_to_string(&manifest_bundle_path).unwrap()).unwrap();
     manifest["audit"]["events_count"] = serde_json::json!(999); // Change value
-    fs::write(&manifest_bundle_path, serde_json::to_string_pretty(&manifest).unwrap())
-        .expect("Failed to write tampered manifest");
+    fs::write(
+        &manifest_bundle_path,
+        serde_json::to_string_pretty(&manifest).unwrap(),
+    )
+    .expect("Failed to write tampered manifest");
 
     // Compute new hash
     use cap_agent::crypto;
@@ -229,7 +218,7 @@ fn test_verify_bundle_complete_structure() {
     // Create bundle
     fs::remove_dir_all(&bundle_path).ok();
     std::process::Command::new("cargo")
-        .args(&[
+        .args([
             "run",
             "--",
             "bundle-v2",
@@ -289,7 +278,7 @@ fn test_executor_detects_no_wasm() {
     // Create bundle (no WASM)
     fs::remove_dir_all(&bundle_path).ok();
     std::process::Command::new("cargo")
-        .args(&[
+        .args([
             "run",
             "--",
             "bundle-v2",
@@ -305,8 +294,7 @@ fn test_executor_detects_no_wasm() {
         .expect("Failed to execute bundle-v2");
 
     // Create executor
-    let executor = BundleExecutor::new(bundle_path.clone())
-        .expect("Failed to create executor");
+    let executor = BundleExecutor::new(bundle_path.clone()).expect("Failed to create executor");
 
     // Should detect no WASM
     assert!(!executor.has_wasm(), "Should detect missing WASM");
@@ -318,8 +306,8 @@ fn test_executor_detects_no_wasm() {
 /// Test: BundleExecutor can perform native verification
 #[test]
 fn test_executor_native_verification() {
-    use cap_agent::wasm::BundleExecutor;
     use cap_agent::verifier::core::VerifyOptions;
+    use cap_agent::wasm::BundleExecutor;
 
     let test_dir = "tests/out/verify_bundle";
     let manifest_path = format!("{}/test_manifest.json", test_dir);
@@ -334,7 +322,7 @@ fn test_executor_native_verification() {
     // Create bundle
     fs::remove_dir_all(&bundle_path).ok();
     std::process::Command::new("cargo")
-        .args(&[
+        .args([
             "run",
             "--",
             "bundle-v2",
@@ -350,15 +338,15 @@ fn test_executor_native_verification() {
         .expect("Failed to execute bundle-v2");
 
     // Create executor and verify
-    let executor = BundleExecutor::new(bundle_path.clone())
-        .expect("Failed to create executor");
+    let executor = BundleExecutor::new(bundle_path.clone()).expect("Failed to create executor");
 
     let options = VerifyOptions {
         check_timestamp: false,
         check_registry: false,
     };
 
-    let report = executor.verify(&options)
+    let report = executor
+        .verify(&options)
         .expect("Native verification failed");
 
     // Should have status "ok"

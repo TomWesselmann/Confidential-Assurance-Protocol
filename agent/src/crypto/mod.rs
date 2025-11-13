@@ -216,8 +216,7 @@ pub fn hex_to_32b(s: &str) -> Result<[u8; 32]> {
     let hex_str = s.strip_prefix("0x").unwrap_or(s);
 
     // Decode hex
-    let bytes = hex::decode(hex_str)
-        .map_err(|e| anyhow!("Invalid hex string: {}", e))?;
+    let bytes = hex::decode(hex_str).map_err(|e| anyhow!("Invalid hex string: {}", e))?;
 
     // Check length
     if bytes.len() != 32 {
@@ -294,7 +293,10 @@ mod tests {
         let hex = hex_lower_prefixed32(bytes);
         assert_eq!(hex.len(), 66); // "0x" + 64 hex chars
         assert!(hex.starts_with("0x"));
-        assert!(hex.chars().skip(2).all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()));
+        assert!(hex
+            .chars()
+            .skip(2)
+            .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()));
     }
 
     #[test]
@@ -327,10 +329,11 @@ mod tests {
 
     #[test]
     fn test_hex_roundtrip() {
-        let original = [0xAB, 0xCD, 0xEF, 0x01, 0x23, 0x45, 0x67, 0x89,
-                        0xAB, 0xCD, 0xEF, 0x01, 0x23, 0x45, 0x67, 0x89,
-                        0xAB, 0xCD, 0xEF, 0x01, 0x23, 0x45, 0x67, 0x89,
-                        0xAB, 0xCD, 0xEF, 0x01, 0x23, 0x45, 0x67, 0x89];
+        let original = [
+            0xAB, 0xCD, 0xEF, 0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF, 0x01, 0x23, 0x45,
+            0x67, 0x89, 0xAB, 0xCD, 0xEF, 0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF, 0x01,
+            0x23, 0x45, 0x67, 0x89,
+        ];
         let hex = hex_lower_prefixed32(original);
         let decoded = hex_to_32b(&hex).unwrap();
         assert_eq!(original, decoded);

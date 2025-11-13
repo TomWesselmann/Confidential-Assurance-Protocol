@@ -2,8 +2,8 @@
 //!
 //! Tests für CLI-Integration des Adaptive Enforcer.
 
-use cap_agent::orchestrator::{Enforcer, EnforceOptions, OrchestratorContext};
-use cap_agent::policy_v2::types::{IrV1, IrRule, IrExpression};
+use cap_agent::orchestrator::{EnforceOptions, Enforcer, OrchestratorContext};
+use cap_agent::policy_v2::types::{IrExpression, IrRule, IrV1};
 use std::collections::HashMap;
 
 /// Helper: Erstellt Test-IR mit minimalen Regeln
@@ -11,15 +11,16 @@ fn create_test_ir() -> IrV1 {
     IrV1 {
         ir_version: "1.0".to_string(),
         policy_id: "test.v1".to_string(),
-        policy_hash: "sha3-256:0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef".to_string(),
-        rules: vec![
-            IrRule {
-                id: "rule1".to_string(),
-                op: "eq".to_string(),
-                lhs: IrExpression::Var { var: "supplier_hash".to_string() },
-                rhs: IrExpression::Literal(serde_json::Value::String("0xabc".to_string())),
+        policy_hash: "sha3-256:0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+            .to_string(),
+        rules: vec![IrRule {
+            id: "rule1".to_string(),
+            op: "eq".to_string(),
+            lhs: IrExpression::Var {
+                var: "supplier_hash".to_string(),
             },
-        ],
+            rhs: IrExpression::Literal(serde_json::Value::String("0xabc".to_string())),
+        }],
         adaptivity: None,
         ir_hash: "sha3-256:def".to_string(),
     }
@@ -42,9 +43,12 @@ fn test_defaults_shadow_mode() {
     // Test: Default-Optionen entsprechen Shadow-Mode
     let opts = EnforceOptions::default();
 
-    assert_eq!(opts.enforce, false, "Default enforce should be false");
+    assert!(!opts.enforce, "Default enforce should be false");
     assert_eq!(opts.rollout_percent, 0, "Default rollout should be 0");
-    assert_eq!(opts.drift_max_ratio, 0.005, "Default drift_max should be 0.005");
+    assert_eq!(
+        opts.drift_max_ratio, 0.005,
+        "Default drift_max should be 0.005"
+    );
 }
 
 #[test]
@@ -61,7 +65,10 @@ fn test_parse_enforce_rollout_drift() {
     };
     let enforcer_shadow = Enforcer::new(&ir, opts_shadow).unwrap();
     let result = enforcer_shadow.decide(&ctx, "test-request-123").unwrap();
-    assert!(!result.enforced_applied, "Shadow mode should not apply enforcement");
+    assert!(
+        !result.enforced_applied,
+        "Shadow mode should not apply enforcement"
+    );
 
     // Canary (enforce=true, rollout=25)
     let opts_canary = EnforceOptions {
@@ -81,7 +88,10 @@ fn test_parse_enforce_rollout_drift() {
     };
     let enforcer_full = Enforcer::new(&ir, opts_full).unwrap();
     let result_full = enforcer_full.decide(&ctx, "test-request-456").unwrap();
-    assert!(result_full.enforced_applied, "Full rollout should always apply enforcement");
+    assert!(
+        result_full.enforced_applied,
+        "Full rollout should always apply enforcement"
+    );
 }
 
 #[test]
@@ -92,7 +102,7 @@ fn test_deterministic_sampling() {
 
     let opts = EnforceOptions {
         enforce: true,
-        rollout_percent: 50,  // 50% rollout
+        rollout_percent: 50, // 50% rollout
         drift_max_ratio: 0.005,
     };
 
@@ -134,7 +144,7 @@ fn test_rollout_percentage_distribution() {
 
     let opts = EnforceOptions {
         enforce: true,
-        rollout_percent: 25,  // 25% rollout
+        rollout_percent: 25, // 25% rollout
         drift_max_ratio: 0.005,
     };
 
@@ -152,7 +162,7 @@ fn test_rollout_percentage_distribution() {
     // Bei 25% rollout erwarten wir ca. 25 von 100
     // Mit ±15% Toleranz (10-40) wegen Hash-basiertem Sampling
     assert!(
-        enforced_count >= 10 && enforced_count <= 40,
+        (10..=40).contains(&enforced_count),
         "Expected ~25% rollout, got {}%",
         enforced_count
     );
@@ -165,8 +175,8 @@ fn test_enforce_disabled_overrides_rollout() {
     let ctx = create_test_context();
 
     let opts = EnforceOptions {
-        enforce: false,  // Enforcement disabled
-        rollout_percent: 100,  // Aber 100% rollout
+        enforce: false,       // Enforcement disabled
+        rollout_percent: 100, // Aber 100% rollout
         drift_max_ratio: 0.005,
     };
 
@@ -187,13 +197,13 @@ fn test_drift_max_ratio_option() {
     let opts_default = EnforceOptions {
         enforce: true,
         rollout_percent: 100,
-        drift_max_ratio: 0.005,  // Default 0.5%
+        drift_max_ratio: 0.005, // Default 0.5%
     };
 
     let opts_custom = EnforceOptions {
         enforce: true,
         rollout_percent: 100,
-        drift_max_ratio: 0.01,  // Custom 1%
+        drift_max_ratio: 0.01, // Custom 1%
     };
 
     let enforcer_default = Enforcer::new(&ir, opts_default.clone()).unwrap();

@@ -1,7 +1,6 @@
 /// Helper: Generate Mock JWT Token for Testing
 ///
 /// Usage: cargo run --example generate_mock_token
-
 use cap_agent::api::auth::generate_mock_token;
 use cap_agent::api::auth::Claims;
 
@@ -24,7 +23,7 @@ fn main() {
     println!("==================================================");
     println!("{}", token);
     println!("==================================================");
-    println!("");
+    println!();
     println!("Usage:");
     println!("  curl -H 'Authorization: Bearer {}' \\", token);
     println!("       http://localhost:8080/verify");

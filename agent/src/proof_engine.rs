@@ -269,7 +269,11 @@ pub fn export_proof_package<P: AsRef<Path>>(
     }
     writeln!(readme)?;
     writeln!(readme, "Verification:")?;
-    writeln!(readme, "  cargo run -- verifier run --package {}", dir.display())?;
+    writeln!(
+        readme,
+        "  cargo run -- verifier run --package {}",
+        dir.display()
+    )?;
 
     Ok(())
 }

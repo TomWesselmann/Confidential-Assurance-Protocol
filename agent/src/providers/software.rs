@@ -26,7 +26,10 @@ impl SoftwareProvider {
     /// # Arguments
     /// * `keys_dir` - Pfad zum Schlüsselverzeichnis
     /// * `default_key_name` - Optional: Name des Default-Schlüssels (ohne Pfad/Extension)
-    pub fn new<P: AsRef<Path>>(keys_dir: P, default_key_name: Option<String>) -> Result<Self, KeyError> {
+    pub fn new<P: AsRef<Path>>(
+        keys_dir: P,
+        default_key_name: Option<String>,
+    ) -> Result<Self, KeyError> {
         let keys_path = keys_dir.as_ref().to_path_buf();
 
         let key_store = KeyStore::new(&keys_path)
@@ -81,10 +84,13 @@ impl SoftwareProvider {
         }
 
         // Fallback: Finde ersten aktiven Schlüssel
-        let store = self.key_store.read()
+        let store = self
+            .key_store
+            .read()
             .map_err(|e| KeyError::ProviderError(format!("Lock error: {}", e)))?;
 
-        let keys = store.list()
+        let keys = store
+            .list()
             .map_err(|e| KeyError::IoError(format!("Failed to list keys: {}", e)))?;
 
         for key in keys {
@@ -134,7 +140,8 @@ impl KeyProvider for SoftwareProvider {
         let metadata = self.load_metadata(&key_name)?;
 
         // Use Week 7 KID derivation formula
-        let pubkey = metadata.public_key_bytes()
+        let pubkey = metadata
+            .public_key_bytes()
             .map_err(|e| KeyError::ProviderError(format!("Invalid public key: {}", e)))?;
 
         let kid = derive_kid(&pubkey, self.provider_id(), &key_name);
@@ -144,10 +151,13 @@ impl KeyProvider for SoftwareProvider {
     fn sign(&self, kid: Option<&str>, msg: &[u8]) -> Result<Vec<u8>, KeyError> {
         let key_name = if let Some(kid_str) = kid {
             // Find key by KID
-            let store = self.key_store.read()
+            let store = self
+                .key_store
+                .read()
                 .map_err(|e| KeyError::ProviderError(format!("Lock error: {}", e)))?;
 
-            let keys = store.list()
+            let _keys = store
+                .list()
                 .map_err(|e| KeyError::IoError(format!("Failed to list keys: {}", e)))?;
 
             // Search for key with matching KID (using Week 7 derivation)
@@ -160,8 +170,9 @@ impl KeyProvider for SoftwareProvider {
 
                 if path.extension().and_then(|s| s.to_str()) == Some("json") {
                     if let Ok(meta) = KeyMetadata::load(&path) {
-                        let pubkey = meta.public_key_bytes()
-                            .map_err(|e| KeyError::ProviderError(format!("Invalid public key: {}", e)))?;
+                        let pubkey = meta.public_key_bytes().map_err(|e| {
+                            KeyError::ProviderError(format!("Invalid public key: {}", e))
+                        })?;
 
                         if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
                             let kname = stem.trim_end_matches(".v1");
@@ -176,7 +187,8 @@ impl KeyProvider for SoftwareProvider {
                 }
             }
 
-            found_key_name.ok_or_else(|| KeyError::NotFound(format!("Key with KID {} not found", kid_str)))?
+            found_key_name
+                .ok_or_else(|| KeyError::NotFound(format!("Key with KID {} not found", kid_str)))?
         } else {
             self.find_default_key()?
         };
@@ -208,8 +220,9 @@ impl KeyProvider for SoftwareProvider {
 
             if path.extension().and_then(|s| s.to_str()) == Some("json") {
                 if let Ok(meta) = KeyMetadata::load(&path) {
-                    let pubkey = meta.public_key_bytes()
-                        .map_err(|e| KeyError::ProviderError(format!("Invalid public key: {}", e)))?;
+                    let pubkey = meta.public_key_bytes().map_err(|e| {
+                        KeyError::ProviderError(format!("Invalid public key: {}", e))
+                    })?;
 
                     if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
                         let kname = stem.trim_end_matches(".v1");
@@ -223,7 +236,10 @@ impl KeyProvider for SoftwareProvider {
             }
         }
 
-        Err(KeyError::NotFound(format!("Key with KID {} not found", kid)))
+        Err(KeyError::NotFound(format!(
+            "Key with KID {} not found",
+            kid
+        )))
     }
 
     fn list_kids(&self) -> Result<Vec<String>, KeyError> {

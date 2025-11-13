@@ -2,7 +2,6 @@
 ///
 /// This module provides package-level verification that loads files from disk.
 /// For pure, portable verification logic, see `cap_agent::verifier::core` in the library.
-
 use crate::manifest::Manifest;
 use crate::proof_engine::Proof;
 use std::error::Error;
@@ -161,10 +160,19 @@ pub fn show_package_summary<P: AsRef<Path>>(package_dir: P) -> Result<String, Bo
     summary.push_str("Manifest:\n");
     summary.push_str(&format!("  Version: {}\n", manifest.version));
     summary.push_str(&format!("  Erstellt: {}\n", manifest.created_at));
-    summary.push_str(&format!("  Company Root: {}\n", manifest.company_commitment_root));
-    summary.push_str(&format!("  Policy: {} ({})\n", manifest.policy.name, manifest.policy.version));
+    summary.push_str(&format!(
+        "  Company Root: {}\n",
+        manifest.company_commitment_root
+    ));
+    summary.push_str(&format!(
+        "  Policy: {} ({})\n",
+        manifest.policy.name, manifest.policy.version
+    ));
     summary.push_str(&format!("  Policy Hash: {}\n", manifest.policy.hash));
-    summary.push_str(&format!("  Audit Events: {}\n", manifest.audit.events_count));
+    summary.push_str(&format!(
+        "  Audit Events: {}\n",
+        manifest.audit.events_count
+    ));
     summary.push_str(&format!("  Audit Tail: {}\n\n", manifest.audit.tail_digest));
 
     summary.push_str("Proof:\n");
@@ -172,9 +180,16 @@ pub fn show_package_summary<P: AsRef<Path>>(package_dir: P) -> Result<String, Bo
     summary.push_str(&format!("  Typ: {}\n", proof.proof_type));
     summary.push_str(&format!("  Statement: {}\n", proof.statement));
     summary.push_str(&format!("  Status: {}\n", proof.status));
-    summary.push_str(&format!("  Checks: {}/{}\n",
-        proof.proof_data.checked_constraints.iter().filter(|c| c.ok).count(),
-        proof.proof_data.checked_constraints.len()));
+    summary.push_str(&format!(
+        "  Checks: {}/{}\n",
+        proof
+            .proof_data
+            .checked_constraints
+            .iter()
+            .filter(|c| c.ok)
+            .count(),
+        proof.proof_data.checked_constraints.len()
+    ));
 
     summary.push_str("\nConstraint-Checks:\n");
     for check in &proof.proof_data.checked_constraints {
@@ -276,7 +291,9 @@ mod tests {
         manifest
             .save(format!("{}/manifest.json", test_dir))
             .unwrap();
-        proof.save_as_dat(format!("{}/proof.dat", test_dir)).unwrap();
+        proof
+            .save_as_dat(format!("{}/proof.dat", test_dir))
+            .unwrap();
 
         let summary = show_package_summary(test_dir).unwrap();
         assert!(summary.contains("PROOF-PAKET"));

@@ -5,8 +5,7 @@
 
 use once_cell::sync::Lazy;
 use prometheus::{
-    register_gauge, register_histogram, register_int_counter_vec, Gauge, Histogram,
-    IntCounterVec,
+    register_gauge, register_histogram, register_int_counter_vec, Gauge, Histogram, IntCounterVec,
 };
 
 /// Current enforcement rollout percentage (0-100)
@@ -78,11 +77,7 @@ pub static ADAPT_DRIFT_EVENTS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
 /// adapt_drift_ratio{window="5m"} 0.003
 /// ```
 pub static ADAPT_DRIFT_RATIO_5M: Lazy<Gauge> = Lazy::new(|| {
-    register_gauge!(
-        "adapt_drift_ratio",
-        "Drift ratio (5-minute rolling window)"
-    )
-    .unwrap()
+    register_gauge!("adapt_drift_ratio", "Drift ratio (5-minute rolling window)").unwrap()
 });
 
 /// Selection latency (rule selection + planning)

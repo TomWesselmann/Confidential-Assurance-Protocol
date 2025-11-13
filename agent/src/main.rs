@@ -1116,8 +1116,7 @@ fn run_manifest_build(policy_path: &str, output: Option<String>) -> Result<(), B
     let commitments = commitment::load_commitments("build/commitments.json")?;
 
     // Erstelle Manifest
-    let manifest =
-        manifest::Manifest::build(&commitments, policy_info, "build/agent.audit.jsonl")?;
+    let manifest = manifest::Manifest::build(&commitments, policy_info, "build/agent.audit.jsonl")?;
 
     // Speichere Manifest
     let output_path = output.unwrap_or_else(|| "build/manifest.json".to_string());
@@ -1339,8 +1338,8 @@ fn run_proof_export(
     output: Option<String>,
     force: bool,
 ) -> Result<(), Box<dyn Error>> {
-    use sha3::{Digest, Sha3_256};
     use chrono::Utc;
+    use sha3::{Digest, Sha3_256};
 
     println!("📦 Exportiere standardisiertes CAP Proof-Paket (v1.0)...");
 
@@ -1400,7 +1399,10 @@ fn run_proof_export(
         println!("      ✓ verification.report.json");
     } else {
         // Erstelle minimalen Report
-        fs::write(&rep_dst, r#"{"status":"unknown","note":"No verification performed before export"}"#)?;
+        fs::write(
+            &rep_dst,
+            r#"{"status":"unknown","note":"No verification performed before export"}"#,
+        )?;
         println!("      ⚠️  verification.report.json (minimal, status=unknown)");
     }
 
@@ -1408,7 +1410,7 @@ fn run_proof_export(
     println!("   📝 Erstelle README.txt...");
     let readme_dst = out_path.join("README.txt");
     let readme = format!(
-r#"CAP Proof Package (v1.0)
+        r#"CAP Proof Package (v1.0)
 ========================
 
 This package contains a complete, offline-verifiable proof package
@@ -1496,7 +1498,16 @@ For more information, see: https://cap.protocol/
     println!();
     println!("✅ CAP Proof-Paket erfolgreich exportiert!");
     println!("   Verzeichnis: {}", output_dir);
-    println!("   Dateien: {}", if ts_dst.is_some() && reg_dst.is_some() { 7 } else if ts_dst.is_some() || reg_dst.is_some() { 6 } else { 5 });
+    println!(
+        "   Dateien: {}",
+        if ts_dst.is_some() && reg_dst.is_some() {
+            7
+        } else if ts_dst.is_some() || reg_dst.is_some() {
+            6
+        } else {
+            5
+        }
+    );
     println!("   Package Version: cap-proof.v1.0");
 
     Ok(())
@@ -1543,7 +1554,10 @@ fn run_zk_build(
             } else {
                 String::new()
             },
-            format!("supplier_count_max_{}", policy.constraints.supplier_count_max),
+            format!(
+                "supplier_count_max_{}",
+                policy.constraints.supplier_count_max
+            ),
         ]
         .into_iter()
         .filter(|s| !s.is_empty())
@@ -1567,7 +1581,9 @@ fn run_zk_build(
     let proof = zk.prove(&statement, &witness)?;
 
     // Speichere Proof
-    let out_dat = output.clone().unwrap_or_else(|| "build/zk_proof.dat".to_string());
+    let out_dat = output
+        .clone()
+        .unwrap_or_else(|| "build/zk_proof.dat".to_string());
     let out_json = out_dat.replace(".dat", ".json");
 
     zk_system::save_zk_proof_dat(&proof, &out_dat)?;
@@ -1629,7 +1645,10 @@ fn run_zk_verify(proof_path: &str) -> Result<(), Box<dyn Error>> {
         println!("✅ ZK-Proof ist gültig!");
         println!("  System: {}", proof.system);
         println!("  Policy Hash: {}", proof.public_inputs.policy_hash);
-        println!("  Company Root: {}", proof.public_inputs.company_commitment_root);
+        println!(
+            "  Company Root: {}",
+            proof.public_inputs.company_commitment_root
+        );
         println!("  Constraints: {}", proof.public_inputs.constraints.len());
     } else {
         println!("❌ ZK-Proof ist UNGÜLTIG!");
@@ -1665,7 +1684,10 @@ fn run_zk_bench(
             } else {
                 String::new()
             },
-            format!("supplier_count_max_{}", policy.constraints.supplier_count_max),
+            format!(
+                "supplier_count_max_{}",
+                policy.constraints.supplier_count_max
+            ),
         ]
         .into_iter()
         .filter(|s| !s.is_empty())
@@ -1700,7 +1722,10 @@ fn run_zk_bench(
 
     println!("\n  Gesamt: {:?}", prove_duration);
     println!("  Durchschnitt: {:?}", prove_avg);
-    println!("  Throughput: {:.2} proofs/s", 1000.0 / prove_avg.as_millis() as f64);
+    println!(
+        "  Throughput: {:.2} proofs/s",
+        1000.0 / prove_avg.as_millis() as f64
+    );
 
     // Benchmark Verifying
     println!("\n📊 Verify-Benchmark:");
@@ -1717,7 +1742,10 @@ fn run_zk_bench(
 
     println!("\n  Gesamt: {:?}", verify_duration);
     println!("  Durchschnitt: {:?}", verify_avg);
-    println!("  Throughput: {:.2} verifications/s", 1000.0 / verify_avg.as_millis() as f64);
+    println!(
+        "  Throughput: {:.2} verifications/s",
+        1000.0 / verify_avg.as_millis() as f64
+    );
 
     audit.log_event(
         "zk_bench_executed",
@@ -1735,6 +1763,7 @@ fn run_zk_bench(
 }
 
 /// Adaptive Proof Orchestration - Week 6 B1
+#[allow(clippy::too_many_arguments)]
 fn run_proof_adapt(
     policy: &Option<String>,
     ir: &Option<std::path::PathBuf>,
@@ -1742,13 +1771,20 @@ fn run_proof_adapt(
     enforce: bool,
     rollout: u8,
     drift_max: f64,
-    _selector: &str,    // TODO: Implement selector (basic vs weighted)
-    _weights: &Option<std::path::PathBuf>,  // TODO: Implement weights file loading
+    _selector: &str, // TODO: Implement selector (basic vs weighted)
+    _weights: &Option<std::path::PathBuf>, // TODO: Implement weights file loading
     dry_run: bool,
     out: &Option<std::path::PathBuf>,
 ) -> Result<(), Box<dyn Error>> {
     println!("🎯 Adaptive Proof Orchestration (Week 6)");
-    println!("   Enforcement: {}", if enforce { "✓ ENABLED" } else { "✗ Shadow-only" });
+    println!(
+        "   Enforcement: {}",
+        if enforce {
+            "✓ ENABLED"
+        } else {
+            "✗ Shadow-only"
+        }
+    );
     println!("   Rollout: {}%", rollout);
     println!("   Drift Max: {}", drift_max);
     if dry_run {
@@ -1771,7 +1807,7 @@ fn run_proof_adapt(
     } else if let Some(policy_id) = policy {
         println!("📋 Policy ID: {}", policy_id);
         // TODO: Load IR from policy registry
-        return Err(format!("Policy ID loading not yet implemented. Please use --ir flag.").into());
+        return Err("Policy ID loading not yet implemented. Please use --ir flag.".to_string().into());
     } else {
         return Err("Either --policy or --ir must be specified".into());
     };
@@ -1968,7 +2004,11 @@ fn run_audit_anchor(
     let mut manifest = manifest::Manifest::load(manifest_in)?;
 
     // Setze Zeitanker
-    manifest.set_time_anchor(kind.to_string(), reference.to_string(), audit_tip_hex.clone());
+    manifest.set_time_anchor(
+        kind.to_string(),
+        reference.to_string(),
+        audit_tip_hex.clone(),
+    );
 
     // Speichere Manifest
     manifest.save(manifest_out)?;
@@ -2001,7 +2041,10 @@ fn run_audit_set_private_anchor(
 
     println!("✅ Private Anchor gesetzt:");
     println!("   Audit-Tip:      {}", audit_tip);
-    println!("   Created-At:     {}", created_at.unwrap_or_else(|| "jetzt".to_string()));
+    println!(
+        "   Created-At:     {}",
+        created_at.unwrap_or_else(|| "jetzt".to_string())
+    );
     println!("   Manifest:       {}", manifest_path);
 
     Ok(())
@@ -2022,7 +2065,13 @@ fn run_audit_set_public_anchor(
         "ethereum" => manifest::PublicChain::Ethereum,
         "hedera" => manifest::PublicChain::Hedera,
         "btc" => manifest::PublicChain::Btc,
-        _ => return Err(format!("Invalid chain: {}. Valid options: ethereum, hedera, btc", chain).into()),
+        _ => {
+            return Err(format!(
+                "Invalid chain: {}. Valid options: ethereum, hedera, btc",
+                chain
+            )
+            .into())
+        }
     };
 
     // Lade Manifest
@@ -2043,17 +2092,17 @@ fn run_audit_set_public_anchor(
     println!("   Chain:          {}", chain);
     println!("   TxID:           {}", txid);
     println!("   Digest:         {}", digest);
-    println!("   Created-At:     {}", created_at.unwrap_or_else(|| "jetzt".to_string()));
+    println!(
+        "   Created-At:     {}",
+        created_at.unwrap_or_else(|| "jetzt".to_string())
+    );
     println!("   Manifest:       {}", manifest_path);
 
     Ok(())
 }
 
 /// Audit verify-anchor - Verifiziert Dual-Anchor-Konsistenz
-fn run_audit_verify_anchor(
-    manifest_path: &str,
-    out: Option<String>,
-) -> Result<(), Box<dyn Error>> {
+fn run_audit_verify_anchor(manifest_path: &str, out: Option<String>) -> Result<(), Box<dyn Error>> {
     println!("🔍 Verifiziere Dual-Anchor-Konsistenz...");
 
     // Lade Manifest
@@ -2090,8 +2139,22 @@ fn run_audit_verify_anchor(
     // Print result
     println!("\n📊 Verifikationsergebnis:");
     println!("   Status:         {}", report["status"]);
-    println!("   Private Anchor: {}", if report["private_ok"].as_bool().unwrap_or(false) { "✅" } else { "❌" });
-    println!("   Public Anchor:  {}", if report["public_ok"].as_bool().unwrap_or(false) { "✅" } else { "❌" });
+    println!(
+        "   Private Anchor: {}",
+        if report["private_ok"].as_bool().unwrap_or(false) {
+            "✅"
+        } else {
+            "❌"
+        }
+    );
+    println!(
+        "   Public Anchor:  {}",
+        if report["public_ok"].as_bool().unwrap_or(false) {
+            "✅"
+        } else {
+            "❌"
+        }
+    );
 
     if let Some(errors) = report["errors"].as_array() {
         if !errors.is_empty() {
@@ -2170,10 +2233,7 @@ fn run_audit_timestamp(
 }
 
 /// Audit verify-timestamp - Verifiziert einen Timestamp gegen Audit-Head
-fn run_audit_verify_timestamp(
-    head_path: &str,
-    timestamp_path: &str,
-) -> Result<(), Box<dyn Error>> {
+fn run_audit_verify_timestamp(head_path: &str, timestamp_path: &str) -> Result<(), Box<dyn Error>> {
     println!("🔍 Verifiziere Timestamp...");
 
     // Lade Audit-Tip
@@ -2225,12 +2285,14 @@ fn run_audit_append(
     println!("📝 Füge Event zur Audit-Chain hinzu...");
 
     // Parse result if provided
-    let parsed_result = result.as_ref().and_then(|r| match r.to_lowercase().as_str() {
-        "ok" => Some(AuditEventResult::Ok),
-        "warn" => Some(AuditEventResult::Warn),
-        "fail" => Some(AuditEventResult::Fail),
-        _ => None,
-    });
+    let parsed_result = result
+        .as_ref()
+        .and_then(|r| match r.to_lowercase().as_str() {
+            "ok" => Some(AuditEventResult::Ok),
+            "warn" => Some(AuditEventResult::Warn),
+            "fail" => Some(AuditEventResult::Fail),
+            _ => None,
+        });
 
     // Open or create chain
     let mut chain = AuditChain::new(file_path)?;
@@ -2255,10 +2317,7 @@ fn run_audit_append(
 }
 
 /// Audit verify - Verifiziert Audit-Chain-Integrität (Track A)
-fn run_audit_verify_chain(
-    file_path: &str,
-    output: Option<String>,
-) -> Result<(), Box<dyn Error>> {
+fn run_audit_verify_chain(file_path: &str, output: Option<String>) -> Result<(), Box<dyn Error>> {
     use cap_agent::audit::verify_chain;
 
     println!("🔍 Verifiziere Audit-Chain...");
@@ -2376,7 +2435,10 @@ fn run_lists_sanctions_root(csv_path: &str, output: Option<String>) -> Result<()
 }
 
 /// Lists jurisdictions-root - Generiert Jurisdictions Merkle Root
-fn run_lists_jurisdictions_root(csv_path: &str, output: Option<String>) -> Result<(), Box<dyn Error>> {
+fn run_lists_jurisdictions_root(
+    csv_path: &str,
+    output: Option<String>,
+) -> Result<(), Box<dyn Error>> {
     println!("🌍 Generiere Jurisdictions Merkle Root...");
 
     let mut audit = AuditLog::new("build/agent.audit.jsonl")?;
@@ -2418,6 +2480,7 @@ fn run_lists_jurisdictions_root(csv_path: &str, output: Option<String>) -> Resul
 }
 
 /// Registry add - Fügt einen Proof zur Registry hinzu
+#[allow(clippy::too_many_arguments)]
 fn run_registry_add(
     manifest_path: &str,
     proof_path: &str,
@@ -2499,12 +2562,14 @@ fn run_registry_add(
             .map_err(|e| format!("Failed to read signing key from {}: {}", key_file, e))?;
 
         if key_bytes.len() != 32 {
-            return Err(format!("Invalid signing key length (expected 32 bytes, got {})", key_bytes.len()).into());
+            return Err(format!(
+                "Invalid signing key length (expected 32 bytes, got {})",
+                key_bytes.len()
+            )
+            .into());
         }
 
-        let signing_key = ed25519_dalek::SigningKey::from_bytes(
-            &key_bytes.try_into().unwrap()
-        );
+        let signing_key = ed25519_dalek::SigningKey::from_bytes(&key_bytes.try_into().unwrap());
 
         // Sign entry
         registry::sign_entry(&mut entry, &signing_key)?;
@@ -2770,7 +2835,14 @@ fn run_registry_inspect(registry_path: Option<String>) -> Result<(), Box<dyn Err
     println!("\n📊 Registry-Informationen:");
     println!("   Version:        {}", unified_registry.source_version());
     println!("   Einträge:       {}", unified_registry.count());
-    println!("   Migriert:       {}", if unified_registry.was_migrated() { "Ja (v1.0 → v1.1)" } else { "Nein" });
+    println!(
+        "   Migriert:       {}",
+        if unified_registry.was_migrated() {
+            "Ja (v1.0 → v1.1)"
+        } else {
+            "Nein"
+        }
+    );
 
     // Show v1.1 metadata if available
     let v1_1 = unified_registry.as_v1_1();
@@ -2890,12 +2962,7 @@ fn run_keys_keygen(
     let verifying_key = signing_key.verifying_key();
 
     // Create key metadata
-    let mut metadata = keys::KeyMetadata::new(
-        &verifying_key.to_bytes(),
-        owner,
-        algo,
-        valid_days,
-    )?;
+    let mut metadata = keys::KeyMetadata::new(&verifying_key.to_bytes(), owner, algo, valid_days)?;
 
     if let Some(ref c) = comment {
         metadata.comment = Some(c.clone());
@@ -2969,7 +3036,10 @@ fn run_keys_list(
         return Ok(());
     }
 
-    println!("   {:<32} {:<15} {:<10} {:<20}", "KID", "Owner", "Status", "Valid Until");
+    println!(
+        "   {:<32} {:<15} {:<10} {:<20}",
+        "KID", "Owner", "Status", "Valid Until"
+    );
     println!("   {}", "-".repeat(80));
 
     for key in &filtered_keys {
@@ -3015,11 +3085,7 @@ fn run_keys_show(dir: &str, kid: &str) -> Result<(), Box<dyn Error>> {
 }
 
 /// Keys rotate - Rotiert Schlüssel
-fn run_keys_rotate(
-    dir: &str,
-    current_path: &str,
-    new_path: &str,
-) -> Result<(), Box<dyn Error>> {
+fn run_keys_rotate(dir: &str, current_path: &str, new_path: &str) -> Result<(), Box<dyn Error>> {
     println!("🔄 Rotiere Schlüssel...");
 
     let store = keys::KeyStore::new(dir)?;
@@ -3064,7 +3130,7 @@ fn run_keys_attest(
     out_path: &str,
 ) -> Result<(), Box<dyn Error>> {
     use base64::Engine;
-    use ed25519_dalek::{SigningKey, Signer};
+    use ed25519_dalek::{Signer, SigningKey};
 
     println!("📜 Attestiere Schlüssel...");
 
@@ -3080,8 +3146,9 @@ fn run_keys_attest(
     let signer_priv_path = signer_path.replace(".json", ".ed25519");
     let signer_key_bytes = fs::read(&signer_priv_path)?;
     let signing_key = SigningKey::from_bytes(
-        &signer_key_bytes.try_into()
-            .map_err(|_| "Invalid key length")?
+        &signer_key_bytes
+            .try_into()
+            .map_err(|_| "Invalid key length")?,
     );
 
     // Create attestation document
@@ -3287,7 +3354,14 @@ fn run_manifest_verify(
     println!("      ✅ Core Verifikation abgeschlossen");
     println!("         Manifest Hash: {}", core_report.manifest_hash);
     println!("         Proof Hash: {}", core_report.proof_hash);
-    println!("         Signatur: {}", if core_report.signature_valid { "✅" } else { "⚠️" });
+    println!(
+        "         Signatur: {}",
+        if core_report.signature_valid {
+            "✅"
+        } else {
+            "⚠️"
+        }
+    );
 
     // 5️⃣ Additional checks (timestamp and registry)
     println!("   4/5 Zusätzliche Prüfungen...");
@@ -3296,7 +3370,14 @@ fn run_manifest_verify(
     let timestamp_valid = match timestamp_path.as_deref() {
         Some(ts_path) => {
             let valid = registry::verify_timestamp_from_file(ts_path);
-            println!("      Timestamp: {}", if valid { "✅ gültig" } else { "❌ ungültig" });
+            println!(
+                "      Timestamp: {}",
+                if valid {
+                    "✅ gültig"
+                } else {
+                    "❌ ungültig"
+                }
+            );
             valid
         }
         None => {
@@ -3310,12 +3391,23 @@ fn run_manifest_verify(
         registry_path,
         &core_report.manifest_hash,
         &core_report.proof_hash,
-    ).unwrap_or(false);
+    )
+    .unwrap_or(false);
 
-    println!("      Registry: {}", if registry_match { "✅ Eintrag gefunden" } else { "❌ Kein Eintrag" });
+    println!(
+        "      Registry: {}",
+        if registry_match {
+            "✅ Eintrag gefunden"
+        } else {
+            "❌ Kein Eintrag"
+        }
+    );
 
     // 6️⃣ Consolidate result
-    let all_ok = core_report.signature_valid && timestamp_valid && registry_match && core_report.status == "ok";
+    let all_ok = core_report.signature_valid
+        && timestamp_valid
+        && registry_match
+        && core_report.status == "ok";
     let status = if all_ok { "ok" } else { "fail" }.to_string();
 
     let report = VerificationReport {
@@ -3357,7 +3449,10 @@ fn run_manifest_verify(
     } else {
         eprintln!("❌ Verifikation fehlgeschlagen!");
         eprintln!("   Report gespeichert: {}", report_path);
-        eprintln!("   Details: {}", serde_json::to_string_pretty(&core_report.details)?);
+        eprintln!(
+            "   Details: {}",
+            serde_json::to_string_pretty(&core_report.details)?
+        );
         Err("Verification failed".into())
     }
 }
@@ -3431,12 +3526,15 @@ fn run_bundle_v2(
         "backend": "mock",
     });
 
-    fs::write(format!("{}/_meta.json", out), serde_json::to_string_pretty(&meta)?)?;
+    fs::write(
+        format!("{}/_meta.json", out),
+        serde_json::to_string_pretty(&meta)?,
+    )?;
 
     // Create README.txt
     println!("   6/7 Creating README.txt...");
     let readme_content = format!(
-r#"CAP Proof Bundle v2.0
+        r#"CAP Proof Bundle v2.0
 =====================
 
 This directory contains a self-contained compliance proof package.
@@ -3532,10 +3630,7 @@ Generated by cap-agent v{}
 }
 
 /// Verify Bundle - Verify a proof package
-fn run_verify_bundle(
-    bundle: &str,
-    out: Option<String>,
-) -> Result<(), Box<dyn Error>> {
+fn run_verify_bundle(bundle: &str, out: Option<String>) -> Result<(), Box<dyn Error>> {
     use std::path::Path;
 
     println!("🔍 Verifying Proof Bundle...");
@@ -3606,7 +3701,14 @@ fn run_verify_bundle(
     println!("   Status:        {}", report.status);
     println!("   Manifest Hash: {}", report.manifest_hash);
     println!("   Proof Hash:    {}", report.proof_hash);
-    println!("   Signature:     {}", if report.signature_valid { "✅" } else { "⚠️" });
+    println!(
+        "   Signature:     {}",
+        if report.signature_valid {
+            "✅"
+        } else {
+            "⚠️"
+        }
+    );
 
     // Save report if requested
     if let Some(out_path) = out {
@@ -3639,7 +3741,11 @@ fn run_blob_put(
     // Validiere Medientyp
     let valid_types = ["manifest", "proof", "wasm", "abi", "other"];
     if !valid_types.contains(&media_type) {
-        return Err(format!("❌ Ungültiger Medientyp: {}. Erlaubt: {:?}", media_type, valid_types).into());
+        return Err(format!(
+            "❌ Ungültiger Medientyp: {}. Erlaubt: {:?}",
+            media_type, valid_types
+        )
+        .into());
     }
 
     // Lese Daten von Datei oder stdin
@@ -3665,7 +3771,10 @@ fn run_blob_put(
 
     // Prüfe ob Blob bereits existiert
     if store.exists(&blob_id_preview) && !no_dedup {
-        println!("✅ BLOB existiert bereits (dedupliziert): {}", blob_id_preview);
+        println!(
+            "✅ BLOB existiert bereits (dedupliziert): {}",
+            blob_id_preview
+        );
 
         // Erhöhe refcount wenn link_entry_id angegeben
         if link_entry_id.is_some() {
@@ -3794,7 +3903,13 @@ fn run_blob_list(
         "size" => blobs.sort_by_key(|b| b.size),
         "refcount" => blobs.sort_by_key(|b| b.refcount),
         "blob_id" => blobs.sort_by(|a, b| a.blob_id.cmp(&b.blob_id)),
-        _ => return Err(format!("❌ Ungültige Sortierung: {}. Erlaubt: size, refcount, blob_id", order).into()),
+        _ => {
+            return Err(format!(
+                "❌ Ungültige Sortierung: {}. Erlaubt: size, refcount, blob_id",
+                order
+            )
+            .into())
+        }
     }
 
     // Limit
@@ -3804,7 +3919,10 @@ fn run_blob_list(
 
     // Ausgabe
     println!("📋 Gefundene BLOBs: {}", blobs.len());
-    println!("{:<66} {:<15} {:<20} {:<10}", "BLOB ID", "Size (bytes)", "Media Type", "Refcount");
+    println!(
+        "{:<66} {:<15} {:<20} {:<10}",
+        "BLOB ID", "Size (bytes)", "Media Type", "Refcount"
+    );
     println!("{}", "-".repeat(115));
 
     for blob in &blobs {
@@ -3873,7 +3991,11 @@ fn run_blob_gc(
         }
     }
 
-    println!("💾 Freizugebender Speicher: {} bytes ({:.2} MB)", total_bytes, total_bytes as f64 / 1_048_576.0);
+    println!(
+        "💾 Freizugebender Speicher: {} bytes ({:.2} MB)",
+        total_bytes,
+        total_bytes as f64 / 1_048_576.0
+    );
 
     if dry_run {
         println!("\n🔍 DRY RUN - Keine Löschung durchgeführt");
@@ -3889,7 +4011,11 @@ fn run_blob_gc(
     // Real GC
     println!("\n🗑️  Lösche unreferenzierte BLOBs...");
     store.gc(false)?;
-    println!("✅ {} BLOBs gelöscht, {} bytes freigegeben", gc_candidates.len(), total_bytes);
+    println!(
+        "✅ {} BLOBs gelöscht, {} bytes freigegeben",
+        gc_candidates.len(),
+        total_bytes
+    );
 
     // Audit-Log-Eintrag
     let mut audit = AuditLog::new("build/agent.audit.jsonl")?;
@@ -3935,15 +4061,17 @@ fn main() {
             }
         },
         Commands::Manifest(cmd) => match cmd {
-            ManifestCommands::Build { policy, out } => {
-                run_manifest_build(policy, out.clone())
-            }
+            ManifestCommands::Build { policy, out } => run_manifest_build(policy, out.clone()),
             ManifestCommands::Validate { file, schema } => {
                 run_manifest_validate(file, schema.clone())
             }
-            ManifestCommands::Verify { manifest, proof, registry, timestamp, out } => {
-                run_manifest_verify(manifest, proof, registry, timestamp.clone(), out.clone())
-            }
+            ManifestCommands::Verify {
+                manifest,
+                proof,
+                registry,
+                timestamp,
+                out,
+            } => run_manifest_verify(manifest, proof, registry, timestamp.clone(), out.clone()),
         },
         Commands::Proof(cmd) => match cmd {
             ProofCommands::Mock { policy, manifest } => run_proof_mock(policy, manifest),
@@ -3973,7 +4101,14 @@ fn main() {
                 sanctions_root,
                 jurisdiction_root,
                 sanctions_csv,
-            } => run_zk_build(policy, manifest, out.clone(), sanctions_root.clone(), jurisdiction_root.clone(), sanctions_csv.clone()),
+            } => run_zk_build(
+                policy,
+                manifest,
+                out.clone(),
+                sanctions_root.clone(),
+                jurisdiction_root.clone(),
+                sanctions_csv.clone(),
+            ),
             ProofCommands::ZkVerify { proof } => run_zk_verify(proof),
             ProofCommands::Bench {
                 policy,
@@ -3992,15 +4127,7 @@ fn main() {
                 dry_run,
                 out,
             } => run_proof_adapt(
-                policy,
-                ir,
-                context,
-                *enforce,
-                *rollout,
-                *drift_max,
-                selector,
-                weights,
-                *dry_run,
+                policy, ir, context, *enforce, *rollout, *drift_max, selector, weights, *dry_run,
                 out,
             ),
         },
@@ -4077,11 +4204,19 @@ fn main() {
                 to,
                 policy_id,
                 out,
-            } => run_audit_export(file, from.clone(), to.clone(), policy_id.clone(), out.clone()),
+            } => run_audit_export(
+                file,
+                from.clone(),
+                to.clone(),
+                policy_id.clone(),
+                out.clone(),
+            ),
         },
         Commands::Lists(cmd) => match cmd {
             ListsCommands::SanctionsRoot { csv, out } => run_lists_sanctions_root(csv, out.clone()),
-            ListsCommands::JurisdictionsRoot { csv, out } => run_lists_jurisdictions_root(csv, out.clone()),
+            ListsCommands::JurisdictionsRoot { csv, out } => {
+                run_lists_jurisdictions_root(csv, out.clone())
+            }
         },
         Commands::Registry(cmd) => match cmd {
             RegistryCommands::Add {
@@ -4101,9 +4236,11 @@ fn main() {
                 backend,
                 signing_key.clone(),
                 *validate_key,
-                keys_dir
+                keys_dir,
             ),
-            RegistryCommands::List { registry, backend } => run_registry_list(registry.clone(), backend),
+            RegistryCommands::List { registry, backend } => {
+                run_registry_list(registry.clone(), backend)
+            }
             RegistryCommands::Verify {
                 manifest,
                 proof,
@@ -4133,15 +4270,15 @@ fn main() {
                 run_keys_list(dir, status.clone(), owner.clone())
             }
             KeysCommands::Show { dir, kid } => run_keys_show(dir, kid),
-            KeysCommands::Rotate { dir, current, new } => {
-                run_keys_rotate(dir, current, new)
-            }
-            KeysCommands::Attest { signer, subject, out } => {
-                run_keys_attest(signer, subject, out)
-            }
+            KeysCommands::Rotate { dir, current, new } => run_keys_rotate(dir, current, new),
+            KeysCommands::Attest {
+                signer,
+                subject,
+                out,
+            } => run_keys_attest(signer, subject, out),
             KeysCommands::Archive { dir, kid } => run_keys_archive(dir, kid),
             KeysCommands::VerifyChain { dir, attestations } => {
-                run_keys_verify_chain(dir, &attestations)
+                run_keys_verify_chain(dir, attestations)
             }
         },
         Commands::Blob(cmd) => match cmd {

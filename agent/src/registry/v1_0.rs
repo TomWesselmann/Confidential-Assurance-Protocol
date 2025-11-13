@@ -1,16 +1,16 @@
+use base64::{engine::general_purpose, Engine};
 /// Registry-Modul für lokale Proof-Verwaltung
 ///
 /// Dieses Modul verwaltet eine lokale Registry (JSON-basiert) für ZK-Proofs,
 /// Manifeste und Timestamps. Es ermöglicht das Hinzufügen, Auflisten und
 /// Verifizieren von Registry-Einträgen.
 use chrono::Utc;
+use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
 use serde::{Deserialize, Serialize};
 use sha3::{Digest, Sha3_256};
 use std::error::Error;
 use std::fs;
 use std::path::Path;
-use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
-use base64::{Engine, engine::general_purpose};
 
 use crate::keys;
 
@@ -72,6 +72,13 @@ pub struct RegistryEntry {
 pub struct Registry {
     pub registry_version: String,
     pub entries: Vec<RegistryEntry>,
+}
+
+#[allow(dead_code)]
+impl Default for Registry {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[allow(dead_code)]
@@ -157,14 +164,10 @@ impl Registry {
     ///
     /// # Rückgabe
     /// Optional: Referenz auf den gefundenen Eintrag
-    pub fn find_entry(
-        &self,
-        manifest_hash: &str,
-        proof_hash: &str,
-    ) -> Option<&RegistryEntry> {
-        self.entries.iter().find(|e| {
-            e.manifest_hash == manifest_hash && e.proof_hash == proof_hash
-        })
+    pub fn find_entry(&self, manifest_hash: &str, proof_hash: &str) -> Option<&RegistryEntry> {
+        self.entries
+            .iter()
+            .find(|e| e.manifest_hash == manifest_hash && e.proof_hash == proof_hash)
     }
 
     /// Verifiziert, ob ein Manifest- und Proof-Hash in der Registry existiert
@@ -243,7 +246,10 @@ fn compute_entry_core_hash(entry: &RegistryEntry) -> Result<Vec<u8>, Box<dyn Err
 ///
 /// # Rückgabe
 /// Ok(()) wenn erfolgreich, Fehler sonst
-pub fn sign_entry(entry: &mut RegistryEntry, signing_key: &SigningKey) -> Result<(), Box<dyn Error>> {
+pub fn sign_entry(
+    entry: &mut RegistryEntry,
+    signing_key: &SigningKey,
+) -> Result<(), Box<dyn Error>> {
     // Compute hash of entry core (without signature fields)
     let entry_hash = compute_entry_core_hash(entry)?;
 
@@ -286,12 +292,14 @@ pub fn verify_entry_signature(entry: &RegistryEntry) -> Result<bool, Box<dyn Err
 
     // Parse Ed25519 types
     let signature = Signature::from_bytes(
-        &sig_bytes.try_into()
-            .map_err(|_| "Invalid signature length")?
+        &sig_bytes
+            .try_into()
+            .map_err(|_| "Invalid signature length")?,
     );
     let verifying_key = VerifyingKey::from_bytes(
-        &pubkey_bytes.try_into()
-            .map_err(|_| "Invalid public key length")?
+        &pubkey_bytes
+            .try_into()
+            .map_err(|_| "Invalid public key length")?,
     )?;
 
     // Compute entry hash
@@ -317,24 +325,14 @@ pub fn validate_key_status(kid: &str, key_store_path: &str) -> Result<(), Box<dy
     let store = KeyStore::new(key_store_path)?;
 
     match store.find_by_kid(kid)? {
-        Some(key_meta) => {
-            match key_meta.status.as_str() {
-                "active" => Ok(()),
-                "retired" => Err(format!(
-                    "Key {} is retired and cannot be used for new entries",
-                    kid
-                ).into()),
-                "revoked" => Err(format!(
-                    "Key {} is revoked and cannot be used",
-                    kid
-                ).into()),
-                other => Err(format!(
-                    "Key {} has unknown status: {}",
-                    kid,
-                    other
-                ).into()),
+        Some(key_meta) => match key_meta.status.as_str() {
+            "active" => Ok(()),
+            "retired" => {
+                Err(format!("Key {} is retired and cannot be used for new entries", kid).into())
             }
-        }
+            "revoked" => Err(format!("Key {} is revoked and cannot be used", kid).into()),
+            other => Err(format!("Key {} has unknown status: {}", kid, other).into()),
+        },
         None => Err(format!("Key not found in store: {}", kid).into()),
     }
 }
@@ -594,7 +592,11 @@ pub trait RegistryStore {
     fn add_entry(&self, entry: RegistryEntry) -> Result<(), Box<dyn Error>>;
 
     /// Finds entry by manifest and proof hashes
-    fn find_by_hashes(&self, manifest_hash: &str, proof_hash: &str) -> Result<Option<RegistryEntry>, Box<dyn Error>>;
+    fn find_by_hashes(
+        &self,
+        manifest_hash: &str,
+        proof_hash: &str,
+    ) -> Result<Option<RegistryEntry>, Box<dyn Error>>;
 
     /// Lists all entries
     fn list(&self) -> Result<Vec<RegistryEntry>, Box<dyn Error>>;
@@ -630,11 +632,16 @@ impl RegistryStore for JsonRegistryStore {
         self.save(&reg)
     }
 
-    fn find_by_hashes(&self, manifest_hash: &str, proof_hash: &str) -> Result<Option<RegistryEntry>, Box<dyn Error>> {
+    fn find_by_hashes(
+        &self,
+        manifest_hash: &str,
+        proof_hash: &str,
+    ) -> Result<Option<RegistryEntry>, Box<dyn Error>> {
         let reg = self.load()?;
-        Ok(reg.entries.into_iter().find(|e|
-            e.manifest_hash == manifest_hash && e.proof_hash == proof_hash
-        ))
+        Ok(reg
+            .entries
+            .into_iter()
+            .find(|e| e.manifest_hash == manifest_hash && e.proof_hash == proof_hash))
     }
 
     fn list(&self) -> Result<Vec<RegistryEntry>, Box<dyn Error>> {
@@ -655,7 +662,8 @@ impl SqliteRegistryStore {
         let conn = rusqlite::Connection::open(path)?;
 
         // Initialize schema
-        conn.execute_batch(r#"
+        conn.execute_batch(
+            r#"
             PRAGMA journal_mode = WAL;
             PRAGMA synchronous = NORMAL;
 
@@ -689,7 +697,8 @@ impl SqliteRegistryStore {
 
             CREATE INDEX IF NOT EXISTS idx_registry_hashes
                 ON registry_entries (manifest_hash, proof_hash);
-        "#)?;
+        "#,
+        )?;
 
         // Ensure version
         conn.execute(
@@ -826,7 +835,11 @@ impl RegistryStore for SqliteRegistryStore {
         Ok(())
     }
 
-    fn find_by_hashes(&self, manifest_hash: &str, proof_hash: &str) -> Result<Option<RegistryEntry>, Box<dyn Error>> {
+    fn find_by_hashes(
+        &self,
+        manifest_hash: &str,
+        proof_hash: &str,
+    ) -> Result<Option<RegistryEntry>, Box<dyn Error>> {
         let conn = self.conn.borrow();
         let mut stmt = conn.prepare(
             "SELECT id, manifest_hash, proof_hash, timestamp_file, registered_at, signature, public_key,
@@ -874,7 +887,10 @@ impl RegistryStore for SqliteRegistryStore {
 }
 
 /// Opens a registry store based on backend type
-pub fn open_store(backend: RegistryBackend, path: &Path) -> Result<Box<dyn RegistryStore>, Box<dyn Error>> {
+pub fn open_store(
+    backend: RegistryBackend,
+    path: &Path,
+) -> Result<Box<dyn RegistryStore>, Box<dyn Error>> {
     match backend {
         RegistryBackend::Json => Ok(Box::new(JsonRegistryStore {
             path: path.to_path_buf(),
@@ -898,11 +914,7 @@ mod tests {
     #[test]
     fn test_registry_add_entry() {
         let mut registry = Registry::new();
-        let id = registry.add_entry(
-            "0xabc123".to_string(),
-            "0xdef456".to_string(),
-            None,
-        );
+        let id = registry.add_entry("0xabc123".to_string(), "0xdef456".to_string(), None);
         assert_eq!(id, "proof_001");
         assert_eq!(registry.count(), 1);
     }
@@ -910,11 +922,7 @@ mod tests {
     #[test]
     fn test_registry_find_entry() {
         let mut registry = Registry::new();
-        registry.add_entry(
-            "0xabc123".to_string(),
-            "0xdef456".to_string(),
-            None,
-        );
+        registry.add_entry("0xabc123".to_string(), "0xdef456".to_string(), None);
 
         let found = registry.find_entry("0xabc123", "0xdef456");
         assert!(found.is_some());
@@ -927,11 +935,7 @@ mod tests {
     #[test]
     fn test_registry_verify_entry() {
         let mut registry = Registry::new();
-        registry.add_entry(
-            "0xabc123".to_string(),
-            "0xdef456".to_string(),
-            None,
-        );
+        registry.add_entry("0xabc123".to_string(), "0xdef456".to_string(), None);
 
         assert!(registry.verify_entry("0xabc123", "0xdef456"));
         assert!(!registry.verify_entry("0xwrong", "0xhash"));

@@ -2,7 +2,7 @@
 //!
 //! Tests for structured audit log with hash chain.
 
-use cap_agent::audit::{AuditEvent, AuditEventResult, AuditChain, verify_chain, export_events};
+use cap_agent::audit::{export_events, verify_chain, AuditChain, AuditEvent, AuditEventResult};
 use tempfile::NamedTempFile;
 
 #[test]
@@ -55,14 +55,16 @@ fn test_audit_chain_append_first_event() {
     let mut chain = AuditChain::new(temp_file.path()).unwrap();
 
     // First event should have genesis prev_hash
-    let event = chain.append(
-        "first_event".to_string(),
-        Some("lksg.v1".to_string()),
-        None,
-        None,
-        Some(AuditEventResult::Ok),
-        None,
-    ).unwrap();
+    let event = chain
+        .append(
+            "first_event".to_string(),
+            Some("lksg.v1".to_string()),
+            None,
+            None,
+            Some(AuditEventResult::Ok),
+            None,
+        )
+        .unwrap();
 
     assert_eq!(event.prev_hash, AuditChain::GENESIS_HASH);
     assert_eq!(chain.tail_hash(), &event.self_hash);
@@ -74,9 +76,15 @@ fn test_audit_chain_append_multiple_events() {
     let mut chain = AuditChain::new(temp_file.path()).unwrap();
 
     // Append 3 events
-    let event1 = chain.append("event_1".to_string(), None, None, None, None, None).unwrap();
-    let event2 = chain.append("event_2".to_string(), None, None, None, None, None).unwrap();
-    let event3 = chain.append("event_3".to_string(), None, None, None, None, None).unwrap();
+    let event1 = chain
+        .append("event_1".to_string(), None, None, None, None, None)
+        .unwrap();
+    let event2 = chain
+        .append("event_2".to_string(), None, None, None, None, None)
+        .unwrap();
+    let event3 = chain
+        .append("event_3".to_string(), None, None, None, None, None)
+        .unwrap();
 
     // Verify chain links
     assert_eq!(event1.prev_hash, AuditChain::GENESIS_HASH);
@@ -102,9 +110,15 @@ fn test_verify_chain_valid() {
     let mut chain = AuditChain::new(temp_file.path()).unwrap();
 
     // Append events
-    chain.append("event_1".to_string(), None, None, None, None, None).unwrap();
-    chain.append("event_2".to_string(), None, None, None, None, None).unwrap();
-    chain.append("event_3".to_string(), None, None, None, None, None).unwrap();
+    chain
+        .append("event_1".to_string(), None, None, None, None, None)
+        .unwrap();
+    chain
+        .append("event_2".to_string(), None, None, None, None, None)
+        .unwrap();
+    chain
+        .append("event_3".to_string(), None, None, None, None, None)
+        .unwrap();
 
     // Verify
     let report = verify_chain(temp_file.path()).unwrap();
@@ -119,9 +133,36 @@ fn test_export_events_all() {
     let mut chain = AuditChain::new(temp_file.path()).unwrap();
 
     // Append events
-    chain.append("event_1".to_string(), Some("lksg.v1".to_string()), None, None, None, None).unwrap();
-    chain.append("event_2".to_string(), Some("other.v1".to_string()), None, None, None, None).unwrap();
-    chain.append("event_3".to_string(), Some("lksg.v1".to_string()), None, None, None, None).unwrap();
+    chain
+        .append(
+            "event_1".to_string(),
+            Some("lksg.v1".to_string()),
+            None,
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+    chain
+        .append(
+            "event_2".to_string(),
+            Some("other.v1".to_string()),
+            None,
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+    chain
+        .append(
+            "event_3".to_string(),
+            Some("lksg.v1".to_string()),
+            None,
+            None,
+            None,
+            None,
+        )
+        .unwrap();
 
     // Export all events
     let events = export_events(temp_file.path(), None, None, None).unwrap();
@@ -134,10 +175,39 @@ fn test_export_events_by_policy() {
     let mut chain = AuditChain::new(temp_file.path()).unwrap();
 
     // Append events with different policies
-    chain.append("event_1".to_string(), Some("lksg.v1".to_string()), None, None, None, None).unwrap();
-    chain.append("event_2".to_string(), Some("other.v1".to_string()), None, None, None, None).unwrap();
-    chain.append("event_3".to_string(), Some("lksg.v1".to_string()), None, None, None, None).unwrap();
-    chain.append("event_4".to_string(), None, None, None, None, None).unwrap();
+    chain
+        .append(
+            "event_1".to_string(),
+            Some("lksg.v1".to_string()),
+            None,
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+    chain
+        .append(
+            "event_2".to_string(),
+            Some("other.v1".to_string()),
+            None,
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+    chain
+        .append(
+            "event_3".to_string(),
+            Some("lksg.v1".to_string()),
+            None,
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+    chain
+        .append("event_4".to_string(), None, None, None, None, None)
+        .unwrap();
 
     // Export filtered by policy
     let events = export_events(temp_file.path(), None, None, Some("lksg.v1")).unwrap();
@@ -153,14 +223,20 @@ fn test_export_events_by_timestamp() {
     let mut chain = AuditChain::new(temp_file.path()).unwrap();
 
     // Append events
-    chain.append("event_1".to_string(), None, None, None, None, None).unwrap();
+    chain
+        .append("event_1".to_string(), None, None, None, None, None)
+        .unwrap();
     std::thread::sleep(std::time::Duration::from_millis(10));
 
     let mid_time = chrono::Utc::now().to_rfc3339();
     std::thread::sleep(std::time::Duration::from_millis(10));
 
-    chain.append("event_2".to_string(), None, None, None, None, None).unwrap();
-    chain.append("event_3".to_string(), None, None, None, None, None).unwrap();
+    chain
+        .append("event_2".to_string(), None, None, None, None, None)
+        .unwrap();
+    chain
+        .append("event_3".to_string(), None, None, None, None, None)
+        .unwrap();
 
     // Export events after mid_time
     let events = export_events(temp_file.path(), Some(&mid_time), None, None).unwrap();

@@ -2,7 +2,6 @@
 ///
 /// Tests the complete REST API with PolicyV2 compiler and dual-mode verification.
 /// Requires the REST API server to be running.
-
 use serde_json::{json, Value};
 use std::process::{Command, Stdio};
 use std::thread;
@@ -11,7 +10,7 @@ use std::time::Duration;
 /// Helper: Start REST API server in background
 fn start_test_server() -> std::process::Child {
     let child = Command::new("cargo")
-        .args(&["run", "--bin", "cap-verifier-api"])
+        .args(["run", "--bin", "cap-verifier-api"])
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .spawn()
@@ -28,12 +27,13 @@ fn generate_mock_token() -> String {
     // For testing, we'll use a simple mock token
     // In production, this would come from an OAuth2 provider
     let output = Command::new("cargo")
-        .args(&["run", "--example", "generate_mock_token"])
+        .args(["run", "--example", "generate_mock_token"])
         .output()
         .expect("Failed to generate mock token");
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    stdout.lines()
+    stdout
+        .lines()
         .find(|line| line.starts_with("eyJ"))
         .unwrap_or("")
         .to_string()
@@ -130,6 +130,7 @@ fn create_valid_context() -> Value {
 
 #[test]
 #[ignore] // Run with: cargo test --test test_integration_http -- --ignored
+#[allow(clippy::zombie_processes)]
 fn it_01_policy_compile_valid_strict() {
     let mut _server = start_test_server();
     let token = generate_mock_token();
@@ -145,7 +146,10 @@ fn it_01_policy_compile_valid_strict() {
 
     // Assertions
     assert_eq!(status, 200, "Expected 200 OK");
-    assert!(response.get("policy_hash").is_some(), "Expected policy_hash");
+    assert!(
+        response.get("policy_hash").is_some(),
+        "Expected policy_hash"
+    );
     assert!(response.get("ir").is_some(), "Expected ir");
     assert!(response.get("ir_hash").is_some(), "Expected ir_hash");
     assert!(response.get("etag").is_some(), "Expected etag");
@@ -156,6 +160,7 @@ fn it_01_policy_compile_valid_strict() {
 
 #[test]
 #[ignore]
+#[allow(clippy::zombie_processes)]
 fn it_02_policy_compile_missing_legal_basis() {
     let mut _server = start_test_server();
     let token = generate_mock_token();
@@ -174,17 +179,21 @@ fn it_02_policy_compile_missing_legal_basis() {
     assert!(response.get("lints").is_some(), "Expected lints array");
 
     let lints = response["lints"].as_array().expect("lints should be array");
-    let has_e1002 = lints.iter().any(|lint| {
-        lint["code"].as_str() == Some("E1002")
-    });
+    let has_e1002 = lints
+        .iter()
+        .any(|lint| lint["code"].as_str() == Some("E1002"));
 
-    assert!(has_e1002, "Expected E1002 lint error for missing legal_basis");
+    assert!(
+        has_e1002,
+        "Expected E1002 lint error for missing legal_basis"
+    );
 
     println!("✅ IT-02: POST /policy/compile (missing legal_basis) - PASSED");
 }
 
 #[test]
 #[ignore]
+#[allow(clippy::zombie_processes)]
 fn it_03_verify_policy_mode_ok() {
     let mut _server = start_test_server();
     let token = generate_mock_token();
@@ -197,7 +206,11 @@ fn it_03_verify_policy_mode_ok() {
         "persist": true
     });
 
-    let (status, _response) = http_post("http://localhost:8080/policy/compile", &token, compile_request);
+    let (status, _response) = http_post(
+        "http://localhost:8080/policy/compile",
+        &token,
+        compile_request,
+    );
     assert_eq!(status, 200, "Policy compilation failed");
 
     // Now verify with policy_id (Mode A)
@@ -214,7 +227,10 @@ fn it_03_verify_policy_mode_ok() {
     assert_eq!(status, 200, "Expected 200 OK");
     assert_eq!(response["result"], "OK", "Expected result=OK");
     assert!(response.get("trace").is_some(), "Expected trace");
-    assert!(response.get("manifest_hash").is_some(), "Expected manifest_hash");
+    assert!(
+        response.get("manifest_hash").is_some(),
+        "Expected manifest_hash"
+    );
     assert!(response.get("proof_hash").is_some(), "Expected proof_hash");
 
     println!("✅ IT-03: POST /verify (Policy mode, OK) - PASSED");
@@ -234,7 +250,11 @@ fn it_04_verify_embedded_ir_ok() {
         "persist": true
     });
 
-    let (status, compile_response) = http_post("http://localhost:8080/policy/compile", &token, compile_request);
+    let (status, compile_response) = http_post(
+        "http://localhost:8080/policy/compile",
+        &token,
+        compile_request,
+    );
     assert_eq!(status, 200, "Policy compilation failed");
 
     let ir = compile_response["ir"].clone();
@@ -253,7 +273,10 @@ fn it_04_verify_embedded_ir_ok() {
     assert_eq!(status, 200, "Expected 200 OK");
     assert_eq!(response["result"], "OK", "Expected result=OK");
     assert!(response.get("trace").is_some(), "Expected trace");
-    assert!(response.get("manifest_hash").is_some(), "Expected manifest_hash");
+    assert!(
+        response.get("manifest_hash").is_some(),
+        "Expected manifest_hash"
+    );
 
     println!("✅ IT-04: POST /verify (Embedded IR, OK) - PASSED");
 }
@@ -272,7 +295,11 @@ fn it_05_verify_mode_ab_equivalence() {
         "persist": true
     });
 
-    let (_, compile_response) = http_post("http://localhost:8080/policy/compile", &token, compile_request);
+    let (_, compile_response) = http_post(
+        "http://localhost:8080/policy/compile",
+        &token,
+        compile_request,
+    );
     let ir = compile_response["ir"].clone();
 
     let context = create_valid_context();
@@ -298,9 +325,18 @@ fn it_05_verify_mode_ab_equivalence() {
     let (_, response_b) = http_post("http://localhost:8080/verify", &token, verify_b);
 
     // Equivalence check
-    assert_eq!(response_a["result"], response_b["result"], "Results should match");
-    assert_eq!(response_a["manifest_hash"], response_b["manifest_hash"], "Manifest hashes should match");
-    assert_eq!(response_a["proof_hash"], response_b["proof_hash"], "Proof hashes should match");
+    assert_eq!(
+        response_a["result"], response_b["result"],
+        "Results should match"
+    );
+    assert_eq!(
+        response_a["manifest_hash"], response_b["manifest_hash"],
+        "Manifest hashes should match"
+    );
+    assert_eq!(
+        response_a["proof_hash"], response_b["proof_hash"],
+        "Proof hashes should match"
+    );
 
     println!("✅ IT-05: Mode A/B Equivalence - PASSED");
 }
@@ -319,11 +355,19 @@ fn it_06_policy_get_with_etag_304() {
         "persist": true
     });
 
-    let (_, compile_response) = http_post("http://localhost:8080/policy/compile", &token, compile_request);
+    let (_, compile_response) = http_post(
+        "http://localhost:8080/policy/compile",
+        &token,
+        compile_request,
+    );
     let etag = compile_response["etag"].as_str().expect("Expected etag");
 
     // GET with If-None-Match
-    let (status, _) = http_get("http://localhost:8080/policy/test.policy.v1", &token, Some(etag));
+    let (status, _) = http_get(
+        "http://localhost:8080/policy/test.policy.v1",
+        &token,
+        Some(etag),
+    );
 
     // Assertion
     assert_eq!(status, 304, "Expected 304 Not Modified");
@@ -402,7 +446,11 @@ fn it_09_policy_conflict_409() {
         "persist": true
     });
 
-    let (status1, _) = http_post("http://localhost:8080/policy/compile", &token, compile_request1);
+    let (status1, _) = http_post(
+        "http://localhost:8080/policy/compile",
+        &token,
+        compile_request1,
+    );
     assert_eq!(status1, 200, "First compilation should succeed");
 
     // Try to compile different policy with same ID (should conflict)
@@ -415,7 +463,11 @@ fn it_09_policy_conflict_409() {
         "persist": true
     });
 
-    let (status2, _) = http_post("http://localhost:8080/policy/compile", &token, compile_request2);
+    let (status2, _) = http_post(
+        "http://localhost:8080/policy/compile",
+        &token,
+        compile_request2,
+    );
 
     // Assertion
     assert_eq!(status2, 409, "Expected 409 Conflict");

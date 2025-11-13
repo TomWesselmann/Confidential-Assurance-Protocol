@@ -1,15 +1,13 @@
+use cap_agent::policy_v2::{
+    canonicalize, generate_ir, lint, parse_yaml_str, sha3_256_hex, LintMode,
+};
 /// Compiler Benchmarks - Week 4 Performance Testing
 ///
 /// Targets:
 /// - p95 ≤ 50 ms (warm cache)
 /// - p95 ≤ 200 ms (cold cache)
 /// - Memory < 64 MiB
-
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
-use cap_agent::policy_v2::{
-    PolicyV2, parse_yaml_str, lint, LintMode, generate_ir,
-    canonicalize, sha3_256_hex,
-};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use std::collections::HashMap;
 
 /// Example PolicyV2 YAML for benchmarking (from examples/lksg_v1.policy.yml)
@@ -18,8 +16,7 @@ const EXAMPLE_POLICY_YAML: &str = include_str!("../examples/lksg_v1.policy.yml")
 /// Cold compilation: Parse + Lint + IR generation + Hash (no cache)
 fn compile_cold(yaml: &str) -> Result<(String, String), String> {
     // 1. Parse YAML
-    let policy = parse_yaml_str(yaml)
-        .map_err(|e| format!("Parse error: {}", e))?;
+    let policy = parse_yaml_str(yaml).map_err(|e| format!("Parse error: {}", e))?;
 
     // 2. Lint (strict mode)
     let diagnostics = lint(&policy, LintMode::Strict);
@@ -28,8 +25,8 @@ fn compile_cold(yaml: &str) -> Result<(String, String), String> {
     }
 
     // 3. Compute policy hash
-    let policy_json = serde_json::to_string(&policy)
-        .map_err(|e| format!("Serialization error: {}", e))?;
+    let policy_json =
+        serde_json::to_string(&policy).map_err(|e| format!("Serialization error: {}", e))?;
     let policy_hash = sha3_256_hex(&policy_json);
 
     // 4. Generate IR
@@ -37,8 +34,7 @@ fn compile_cold(yaml: &str) -> Result<(String, String), String> {
         .map_err(|e| format!("IR generation error: {}", e))?;
 
     // 5. Canonicalize and hash IR
-    let ir_canonical = canonicalize(&ir)
-        .map_err(|e| format!("Canonicalization error: {}", e))?;
+    let ir_canonical = canonicalize(&ir).map_err(|e| format!("Canonicalization error: {}", e))?;
     let ir_hash = sha3_256_hex(&ir_canonical);
     ir.ir_hash = ir_hash.clone();
 
@@ -61,11 +57,10 @@ impl WarmCache {
     /// Warm compilation: Check cache, fall back to cold if miss
     fn compile_warm(&mut self, yaml: &str) -> Result<(String, String), String> {
         // Compute policy hash (quick)
-        let policy = parse_yaml_str(yaml)
-            .map_err(|e| format!("Parse error: {}", e))?;
+        let policy = parse_yaml_str(yaml).map_err(|e| format!("Parse error: {}", e))?;
 
-        let policy_json = serde_json::to_string(&policy)
-            .map_err(|e| format!("Serialization error: {}", e))?;
+        let policy_json =
+            serde_json::to_string(&policy).map_err(|e| format!("Serialization error: {}", e))?;
         let policy_hash = sha3_256_hex(&policy_json);
 
         // Check cache
@@ -92,7 +87,7 @@ fn bench_compile_cold(c: &mut Criterion) {
 
     // Pre-validate that compilation works
     match compile_cold(yaml) {
-        Ok(_) => {},
+        Ok(_) => {}
         Err(e) => {
             panic!("Pre-validation failed: {}", e);
         }
@@ -101,7 +96,11 @@ fn bench_compile_cold(c: &mut Criterion) {
     c.bench_function("compile_cold", |b| {
         b.iter(|| {
             let result = compile_cold(black_box(yaml));
-            assert!(result.is_ok(), "Compilation should succeed: {:?}", result.err());
+            assert!(
+                result.is_ok(),
+                "Compilation should succeed: {:?}",
+                result.err()
+            );
             result
         });
     });
@@ -156,10 +155,7 @@ fn bench_lint(c: &mut Criterion) {
     let policy = parse_yaml_str(yaml).expect("Parse failed");
 
     c.bench_function("lint_strict", |b| {
-        b.iter(|| {
-            let diagnostics = lint(black_box(&policy), LintMode::Strict);
-            diagnostics
-        });
+        b.iter(|| lint(black_box(&policy), LintMode::Strict));
     });
 }
 
@@ -215,17 +211,13 @@ fn bench_policy_sizes(c: &mut Criterion) {
     for rule_count in [1, 5, 10, 20, 50].iter() {
         let yaml = generate_policy_with_rules(*rule_count);
 
-        group.bench_with_input(
-            BenchmarkId::from_parameter(rule_count),
-            &yaml,
-            |b, yaml| {
-                b.iter(|| {
-                    let result = compile_cold(black_box(yaml));
-                    assert!(result.is_ok());
-                    result
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::from_parameter(rule_count), &yaml, |b, yaml| {
+            b.iter(|| {
+                let result = compile_cold(black_box(yaml));
+                assert!(result.is_ok());
+                result
+            });
+        });
     }
 
     group.finish();

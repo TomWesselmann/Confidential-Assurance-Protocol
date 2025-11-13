@@ -2,12 +2,12 @@
 //!
 //! Provides a single API for reading v1.0/v1.1 registries and always writing v1.1.
 
-use super::schema::{RegistryV1_1, RegistryEntryV1_1, RegistryMeta};
-use super::v1_0::{Registry as RegistryV1_0};
-use super::migrate::{migrate_to_v1_1, backfill_kid};
+use super::migrate::{backfill_kid, migrate_to_v1_1};
+use super::schema::{RegistryEntryV1_1, RegistryV1_1};
+use super::v1_0::Registry as RegistryV1_0;
 use anyhow::{anyhow, Result};
+use serde::Deserialize;
 use std::path::Path;
-use serde::{Deserialize, Serialize};
 
 /// Unified Registry API (version-agnostic)
 ///
@@ -22,6 +22,7 @@ pub struct UnifiedRegistry {
 
 impl UnifiedRegistry {
     /// Creates a new empty v1.1 registry
+    #[allow(dead_code)]
     pub fn new(tool_version: &str) -> Self {
         Self {
             inner: RegistryV1_1::new(tool_version),
@@ -31,8 +32,8 @@ impl UnifiedRegistry {
 
     /// Loads a registry from file (auto-detects v1.0 or v1.1)
     pub fn load(path: &Path) -> Result<Self> {
-        let json_str = std::fs::read_to_string(path)
-            .map_err(|e| anyhow!("Failed to read registry: {}", e))?;
+        let json_str =
+            std::fs::read_to_string(path).map_err(|e| anyhow!("Failed to read registry: {}", e))?;
 
         // Try to detect version
         let version = detect_version(&json_str)?;
@@ -69,16 +70,15 @@ impl UnifiedRegistry {
         let json = serde_json::to_string_pretty(&self.inner)
             .map_err(|e| anyhow!("Failed to serialize registry: {}", e))?;
 
-        std::fs::write(path, json)
-            .map_err(|e| anyhow!("Failed to write registry: {}", e))?;
+        std::fs::write(path, json).map_err(|e| anyhow!("Failed to write registry: {}", e))?;
 
         Ok(())
     }
 
     /// Adds an entry to the registry
+    #[allow(dead_code)]
     pub fn add_entry(&mut self, entry: RegistryEntryV1_1) -> Result<()> {
-        self.inner.add_entry(entry)
-            .map_err(|e| anyhow!(e))
+        self.inner.add_entry(entry).map_err(|e| anyhow!(e))
     }
 
     /// Returns the source version (1.0 or 1.1)
@@ -107,6 +107,7 @@ impl UnifiedRegistry {
     }
 
     /// Returns a mutable reference to the underlying v1.1 registry
+    #[allow(dead_code)]
     pub fn as_v1_1_mut(&mut self) -> &mut RegistryV1_1 {
         &mut self.inner
     }
@@ -132,8 +133,8 @@ fn detect_version(json_str: &str) -> Result<String> {
         schema_version: String,
     }
 
-    let detector: VersionDetector = serde_json::from_str(json_str)
-        .map_err(|e| anyhow!("Failed to detect version: {}", e))?;
+    let detector: VersionDetector =
+        serde_json::from_str(json_str).map_err(|e| anyhow!("Failed to detect version: {}", e))?;
 
     // Check for v1.1 metadata
     if let Some(meta) = detector.meta {
@@ -152,8 +153,8 @@ fn detect_version(json_str: &str) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::NamedTempFile;
     use std::io::Write;
+    use tempfile::NamedTempFile;
 
     #[test]
     fn test_new_registry_is_v1_1() {

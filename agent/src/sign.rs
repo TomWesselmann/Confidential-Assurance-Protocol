@@ -2,7 +2,7 @@ use crate::manifest::{Manifest, SignatureInfo, SignedManifest};
 use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
 use rand::rngs::OsRng;
 use std::error::Error;
-use std::fs::{File, create_dir_all};
+use std::fs::{create_dir_all, File};
 use std::io::{Read, Write};
 use std::path::Path;
 
@@ -52,11 +52,7 @@ pub fn load_private_key<P: AsRef<Path>>(path: P) -> Result<SigningKey, Box<dyn E
     file.read_to_end(&mut bytes)?;
 
     if bytes.len() != 32 {
-        return Err(format!(
-            "Ungültige Schlüssellänge: {} (erwartet 32)",
-            bytes.len()
-        )
-        .into());
+        return Err(format!("Ungültige Schlüssellänge: {} (erwartet 32)", bytes.len()).into());
     }
 
     let mut key_bytes = [0u8; 32];
@@ -78,11 +74,7 @@ pub fn load_public_key<P: AsRef<Path>>(path: P) -> Result<VerifyingKey, Box<dyn 
     file.read_to_end(&mut bytes)?;
 
     if bytes.len() != 32 {
-        return Err(format!(
-            "Ungültige Schlüssellänge: {} (erwartet 32)",
-            bytes.len()
-        )
-        .into());
+        return Err(format!("Ungültige Schlüssellänge: {} (erwartet 32)", bytes.len()).into());
     }
 
     let mut key_bytes = [0u8; 32];
@@ -160,11 +152,7 @@ pub fn verify_manifest(
     let sig_bytes = hex::decode(sig_hex)?;
 
     if sig_bytes.len() != 64 {
-        return Err(format!(
-            "Ungültige Signaturlänge: {} (erwartet 64)",
-            sig_bytes.len()
-        )
-        .into());
+        return Err(format!("Ungültige Signaturlänge: {} (erwartet 64)", sig_bytes.len()).into());
     }
 
     let mut sig_array = [0u8; 64];

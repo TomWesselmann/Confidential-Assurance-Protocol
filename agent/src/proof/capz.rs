@@ -13,9 +13,8 @@
 /// payload_len[4]  = u32 LE
 /// payload[payload_len] = proof data (JSON or binary)
 /// ```
-
 use anyhow::{anyhow, Result};
-use std::io::{Read, Write, Cursor};
+use std::io::{Cursor, Read, Write};
 
 /// CAPZ Magic bytes
 pub const CAPZ_MAGIC: &[u8; 4] = b"CAPZ";
@@ -291,7 +290,10 @@ mod tests {
         let result = CapzHeader::read(&mut cursor);
 
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Invalid CAPZ magic"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Invalid CAPZ magic"));
     }
 
     #[test]
@@ -304,7 +306,10 @@ mod tests {
         let result = CapzHeader::read(&mut cursor);
 
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Unsupported CAPZ version"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Unsupported CAPZ version"));
     }
 
     #[test]
@@ -318,7 +323,10 @@ mod tests {
         let result = CapzHeader::read(&mut cursor);
 
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Invalid backend value"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Invalid backend value"));
     }
 
     #[test]
@@ -333,7 +341,10 @@ mod tests {
         let result = CapzHeader::read(&mut cursor);
 
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Payload length too large"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Payload length too large"));
     }
 
     #[test]
@@ -349,12 +360,8 @@ mod tests {
         let params_hash = [2u8; 32];
         let payload = b"test".to_vec();
 
-        let container = CapzContainer::with_hashes(
-            ProofBackend::Halo2,
-            vk_hash,
-            params_hash,
-            payload.clone(),
-        );
+        let container =
+            CapzContainer::with_hashes(ProofBackend::Halo2, vk_hash, params_hash, payload.clone());
 
         assert_eq!(container.header.vk_hash, vk_hash);
         assert_eq!(container.header.params_hash, params_hash);

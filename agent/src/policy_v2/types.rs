@@ -34,8 +34,8 @@ pub struct InputDef {
 pub struct Rule {
     pub id: String,
     pub op: String,
-    pub lhs: serde_json::Value,  // Can be string or object
-    pub rhs: serde_json::Value,  // Can be string or object
+    pub lhs: serde_json::Value, // Can be string or object
+    pub rhs: serde_json::Value, // Can be string or object
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]

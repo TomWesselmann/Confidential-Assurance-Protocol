@@ -2,7 +2,6 @@
 ///
 /// Stellt sicher, dass kryptografische Signaturen nachvollziehbar, rotierbar
 /// und langfristig gültig bleiben.
-
 use anyhow::{anyhow, Result};
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
 use chrono::Utc;
@@ -107,13 +106,16 @@ impl KeyMetadata {
     }
 
     /// Marks this key as revoked (for security incidents)
+    #[allow(dead_code)]
     pub fn revoke(&mut self) {
         self.status = "revoked".to_string();
     }
 
     /// Gets the public key bytes
+    #[allow(dead_code)]
     pub fn public_key_bytes(&self) -> Result<Vec<u8>> {
-        BASE64.decode(&self.public_key)
+        BASE64
+            .decode(&self.public_key)
             .map_err(|e| anyhow!("Failed to decode public key: {}", e))
     }
 }
@@ -229,6 +231,7 @@ impl KeyStore {
     }
 
     /// Gets the active key for an owner
+    #[allow(dead_code)]
     pub fn get_active(&self, owner: &str) -> Result<Option<KeyMetadata>> {
         for key in self.list()? {
             if key.owner == owner && key.status == "active" {
@@ -287,27 +290,33 @@ impl SignedAttestation {
 
     /// Verifies the attestation signature
     pub fn verify(&self) -> Result<()> {
-        use ed25519_dalek::{Signature, VerifyingKey, Verifier};
+        use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 
         // Decode public key
-        let pubkey_bytes = BASE64.decode(&self.signer_public_key)
+        let pubkey_bytes = BASE64
+            .decode(&self.signer_public_key)
             .map_err(|e| anyhow!("Failed to decode public key: {}", e))?;
         let verifying_key = VerifyingKey::from_bytes(
-            &pubkey_bytes.try_into()
-                .map_err(|_| anyhow!("Invalid public key length"))?
-        ).map_err(|e| anyhow!("Invalid public key: {}", e))?;
+            &pubkey_bytes
+                .try_into()
+                .map_err(|_| anyhow!("Invalid public key length"))?,
+        )
+        .map_err(|e| anyhow!("Invalid public key: {}", e))?;
 
         // Decode signature
-        let sig_bytes = BASE64.decode(&self.signature)
+        let sig_bytes = BASE64
+            .decode(&self.signature)
             .map_err(|e| anyhow!("Failed to decode signature: {}", e))?;
         let signature = Signature::from_bytes(
-            &sig_bytes.try_into()
-                .map_err(|_| anyhow!("Invalid signature length"))?
+            &sig_bytes
+                .try_into()
+                .map_err(|_| anyhow!("Invalid signature length"))?,
         );
 
         // Verify signature over attestation
         let attestation_bytes = serde_json::to_vec(&self.attestation)?;
-        verifying_key.verify(&attestation_bytes, &signature)
+        verifying_key
+            .verify(&attestation_bytes, &signature)
             .map_err(|e| anyhow!("Signature verification failed: {}", e))?;
 
         // Verify that signer_public_key matches attestation.signer_kid
@@ -363,11 +372,14 @@ pub fn verify_chain(attestation_paths: &[&str], key_store: &KeyStore) -> Result<
         }
 
         // Verify signer key exists in key store
-        let signer_key = key_store.find_by_kid(&signed_att.attestation.signer_kid)?
-            .ok_or_else(|| anyhow!(
-                "Signer key not found in store: {}",
-                signed_att.attestation.signer_kid
-            ))?;
+        let signer_key = key_store
+            .find_by_kid(&signed_att.attestation.signer_kid)?
+            .ok_or_else(|| {
+                anyhow!(
+                    "Signer key not found in store: {}",
+                    signed_att.attestation.signer_kid
+                )
+            })?;
 
         // Check signer key status (must be active or retired, not revoked)
         if signer_key.status == "revoked" {
@@ -433,7 +445,7 @@ mod tests {
         let temp_dir = std::env::temp_dir().join("cap_test_keystore");
         let _ = fs::remove_dir_all(&temp_dir);
 
-        let store = KeyStore::new(&temp_dir).unwrap();
+        let _store = KeyStore::new(&temp_dir).unwrap();
 
         assert!(temp_dir.exists());
         assert!(temp_dir.join("archive").exists());
@@ -461,8 +473,8 @@ mod tests {
     /// Same public key should always produce the same KID
     #[test]
     fn test_kid_determinism_property() {
-        use ed25519_dalek::{SigningKey, VerifyingKey};
         use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
+        use ed25519_dalek::{SigningKey, VerifyingKey};
 
         // Generate 10 random keys and verify determinism
         for _ in 0..10 {
@@ -493,8 +505,8 @@ mod tests {
     /// Different public keys should produce different KIDs (with high probability)
     #[test]
     fn test_kid_uniqueness_property() {
-        use ed25519_dalek::SigningKey;
         use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
+        use ed25519_dalek::SigningKey;
         use std::collections::HashSet;
 
         let mut kids = HashSet::new();

@@ -2,12 +2,10 @@
 //!
 //! Testet die Kompatibilität zwischen v1.0 und v1.1 Registries.
 
-use cap_agent::registry::{
-    Registry as RegistryV1_0,
-    UnifiedRegistry, RegistryEntryV1_1
-};
-use tempfile::NamedTempFile;
+use cap_agent::registry::v1_0::Registry as RegistryV1_0;
+use cap_agent::registry::{RegistryEntryV1_1, UnifiedRegistry};
 use std::io::Write;
+use tempfile::NamedTempFile;
 
 #[test]
 fn test_read_v1_0_write_v1_1() {
@@ -176,11 +174,7 @@ fn test_entry_count_preserved_across_migration() {
     // Create v1.0 with specific number of entries
     let mut v1_0 = RegistryV1_0::new();
     for i in 0..5 {
-        v1_0.add_entry(
-            format!("0xmanifest_{}", i),
-            format!("0xproof_{}", i),
-            None,
-        );
+        v1_0.add_entry(format!("0xmanifest_{}", i), format!("0xproof_{}", i), None);
     }
 
     let temp_file = NamedTempFile::new().unwrap();
@@ -225,7 +219,11 @@ fn test_v1_1_metadata_present_after_save() {
 fn test_backward_compatibility_fields_preserved() {
     // Create v1.0 entry with all optional fields
     let mut v1_0 = RegistryV1_0::new();
-    v1_0.add_entry("0xabc".to_string(), "0xdef".to_string(), Some("ts.tsr".to_string()));
+    v1_0.add_entry(
+        "0xabc".to_string(),
+        "0xdef".to_string(),
+        Some("ts.tsr".to_string()),
+    );
 
     // Manually set optional fields
     if let Some(entry) = v1_0.entries.last_mut() {

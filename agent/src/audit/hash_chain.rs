@@ -2,9 +2,9 @@
 //!
 //! Append-only audit log with cryptographic hash chain, tamper detection, and export.
 
+use anyhow::{anyhow, Result};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
-use anyhow::{anyhow, Result};
 use std::fs::{File, OpenOptions};
 use std::io::{BufRead, BufReader, Write as IoWrite};
 use std::path::Path;
@@ -168,6 +168,7 @@ impl AuditEvent {
 }
 
 /// Audit chain verification report
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct VerifyReport {
     /// Total events verified
@@ -185,6 +186,7 @@ pub struct VerifyReport {
 
 impl VerifyReport {
     /// Creates a successful verification report
+    #[allow(dead_code)]
     pub fn ok(total_events: usize) -> Self {
         Self {
             total_events,
@@ -195,6 +197,7 @@ impl VerifyReport {
     }
 
     /// Creates a failed verification report
+    #[allow(dead_code)]
     pub fn fail(total_events: usize, tamper_index: usize, error: String) -> Self {
         Self {
             total_events,
@@ -206,6 +209,7 @@ impl VerifyReport {
 }
 
 /// Audit chain manager (JSONL storage)
+#[allow(dead_code)]
 pub struct AuditChain {
     path: String,
     last_hash: String,
@@ -213,10 +217,12 @@ pub struct AuditChain {
 
 impl AuditChain {
     /// Genesis hash for first event
+    #[allow(dead_code)]
     pub const GENESIS_HASH: &'static str =
         "0x0000000000000000000000000000000000000000000000000000000000000000";
 
     /// Creates or opens an audit chain
+    #[allow(dead_code)]
     ///
     /// # Arguments
     /// * `path` - Path to JSONL file
@@ -224,7 +230,9 @@ impl AuditChain {
     /// # Returns
     /// New AuditChain instance
     pub fn new<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let path_str = path.as_ref().to_str()
+        let path_str = path
+            .as_ref()
+            .to_str()
             .ok_or_else(|| anyhow!("Invalid path"))?
             .to_string();
 
@@ -241,6 +249,7 @@ impl AuditChain {
     }
 
     /// Reads last event hash from chain
+    #[allow(dead_code)]
     fn read_last_hash(path: &str) -> Result<String> {
         let file = File::open(path)?;
         let reader = BufReader::new(file);
@@ -269,6 +278,7 @@ impl AuditChain {
     ///
     /// # Returns
     /// The appended event
+    #[allow(dead_code)]
     pub fn append(
         &mut self,
         event: String,
@@ -304,6 +314,7 @@ impl AuditChain {
     }
 
     /// Returns the current tail hash
+    #[allow(dead_code)]
     pub fn tail_hash(&self) -> &str {
         &self.last_hash
     }
@@ -316,6 +327,7 @@ impl AuditChain {
 ///
 /// # Returns
 /// VerifyReport with tamper detection
+#[allow(dead_code)]
 pub fn verify_chain<P: AsRef<Path>>(path: P) -> Result<VerifyReport> {
     let file = File::open(path)?;
     let reader = BufReader::new(file);
@@ -336,7 +348,10 @@ pub fn verify_chain<P: AsRef<Path>>(path: P) -> Result<VerifyReport> {
             return Ok(VerifyReport::fail(
                 index + 1,
                 index,
-                format!("Hash chain broken: expected prev_hash {}, got {}", prev_hash, event.prev_hash),
+                format!(
+                    "Hash chain broken: expected prev_hash {}, got {}",
+                    prev_hash, event.prev_hash
+                ),
             ));
         }
 
@@ -366,6 +381,7 @@ pub fn verify_chain<P: AsRef<Path>>(path: P) -> Result<VerifyReport> {
 ///
 /// # Returns
 /// Vector of filtered events
+#[allow(dead_code)]
 pub fn export_events<P: AsRef<Path>>(
     path: P,
     from_ts: Option<&str>,
@@ -438,27 +454,24 @@ mod tests {
         let mut chain = AuditChain::new(temp_file.path()).unwrap();
 
         // Append first event
-        let event1 = chain.append(
-            "event_1".to_string(),
-            Some("lksg.v1".to_string()),
-            None,
-            None,
-            Some(AuditEventResult::Ok),
-            None,
-        ).unwrap();
+        let event1 = chain
+            .append(
+                "event_1".to_string(),
+                Some("lksg.v1".to_string()),
+                None,
+                None,
+                Some(AuditEventResult::Ok),
+                None,
+            )
+            .unwrap();
 
         assert_eq!(event1.prev_hash, AuditChain::GENESIS_HASH);
         assert_eq!(chain.tail_hash(), &event1.self_hash);
 
         // Append second event
-        let event2 = chain.append(
-            "event_2".to_string(),
-            None,
-            None,
-            None,
-            None,
-            None,
-        ).unwrap();
+        let event2 = chain
+            .append("event_2".to_string(), None, None, None, None, None)
+            .unwrap();
 
         assert_eq!(event2.prev_hash, event1.self_hash);
         assert_eq!(chain.tail_hash(), &event2.self_hash);
@@ -470,9 +483,15 @@ mod tests {
         let mut chain = AuditChain::new(temp_file.path()).unwrap();
 
         // Append events
-        chain.append("event_1".to_string(), None, None, None, None, None).unwrap();
-        chain.append("event_2".to_string(), None, None, None, None, None).unwrap();
-        chain.append("event_3".to_string(), None, None, None, None, None).unwrap();
+        chain
+            .append("event_1".to_string(), None, None, None, None, None)
+            .unwrap();
+        chain
+            .append("event_2".to_string(), None, None, None, None, None)
+            .unwrap();
+        chain
+            .append("event_3".to_string(), None, None, None, None, None)
+            .unwrap();
 
         // Verify
         let report = verify_chain(temp_file.path()).unwrap();
@@ -487,9 +506,36 @@ mod tests {
         let mut chain = AuditChain::new(temp_file.path()).unwrap();
 
         // Append events with different policies
-        chain.append("event_1".to_string(), Some("lksg.v1".to_string()), None, None, None, None).unwrap();
-        chain.append("event_2".to_string(), Some("other.v1".to_string()), None, None, None, None).unwrap();
-        chain.append("event_3".to_string(), Some("lksg.v1".to_string()), None, None, None, None).unwrap();
+        chain
+            .append(
+                "event_1".to_string(),
+                Some("lksg.v1".to_string()),
+                None,
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+        chain
+            .append(
+                "event_2".to_string(),
+                Some("other.v1".to_string()),
+                None,
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+        chain
+            .append(
+                "event_3".to_string(),
+                Some("lksg.v1".to_string()),
+                None,
+                None,
+                None,
+                None,
+            )
+            .unwrap();
 
         // Export filtered by policy
         let events = export_events(temp_file.path(), None, None, Some("lksg.v1")).unwrap();

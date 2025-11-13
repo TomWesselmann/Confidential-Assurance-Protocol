@@ -4,19 +4,16 @@ use std::path::Path;
 
 /// Parse PolicyV2 from YAML file
 pub fn parse_yaml<P: AsRef<Path>>(path: P) -> Result<PolicyV2> {
-    let contents = std::fs::read_to_string(path.as_ref())
-        .context("Failed to read policy file")?;
+    let contents = std::fs::read_to_string(path.as_ref()).context("Failed to read policy file")?;
 
-    let policy: PolicyV2 = serde_yaml::from_str(&contents)
-        .context("Failed to parse YAML")?;
+    let policy: PolicyV2 = serde_yaml::from_str(&contents).context("Failed to parse YAML")?;
 
     Ok(policy)
 }
 
 /// Parse PolicyV2 from YAML string
 pub fn parse_yaml_str(yaml: &str) -> Result<PolicyV2> {
-    let policy: PolicyV2 = serde_yaml::from_str(yaml)
-        .context("Failed to parse YAML string")?;
+    let policy: PolicyV2 = serde_yaml::from_str(yaml).context("Failed to parse YAML string")?;
 
     Ok(policy)
 }

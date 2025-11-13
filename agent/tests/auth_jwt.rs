@@ -6,7 +6,6 @@
 /// - IT-A3: Issuer/Audience mismatch → 401
 /// - IT-A4: Missing scope for endpoint → 403
 /// - IT-A5: JWKS rotation (key ID not found → 401)
-
 use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -39,8 +38,8 @@ fn generate_test_keypair() -> (EncodingKey, jsonwebtoken::DecodingKey) {
         .to_public_key_pem(rsa::pkcs8::LineEnding::LF)
         .expect("Failed to encode public key");
 
-    let encoding_key = EncodingKey::from_rsa_pem(private_pem.as_bytes())
-        .expect("Failed to create encoding key");
+    let encoding_key =
+        EncodingKey::from_rsa_pem(private_pem.as_bytes()).expect("Failed to create encoding key");
     let decoding_key = jsonwebtoken::DecodingKey::from_rsa_pem(public_pem.as_bytes())
         .expect("Failed to create decoding key");
 
@@ -216,7 +215,7 @@ fn it_a5_missing_scope_for_endpoint() {
     };
 
     // Try to validate for /verify endpoint (requires verify:run)
-    let required_scopes = vec!["verify:run".to_string()];
+    let required_scopes = ["verify:run".to_string()];
     let result = validate_scopes(&claims, &required_scopes);
 
     assert!(result.is_err());
@@ -270,14 +269,14 @@ fn it_a7_valid_token_with_multiple_scopes() {
     };
 
     // Validate each scope individually
-    assert!(validate_scopes(&claims, &vec!["verify:run".to_string()]).is_ok());
-    assert!(validate_scopes(&claims, &vec!["policy:compile".to_string()]).is_ok());
-    assert!(validate_scopes(&claims, &vec!["policy:read".to_string()]).is_ok());
+    assert!(validate_scopes(&claims, &["verify:run".to_string()]).is_ok());
+    assert!(validate_scopes(&claims, &["policy:compile".to_string()]).is_ok());
+    assert!(validate_scopes(&claims, &["policy:read".to_string()]).is_ok());
 
     // Validate multiple scopes at once
     assert!(validate_scopes(
         &claims,
-        &vec!["verify:run".to_string(), "policy:compile".to_string()]
+        &["verify:run".to_string(), "policy:compile".to_string()]
     )
     .is_ok());
 

@@ -9,7 +9,7 @@ pub enum LintMode {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LintDiagnostic {
-    pub code: String,  // e.g., "E1001", "W1002"
+    pub code: String, // e.g., "E1001", "W1002"
     pub level: Level,
     pub message: String,
     pub rule_id: Option<String>,
@@ -56,16 +56,24 @@ impl LintCode {
 
     pub fn http_status(&self) -> u16 {
         match self {
-            LintCode::E1001 | LintCode::E1002 | LintCode::E1003
-            | LintCode::E2001 | LintCode::E2003 | LintCode::E3002 => 422,
+            LintCode::E1001
+            | LintCode::E1002
+            | LintCode::E1003
+            | LintCode::E2001
+            | LintCode::E2003
+            | LintCode::E3002 => 422,
             LintCode::W1002 => 200,
         }
     }
 
     pub fn level(&self) -> Level {
         match self {
-            LintCode::E1001 | LintCode::E1002 | LintCode::E1003
-            | LintCode::E2001 | LintCode::E2003 | LintCode::E3002 => Level::Error,
+            LintCode::E1001
+            | LintCode::E1002
+            | LintCode::E1003
+            | LintCode::E2001
+            | LintCode::E2003
+            | LintCode::E3002 => Level::Error,
             LintCode::W1002 => Level::Warning,
         }
     }
@@ -119,7 +127,10 @@ pub fn lint(policy: &PolicyV2, mode: LintMode) -> Vec<LintDiagnostic> {
             diagnostics.push(LintDiagnostic {
                 code: LintCode::E2001.as_str().to_string(),
                 level: Level::Error,
-                message: format!("invalid op '{}' (allowed: non_membership, eq, range_min)", rule.op),
+                message: format!(
+                    "invalid op '{}' (allowed: non_membership, eq, range_min)",
+                    rule.op
+                ),
                 rule_id: Some(rule.id.clone()),
             });
         }
@@ -137,7 +148,10 @@ pub fn lint(policy: &PolicyV2, mode: LintMode) -> Vec<LintDiagnostic> {
                     diagnostics.push(LintDiagnostic {
                         code: LintCode::E1001.as_str().to_string(),
                         level: Level::Error,
-                        message: format!("unknown rule id '{}' in activation '{}'", rule_id, activation.when),
+                        message: format!(
+                            "unknown rule id '{}' in activation '{}'",
+                            rule_id, activation.when
+                        ),
                         rule_id: None,
                     });
                 }
@@ -267,7 +281,9 @@ mod tests {
         let diagnostics = lint(&policy, LintMode::Strict);
         assert!(has_errors(&diagnostics));
         assert!(diagnostics.iter().any(|d| d.code == "E1003"));
-        assert!(diagnostics.iter().any(|d| d.message.contains("duplicate rule ID")));
+        assert!(diagnostics
+            .iter()
+            .any(|d| d.message.contains("duplicate rule ID")));
     }
 
     #[test]

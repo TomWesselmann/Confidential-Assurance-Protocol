@@ -4,8 +4,7 @@
 /// - Deterministic ordering (sorted by cost, then by rule ID)
 /// - Cost estimation based on operation type
 /// - Dependency resolution (future: DAG-based scheduling)
-
-use crate::policy_v2::types::{IrV1, IrRule};
+use crate::policy_v2::types::{IrRule, IrV1};
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -96,9 +95,8 @@ pub struct Planner {
 impl Planner {
     /// Creates a new planner from IR
     pub fn new(ir: &IrV1) -> Result<Self> {
-        let rules: HashMap<String, IrRule> = ir.rules.iter()
-            .map(|r| (r.id.clone(), r.clone()))
-            .collect();
+        let rules: HashMap<String, IrRule> =
+            ir.rules.iter().map(|r| (r.id.clone(), r.clone())).collect();
 
         Ok(Self {
             rules,
@@ -118,7 +116,9 @@ impl Planner {
         let mut steps: Vec<PlanStep> = Vec::new();
 
         for rule_id in active_rule_ids {
-            let rule = self.rules.get(rule_id)
+            let rule = self
+                .rules
+                .get(rule_id)
                 .ok_or_else(|| anyhow!("Rule not found: {}", rule_id))?;
 
             let cost = CostEstimator::estimate_cost(&rule.op);
@@ -132,10 +132,7 @@ impl Planner {
         }
 
         // Step 2: Sort by cost (ascending), then by rule_id (lexicographic)
-        steps.sort_by(|a, b| {
-            a.cost.cmp(&b.cost)
-                .then_with(|| a.rule_id.cmp(&b.rule_id))
-        });
+        steps.sort_by(|a, b| a.cost.cmp(&b.cost).then_with(|| a.rule_id.cmp(&b.rule_id)));
 
         // Step 3: Assign step indices
         for (idx, step) in steps.iter_mut().enumerate() {
@@ -173,7 +170,7 @@ impl Planner {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::policy_v2::types::{IrV1, IrRule, IrExpression};
+    use crate::policy_v2::types::{IrExpression, IrRule, IrV1};
     use serde_json::json;
 
     fn make_test_ir() -> IrV1 {
@@ -185,19 +182,27 @@ mod tests {
                 IrRule {
                     id: "rule_eq".to_string(),
                     op: "eq".to_string(),
-                    lhs: IrExpression::Var { var: "x".to_string() },
+                    lhs: IrExpression::Var {
+                        var: "x".to_string(),
+                    },
                     rhs: IrExpression::Literal(json!(1)),
                 },
                 IrRule {
                     id: "rule_membership".to_string(),
                     op: "non_membership".to_string(),
-                    lhs: IrExpression::Var { var: "hash".to_string() },
-                    rhs: IrExpression::Var { var: "root".to_string() },
+                    lhs: IrExpression::Var {
+                        var: "hash".to_string(),
+                    },
+                    rhs: IrExpression::Var {
+                        var: "root".to_string(),
+                    },
                 },
                 IrRule {
                     id: "rule_range".to_string(),
                     op: "range_min".to_string(),
-                    lhs: IrExpression::Var { var: "age".to_string() },
+                    lhs: IrExpression::Var {
+                        var: "age".to_string(),
+                    },
                     rhs: IrExpression::Literal(json!(18)),
                 },
             ],
@@ -273,19 +278,25 @@ mod tests {
                 IrRule {
                     id: "z_rule".to_string(),
                     op: "eq".to_string(),
-                    lhs: IrExpression::Var { var: "x".to_string() },
+                    lhs: IrExpression::Var {
+                        var: "x".to_string(),
+                    },
                     rhs: IrExpression::Literal(json!(1)),
                 },
                 IrRule {
                     id: "a_rule".to_string(),
                     op: "eq".to_string(),
-                    lhs: IrExpression::Var { var: "y".to_string() },
+                    lhs: IrExpression::Var {
+                        var: "y".to_string(),
+                    },
                     rhs: IrExpression::Literal(json!(2)),
                 },
                 IrRule {
                     id: "m_rule".to_string(),
                     op: "eq".to_string(),
-                    lhs: IrExpression::Var { var: "z".to_string() },
+                    lhs: IrExpression::Var {
+                        var: "z".to_string(),
+                    },
                     rhs: IrExpression::Literal(json!(3)),
                 },
             ],
@@ -315,10 +326,7 @@ mod tests {
         let planner = Planner::new(&ir).unwrap();
 
         // Only activate 2 out of 3 rules
-        let active_rules = vec![
-            "rule_membership".to_string(),
-            "rule_eq".to_string(),
-        ];
+        let active_rules = vec!["rule_membership".to_string(), "rule_eq".to_string()];
 
         let plan = planner.plan(&active_rules).unwrap();
 

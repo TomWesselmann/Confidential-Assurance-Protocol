@@ -49,9 +49,7 @@ pub fn compute_jurisdictions_root<P: AsRef<Path>>(
     csv_path: P,
 ) -> Result<(String, Vec<JurisdictionEntry>), Box<dyn Error>> {
     let file = File::open(&csv_path)?;
-    let mut reader = ReaderBuilder::new()
-        .has_headers(true)
-        .from_reader(file);
+    let mut reader = ReaderBuilder::new().has_headers(true).from_reader(file);
 
     let mut entries = Vec::new();
     let mut hashes = Vec::new();

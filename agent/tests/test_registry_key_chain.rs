@@ -6,7 +6,6 @@
 /// 3. Add registry entries with active keys (should succeed)
 /// 4. Attempt to add entry with retired key (should fail)
 /// 5. Verify chain of trust
-
 use cap_agent::{keys, registry};
 use ed25519_dalek::SigningKey;
 use std::fs;
@@ -31,18 +30,11 @@ fn test_registry_with_active_key_validation() {
     // Save key1
     let key1_path = keys_dir.join("key1.v1.json");
     key1_meta.save(&key1_path).unwrap();
-    fs::write(
-        keys_dir.join("key1.v1.ed25519"),
-        key1_bytes.to_bytes(),
-    )
-    .unwrap();
+    fs::write(keys_dir.join("key1.v1.ed25519"), key1_bytes.to_bytes()).unwrap();
 
     // 2. Create registry and add entry with active key
-    let reg_store = registry::open_store(
-        registry::RegistryBackend::Json,
-        Path::new(&registry_file),
-    )
-    .unwrap();
+    let reg_store =
+        registry::open_store(registry::RegistryBackend::Json, Path::new(&registry_file)).unwrap();
 
     let mut entry1 = registry::RegistryEntry {
         id: "proof_001".to_string(),
@@ -177,8 +169,8 @@ fn test_chain_of_trust_verification() {
     };
 
     // Sign attestation with key1
-    use ed25519_dalek::Signer;
     use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
+    use ed25519_dalek::Signer;
 
     let attestation_bytes = serde_json::to_vec(&attestation).unwrap();
     let signature = key1_bytes.sign(&attestation_bytes);
@@ -203,10 +195,7 @@ fn test_chain_of_trust_verification() {
     );
 
     // 5. Verify chain
-    let chain_result = keys::verify_chain(
-        &[att_path.to_str().unwrap()],
-        &store,
-    );
+    let chain_result = keys::verify_chain(&[att_path.to_str().unwrap()], &store);
     assert!(
         chain_result.is_ok(),
         "Chain verification should succeed: {:?}",

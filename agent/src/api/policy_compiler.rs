@@ -1,26 +1,24 @@
+use anyhow::Result;
 /// Policy Compiler API (Week 3) - PolicyV2 with IR Generation
 ///
 /// Endpoints:
 /// - POST /policy/compile - Compiles PolicyV2 YAML to IR v1 with linting
 /// - GET /policy/:id - Retrieves policy and IR by hash (with ETag support)
-
 use axum::{
     extract::Path,
-    http::{StatusCode, HeaderMap},
+    http::{HeaderMap, StatusCode},
     Json,
 };
+use base64::{engine::general_purpose, Engine as _};
+use lru::LruCache;
 use serde::{Deserialize, Serialize};
-use std::sync::{Arc, Mutex, OnceLock};
 use std::collections::HashMap;
 use std::num::NonZeroUsize;
-use lru::LruCache;
-use anyhow::Result;
-use base64::{Engine as _, engine::general_purpose};
+use std::sync::{Arc, Mutex, OnceLock};
 
 use crate::policy_v2::{
-    PolicyV2, IrV1, LintDiagnostic, LintMode,
-    parse_yaml_str, lint, has_errors, http_status_from_diagnostics,
-    generate_ir, canonicalize, sha3_256_hex,
+    canonicalize, generate_ir, has_errors, http_status_from_diagnostics, lint, parse_yaml_str,
+    sha3_256_hex, IrV1, LintDiagnostic, LintMode, PolicyV2,
 };
 
 // ============================================================================
@@ -39,20 +37,25 @@ pub(crate) struct PolicyEntry {
 /// LRU Cache for policy_hash → IR mapping
 /// Key: policy_hash (SHA3-256)
 /// Size: 1000 entries (Week 4 spec)
+#[allow(clippy::type_complexity)]
 static POLICY_IR_CACHE: OnceLock<Arc<Mutex<LruCache<String, Arc<PolicyEntry>>>>> = OnceLock::new();
 
 /// Policy ID → policy_hash index for lookups
 static POLICY_ID_INDEX: OnceLock<Arc<Mutex<HashMap<String, String>>>> = OnceLock::new();
 
 pub(crate) fn get_cache() -> Arc<Mutex<LruCache<String, Arc<PolicyEntry>>>> {
-    POLICY_IR_CACHE.get_or_init(|| {
-        let cache = LruCache::new(NonZeroUsize::new(1000).unwrap());
-        Arc::new(Mutex::new(cache))
-    }).clone()
+    POLICY_IR_CACHE
+        .get_or_init(|| {
+            let cache = LruCache::new(NonZeroUsize::new(1000).unwrap());
+            Arc::new(Mutex::new(cache))
+        })
+        .clone()
 }
 
 pub(crate) fn get_id_index() -> Arc<Mutex<HashMap<String, String>>> {
-    POLICY_ID_INDEX.get_or_init(|| Arc::new(Mutex::new(HashMap::new()))).clone()
+    POLICY_ID_INDEX
+        .get_or_init(|| Arc::new(Mutex::new(HashMap::new())))
+        .clone()
 }
 
 // ============================================================================
@@ -160,7 +163,8 @@ pub async fn handle_policy_v2_compile(
     // Parse policy from YAML or JSON
     let policy = if let Some(yaml_b64) = request.policy_yaml {
         // Decode base64
-        let yaml_bytes = general_purpose::STANDARD.decode(&yaml_b64)
+        let yaml_bytes = general_purpose::STANDARD
+            .decode(&yaml_b64)
             .map_err(|e| (StatusCode::BAD_REQUEST, format!("Invalid base64: {}", e)))?;
 
         let yaml_str = String::from_utf8(yaml_bytes)
@@ -172,7 +176,10 @@ pub async fn handle_policy_v2_compile(
     } else if let Some(policy) = request.policy {
         policy
     } else {
-        return Err((StatusCode::BAD_REQUEST, "Missing policy_yaml or policy".to_string()));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Missing policy_yaml or policy".to_string(),
+        ));
     };
 
     // Parse lint mode
@@ -184,57 +191,79 @@ pub async fn handle_policy_v2_compile(
     // Check for errors in strict mode
     if has_errors(&diagnostics) {
         let status = http_status_from_diagnostics(&diagnostics);
-        tracing::warn!("Policy compilation failed with {} lint errors", diagnostics.len());
+        tracing::warn!(
+            "Policy compilation failed with {} lint errors",
+            diagnostics.len()
+        );
 
         // Return 422 with diagnostics
-        return Ok((StatusCode::from_u16(status).unwrap(), Json(PolicyV2CompileResponse {
-            policy_id: policy.id.clone(),
-            policy_hash: String::new(),
-            ir: IrV1 {
-                ir_version: "1.0".to_string(),
+        return Ok((
+            StatusCode::from_u16(status).unwrap(),
+            Json(PolicyV2CompileResponse {
                 policy_id: policy.id.clone(),
                 policy_hash: String::new(),
-                rules: vec![],
-                adaptivity: None,
+                ir: IrV1 {
+                    ir_version: "1.0".to_string(),
+                    policy_id: policy.id.clone(),
+                    policy_hash: String::new(),
+                    rules: vec![],
+                    adaptivity: None,
+                    ir_hash: String::new(),
+                },
                 ir_hash: String::new(),
-            },
-            ir_hash: String::new(),
-            lints: diagnostics,
-            stored: false,
-            etag: String::new(),
-        })));
+                lints: diagnostics,
+                stored: false,
+                etag: String::new(),
+            }),
+        ));
     }
 
     // Compute policy hash
-    let policy_json = serde_json::to_string(&policy)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Serialization error: {}", e)))?;
+    let policy_json = serde_json::to_string(&policy).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Serialization error: {}", e),
+        )
+    })?;
 
     let policy_hash = sha3_256_hex(&policy_json);
 
     // Check for conflicts (409) if persist=true
     if request.persist {
         let id_index = get_id_index();
-        let index = id_index.lock()
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Lock error: {}", e)))?;
+        let index = id_index.lock().map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Lock error: {}", e),
+            )
+        })?;
 
         if let Some(existing_hash) = index.get(&policy.id) {
             if existing_hash != &policy_hash {
                 tracing::warn!("Policy conflict: {} exists with different hash", policy.id);
                 return Err((
                     StatusCode::CONFLICT,
-                    format!("Policy {} already exists with different hash", policy.id)
+                    format!("Policy {} already exists with different hash", policy.id),
                 ));
             }
         }
     }
 
     // Generate IR v1
-    let mut ir = generate_ir(&policy, policy_hash.clone())
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("IR generation error: {}", e)))?;
+    let mut ir = generate_ir(&policy, policy_hash.clone()).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("IR generation error: {}", e),
+        )
+    })?;
 
     // Canonicalize and compute IR hash
-    let ir_canonical = canonicalize(&ir)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Canonicalization error: {}", e)))?;
+    let ir_canonical = canonicalize(&ir).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Canonicalization error: {}", e),
+        )
+    })?;
 
     let ir_hash = sha3_256_hex(&ir_canonical);
     ir.ir_hash = ir_hash.clone();
@@ -245,8 +274,12 @@ pub async fn handle_policy_v2_compile(
     // Persist if requested (Week 4: LRU Cache)
     let stored = if request.persist {
         let cache = get_cache();
-        let mut lru = cache.lock()
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Lock error: {}", e)))?;
+        let mut lru = cache.lock().map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Lock error: {}", e),
+            )
+        })?;
 
         let entry = Arc::new(PolicyEntry {
             policy: policy.clone(),
@@ -260,11 +293,20 @@ pub async fn handle_policy_v2_compile(
 
         // Update policy_id → policy_hash index
         let id_index = get_id_index();
-        let mut index = id_index.lock()
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Lock error: {}", e)))?;
+        let mut index = id_index.lock().map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Lock error: {}", e),
+            )
+        })?;
         index.insert(policy.id.clone(), policy_hash.clone());
 
-        tracing::info!("Policy cached: {} → {} (LRU size: {})", policy.id, policy_hash, lru.len());
+        tracing::info!(
+            "Policy cached: {} → {} (LRU size: {})",
+            policy.id,
+            policy_hash,
+            lru.len()
+        );
         true
     } else {
         false
@@ -275,15 +317,18 @@ pub async fn handle_policy_v2_compile(
 
     tracing::info!("Policy compiled: {} → IR hash: {}", policy.id, ir_hash);
 
-    Ok((StatusCode::from_u16(status).unwrap(), Json(PolicyV2CompileResponse {
-        policy_id: policy.id.clone(),
-        policy_hash,
-        ir,
-        ir_hash,
-        lints: diagnostics,
-        stored,
-        etag,
-    })))
+    Ok((
+        StatusCode::from_u16(status).unwrap(),
+        Json(PolicyV2CompileResponse {
+            policy_id: policy.id.clone(),
+            policy_hash,
+            ir,
+            ir_hash,
+            lints: diagnostics,
+            stored,
+            etag,
+        }),
+    ))
 }
 
 /// Handles GET /policy/:id (with ETag support)
@@ -296,22 +341,42 @@ pub async fn handle_policy_v2_get(
 ) -> Result<(StatusCode, HeaderMap, Json<PolicyV2GetResponse>), (StatusCode, String)> {
     // Lookup policy_hash from ID index
     let id_index = get_id_index();
-    let index = id_index.lock()
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Lock error: {}", e)))?;
+    let index = id_index.lock().map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Lock error: {}", e),
+        )
+    })?;
 
-    let policy_hash = index.get(&policy_id)
-        .ok_or_else(|| (StatusCode::NOT_FOUND, format!("Policy not found: {}", policy_id)))?
+    let policy_hash = index
+        .get(&policy_id)
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                format!("Policy not found: {}", policy_id),
+            )
+        })?
         .clone();
 
     drop(index); // Release lock early
 
     // Retrieve from LRU cache
     let cache = get_cache();
-    let mut lru = cache.lock()
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Lock error: {}", e)))?;
+    let mut lru = cache.lock().map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Lock error: {}", e),
+        )
+    })?;
 
-    let entry = lru.get(&policy_hash)
-        .ok_or_else(|| (StatusCode::NOT_FOUND, format!("Policy not in cache: {}", policy_id)))?
+    let entry = lru
+        .get(&policy_hash)
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                format!("Policy not in cache: {}", policy_id),
+            )
+        })?
         .clone();
 
     drop(lru); // Release lock early
@@ -340,14 +405,18 @@ pub async fn handle_policy_v2_get(
 
     tracing::info!("Policy retrieved: {}", policy_id);
 
-    Ok((StatusCode::OK, response_headers, Json(PolicyV2GetResponse {
-        policy_id: entry.policy.id.clone(),
-        version: entry.policy.version.clone(),
-        policy_hash: entry.policy_hash.clone(),
-        ir: entry.ir.clone(),
-        ir_hash: entry.ir_hash.clone(),
-        etag,
-    })))
+    Ok((
+        StatusCode::OK,
+        response_headers,
+        Json(PolicyV2GetResponse {
+            policy_id: entry.policy.id.clone(),
+            version: entry.policy.version.clone(),
+            policy_hash: entry.policy_hash.clone(),
+            ir: entry.ir.clone(),
+            ir_hash: entry.ir_hash.clone(),
+            etag,
+        }),
+    ))
 }
 
 // ============================================================================

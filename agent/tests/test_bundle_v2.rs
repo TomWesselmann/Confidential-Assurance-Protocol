@@ -1,10 +1,9 @@
+use serde_json::Value;
 /// Integration tests for Bundle v2 creation and validation
 ///
 /// Tests bundle creation, hash consistency, and structure validation.
-
 use std::fs;
 use std::path::Path;
-use serde_json::Value;
 
 /// Helper: Create minimal test manifest
 fn create_test_manifest(path: &str) -> Result<(), Box<dyn std::error::Error>> {
@@ -103,8 +102,14 @@ fn test_build_minimal_bundle_ok() {
     let meta: Value = serde_json::from_str(&meta_content).expect("Invalid _meta.json");
 
     assert_eq!(meta["bundle_version"], "cap-proof.v2.0");
-    assert!(meta["hashes"]["manifest_sha3"].as_str().unwrap().starts_with("0x"));
-    assert!(meta["hashes"]["proof_sha3"].as_str().unwrap().starts_with("0x"));
+    assert!(meta["hashes"]["manifest_sha3"]
+        .as_str()
+        .unwrap()
+        .starts_with("0x"));
+    assert!(meta["hashes"]["proof_sha3"]
+        .as_str()
+        .unwrap()
+        .starts_with("0x"));
 
     // Cleanup
     fs::remove_dir_all(&bundle_path).ok();
@@ -200,12 +205,14 @@ fn test_tamper_manifest_detected() {
 
     // Tamper with manifest
     let manifest_bundle_path = format!("{}/manifest.json", bundle_path);
-    let mut manifest: Value = serde_json::from_str(
-        &fs::read_to_string(&manifest_bundle_path).unwrap()
-    ).unwrap();
+    let mut manifest: Value =
+        serde_json::from_str(&fs::read_to_string(&manifest_bundle_path).unwrap()).unwrap();
     manifest["audit"]["events_count"] = serde_json::json!(999); // Change value
-    fs::write(&manifest_bundle_path, serde_json::to_string_pretty(&manifest).unwrap())
-        .expect("Failed to write tampered manifest");
+    fs::write(
+        &manifest_bundle_path,
+        serde_json::to_string_pretty(&manifest).unwrap(),
+    )
+    .expect("Failed to write tampered manifest");
 
     // Compute new hash
     use cap_agent::crypto;
@@ -238,7 +245,10 @@ fn test_capz_invalid_magic_fails() {
     let result = CapzHeader::read(&mut cursor);
 
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Invalid CAPZ magic"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("Invalid CAPZ magic"));
 }
 
 /// Test: CAPZ header validation with invalid version
@@ -255,7 +265,10 @@ fn test_capz_invalid_version_fails() {
     let result = CapzHeader::read(&mut cursor);
 
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Unsupported CAPZ version"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("Unsupported CAPZ version"));
 }
 
 /// Test: Bundle structure validation

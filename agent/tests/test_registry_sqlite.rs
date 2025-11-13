@@ -18,13 +18,19 @@ fn test_sqlite_roundtrip() {
 
     // Use CLI to add entry with SQLite backend
     let output = Command::new("cargo")
-        .args(&[
-            "run", "--",
-            "registry", "add",
-            "--manifest", "build/manifest.json",
-            "--proof", "build/proof.dat",
-            "--backend", "sqlite",
-            "--registry", db_path,
+        .args([
+            "run",
+            "--",
+            "registry",
+            "add",
+            "--manifest",
+            "build/manifest.json",
+            "--proof",
+            "build/proof.dat",
+            "--backend",
+            "sqlite",
+            "--registry",
+            db_path,
         ])
         .output();
 
@@ -37,11 +43,15 @@ fn test_sqlite_roundtrip() {
 
             // List entries
             let list_output = Command::new("cargo")
-                .args(&[
-                    "run", "--",
-                    "registry", "list",
-                    "--backend", "sqlite",
-                    "--registry", db_path,
+                .args([
+                    "run",
+                    "--",
+                    "registry",
+                    "list",
+                    "--backend",
+                    "sqlite",
+                    "--registry",
+                    db_path,
                 ])
                 .output()
                 .expect("Failed to list entries");
@@ -66,17 +76,24 @@ fn test_sqlite_error_on_corrupt_db() {
 
     // Try to open the corrupted database via CLI
     let output = Command::new("cargo")
-        .args(&[
-            "run", "--",
-            "registry", "list",
-            "--backend", "sqlite",
-            "--registry", corrupt_db,
+        .args([
+            "run",
+            "--",
+            "registry",
+            "list",
+            "--backend",
+            "sqlite",
+            "--registry",
+            corrupt_db,
         ])
         .output()
         .expect("Failed to execute command");
 
     // Should fail gracefully
-    assert!(!output.status.success(), "Expected error on corrupted SQLite file");
+    assert!(
+        !output.status.success(),
+        "Expected error on corrupted SQLite file"
+    );
 
     // Cleanup
     fs::remove_file(corrupt_db).ok();
@@ -102,27 +119,43 @@ fn test_migrate_empty_registry() {
 
     // Migrate empty registry
     let output = Command::new("cargo")
-        .args(&[
-            "run", "--",
-            "registry", "migrate",
-            "--from", "json",
-            "--input", json_path,
-            "--to", "sqlite",
-            "--output", sqlite_path,
+        .args([
+            "run",
+            "--",
+            "registry",
+            "migrate",
+            "--from",
+            "json",
+            "--input",
+            json_path,
+            "--to",
+            "sqlite",
+            "--output",
+            sqlite_path,
         ])
         .output()
         .expect("Failed to migrate");
 
-    assert!(output.status.success(), "Empty registry migration should succeed");
-    assert!(Path::new(sqlite_path).exists(), "SQLite DB should be created");
+    assert!(
+        output.status.success(),
+        "Empty registry migration should succeed"
+    );
+    assert!(
+        Path::new(sqlite_path).exists(),
+        "SQLite DB should be created"
+    );
 
     // Verify it can be read back
     let list_output = Command::new("cargo")
-        .args(&[
-            "run", "--",
-            "registry", "list",
-            "--backend", "sqlite",
-            "--registry", sqlite_path,
+        .args([
+            "run",
+            "--",
+            "registry",
+            "list",
+            "--backend",
+            "sqlite",
+            "--registry",
+            sqlite_path,
         ])
         .output()
         .expect("Failed to list");
@@ -153,26 +186,38 @@ fn test_duplicate_entry_handling() {
 
     // Add entry first time
     let output1 = Command::new("cargo")
-        .args(&[
-            "run", "--",
-            "registry", "add",
-            "--manifest", "build/test_manifest.json",
-            "--proof", "build/test_proof.dat",
-            "--backend", "sqlite",
-            "--registry", sqlite_path,
+        .args([
+            "run",
+            "--",
+            "registry",
+            "add",
+            "--manifest",
+            "build/test_manifest.json",
+            "--proof",
+            "build/test_proof.dat",
+            "--backend",
+            "sqlite",
+            "--registry",
+            sqlite_path,
         ])
         .output()
         .expect("Failed to add first entry");
 
     // Add same entry second time (should replace due to INSERT OR REPLACE)
     let output2 = Command::new("cargo")
-        .args(&[
-            "run", "--",
-            "registry", "add",
-            "--manifest", "build/test_manifest.json",
-            "--proof", "build/test_proof.dat",
-            "--backend", "sqlite",
-            "--registry", sqlite_path,
+        .args([
+            "run",
+            "--",
+            "registry",
+            "add",
+            "--manifest",
+            "build/test_manifest.json",
+            "--proof",
+            "build/test_proof.dat",
+            "--backend",
+            "sqlite",
+            "--registry",
+            sqlite_path,
         ])
         .output()
         .expect("Failed to add duplicate entry");
@@ -181,11 +226,15 @@ fn test_duplicate_entry_handling() {
     if output1.status.success() && output2.status.success() {
         // List should show entries (possibly 2 if ID generation differs)
         let list_output = Command::new("cargo")
-            .args(&[
-                "run", "--",
-                "registry", "list",
-                "--backend", "sqlite",
-                "--registry", sqlite_path,
+            .args([
+                "run",
+                "--",
+                "registry",
+                "list",
+                "--backend",
+                "sqlite",
+                "--registry",
+                sqlite_path,
             ])
             .output()
             .expect("Failed to list");
@@ -224,13 +273,19 @@ fn test_sqlite_wal_mode() {
 
     // Add entry to trigger WAL file creation
     let output = Command::new("cargo")
-        .args(&[
-            "run", "--",
-            "registry", "add",
-            "--manifest", "build/wal_manifest.json",
-            "--proof", "build/wal_proof.dat",
-            "--backend", "sqlite",
-            "--registry", sqlite_path,
+        .args([
+            "run",
+            "--",
+            "registry",
+            "add",
+            "--manifest",
+            "build/wal_manifest.json",
+            "--proof",
+            "build/wal_proof.dat",
+            "--backend",
+            "sqlite",
+            "--registry",
+            sqlite_path,
         ])
         .output();
 

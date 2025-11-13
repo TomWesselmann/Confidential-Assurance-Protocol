@@ -85,6 +85,7 @@ pub enum ProviderType {
 
 impl ProviderType {
     /// Parst Provider-Typ aus String
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Result<Self, KeyError> {
         match s.to_lowercase().as_str() {
             "software" => Ok(ProviderType::Software),
@@ -358,7 +359,10 @@ mod tests {
         );
 
         let kid3 = derive_kid(pubkey, "pkcs11", "key1");
-        assert_ne!(kid1, kid3, "Different providers must produce different KIDs");
+        assert_ne!(
+            kid1, kid3,
+            "Different providers must produce different KIDs"
+        );
     }
 
     #[test]

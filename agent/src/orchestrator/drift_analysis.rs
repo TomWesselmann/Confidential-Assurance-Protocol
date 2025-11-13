@@ -8,10 +8,10 @@
 //! - Automatische Aggregation und Cleanup
 //! - Sliding Window Queries
 
+use crate::orchestrator::{Verdict, VerdictPair};
+use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::time::{Duration, SystemTime};
-use serde::{Deserialize, Serialize};
-use crate::orchestrator::{Verdict, VerdictPair};
 
 /// Time-stamped drift event
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -37,11 +37,7 @@ pub struct DriftEvent {
 
 impl DriftEvent {
     /// Erstellt DriftEvent aus VerdictPair
-    pub fn from_verdict_pair(
-        pair: &VerdictPair,
-        policy_id: String,
-        request_id: String,
-    ) -> Self {
+    pub fn from_verdict_pair(pair: &VerdictPair, policy_id: String, request_id: String) -> Self {
         Self {
             timestamp: SystemTime::now(),
             shadow: pair.shadow.clone(),
@@ -186,11 +182,12 @@ impl DriftAnalyzer {
     /// - Buffer: 10000 Events
     /// - Max Age: 10 Minuten
     /// - Default Window: 5 Minuten
+    #[allow(clippy::should_implement_trait)]
     pub fn default() -> Self {
         Self::new(
             10_000,
-            Duration::from_secs(600),  // 10 minutes
-            Duration::from_secs(300),  // 5 minutes
+            Duration::from_secs(600), // 10 minutes
+            Duration::from_secs(300), // 5 minutes
         )
     }
 
@@ -318,11 +315,8 @@ mod tests {
             enforced_applied: true,
         };
 
-        let event = DriftEvent::from_verdict_pair(
-            &pair,
-            "test.v1".to_string(),
-            "req-123".to_string(),
-        );
+        let event =
+            DriftEvent::from_verdict_pair(&pair, "test.v1".to_string(), "req-123".to_string());
 
         assert_eq!(event.policy_id, "test.v1");
         assert_eq!(event.request_id, "req-123");
@@ -339,11 +333,8 @@ mod tests {
                 enforced: Verdict::Ok,
                 enforced_applied: true,
             };
-            let event = DriftEvent::from_verdict_pair(
-                &pair,
-                format!("test_{}", i),
-                format!("req_{}", i),
-            );
+            let event =
+                DriftEvent::from_verdict_pair(&pair, format!("test_{}", i), format!("req_{}", i));
             buffer.push(event);
         }
 
@@ -359,14 +350,15 @@ mod tests {
         for i in 0..5 {
             let pair = VerdictPair {
                 shadow: Verdict::Ok,
-                enforced: if i % 2 == 0 { Verdict::Fail } else { Verdict::Ok },
+                enforced: if i % 2 == 0 {
+                    Verdict::Fail
+                } else {
+                    Verdict::Ok
+                },
                 enforced_applied: true,
             };
-            let event = DriftEvent::from_verdict_pair(
-                &pair,
-                "test.v1".to_string(),
-                format!("req_{}", i),
-            );
+            let event =
+                DriftEvent::from_verdict_pair(&pair, "test.v1".to_string(), format!("req_{}", i));
             buffer.push(event);
         }
 

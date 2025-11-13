@@ -1,7 +1,6 @@
 /// OAuth2 Authentication Module (Week 5)
 ///
 /// RS256 JWT validation with JWKS caching
-
 pub mod errors;
 
 use errors::AuthError;
@@ -24,11 +23,11 @@ pub struct AuthConfig {
 /// JWT Claims structure
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Claims {
-    pub sub: String,       // Subject (client_id)
-    pub iss: String,       // Issuer
-    pub aud: String,       // Audience
-    pub exp: usize,        // Expiration time (Unix timestamp)
-    pub iat: usize,        // Issued at (Unix timestamp)
+    pub sub: String, // Subject (client_id)
+    pub iss: String, // Issuer
+    pub aud: String, // Audience
+    pub exp: usize,  // Expiration time (Unix timestamp)
+    pub iat: usize,  // Issued at (Unix timestamp)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub nbf: Option<usize>, // Not before (Unix timestamp)
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -44,8 +43,8 @@ struct Jwk {
     #[serde(rename = "use")]
     key_use: Option<String>,
     alg: Option<String>,
-    n: String,  // RSA modulus (base64url)
-    e: String,  // RSA exponent (base64url)
+    n: String, // RSA modulus (base64url)
+    e: String, // RSA exponent (base64url)
 }
 
 /// JWKS (JSON Web Key Set) structure
@@ -161,8 +160,8 @@ pub async fn validate_token(
     let jwk = jwks_cache.find_jwk(&kid).await?;
 
     // 3. Create decoding key from JWK (RSA public key)
-    let decoding_key = DecodingKey::from_rsa_components(&jwk.n, &jwk.e)
-        .map_err(|_| AuthError::JwkParseError)?;
+    let decoding_key =
+        DecodingKey::from_rsa_components(&jwk.n, &jwk.e).map_err(|_| AuthError::JwkParseError)?;
 
     // 4. Setup validation rules
     let mut validation = Validation::new(Algorithm::RS256);
@@ -170,8 +169,8 @@ pub async fn validate_token(
     validation.set_audience(&[&cfg.audience]);
 
     // 5. Decode and validate token
-    let token_data = decode::<Claims>(token, &decoding_key, &validation)
-        .map_err(|e| match e.kind() {
+    let token_data =
+        decode::<Claims>(token, &decoding_key, &validation).map_err(|e| match e.kind() {
             jsonwebtoken::errors::ErrorKind::ExpiredSignature => AuthError::TokenExpired,
             jsonwebtoken::errors::ErrorKind::ImmatureSignature => AuthError::TokenNotYetValid,
             jsonwebtoken::errors::ErrorKind::InvalidIssuer => AuthError::IssuerMismatch,
@@ -232,7 +231,10 @@ required_scopes:
         assert_eq!(config.issuer, "https://idp.example.com");
         assert_eq!(config.audience, "cap-verifier");
         assert_eq!(config.jwks_cache_ttl_sec, 600);
-        assert_eq!(config.required_scopes.get("verify").unwrap(), &vec!["verify:run"]);
+        assert_eq!(
+            config.required_scopes.get("verify").unwrap(),
+            &vec!["verify:run"]
+        );
     }
 
     #[test]
@@ -247,7 +249,7 @@ required_scopes:
             scope: Some("verify:run policy:read".to_string()),
         };
 
-        let result = validate_scopes(&claims, &vec!["verify:run".to_string()]);
+        let result = validate_scopes(&claims, &["verify:run".to_string()]);
         assert!(result.is_ok());
     }
 
@@ -263,7 +265,7 @@ required_scopes:
             scope: Some("policy:read".to_string()),
         };
 
-        let result = validate_scopes(&claims, &vec!["verify:run".to_string()]);
+        let result = validate_scopes(&claims, &["verify:run".to_string()]);
         assert!(matches!(result, Err(AuthError::InsufficientScope)));
     }
 
@@ -279,7 +281,7 @@ required_scopes:
             scope: None,
         };
 
-        let result = validate_scopes(&claims, &vec!["verify:run".to_string()]);
+        let result = validate_scopes(&claims, &["verify:run".to_string()]);
         assert!(matches!(result, Err(AuthError::InsufficientScope)));
     }
 
@@ -290,7 +292,10 @@ required_scopes:
             600,
         );
 
-        assert_eq!(cache.jwks_url, "https://idp.example.com/.well-known/jwks.json");
+        assert_eq!(
+            cache.jwks_url,
+            "https://idp.example.com/.well-known/jwks.json"
+        );
         assert_eq!(cache.ttl, Duration::from_secs(600));
     }
 }

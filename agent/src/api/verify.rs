@@ -1,15 +1,15 @@
-/// Verify API - Request/Response Types and Handler (Week 4: Embedded IR Support)
-///
-/// Provides REST API types that map to the core verification logic.
-/// Supports two modes:
-/// - Mode A: policy_id (reference to stored policy)
-/// - Mode B: ir (embedded IR v1 object)
+//! Verify API - Request/Response Types and Handler (Week 4: Embedded IR Support)
+//!
+//! Provides REST API types that map to the core verification logic.
+//! Supports two modes:
+//! - Mode A: policy_id (reference to stored policy)
+//! - Mode B: ir (embedded IR v1 object)
 
-use serde::{Deserialize, Serialize};
-use anyhow::{anyhow, Result};
-use crate::verifier::core::{ProofStatement, VerifyOptions, VerifyReport};
-use crate::policy_v2::IrV1;
 use crate::crypto;
+use crate::policy_v2::IrV1;
+use crate::verifier::core::{ProofStatement, VerifyOptions, VerifyReport};
+use anyhow::{anyhow, Result};
+use serde::{Deserialize, Serialize};
 
 // ============================================================================
 // API Request/Response Types
@@ -152,14 +152,18 @@ pub struct VerifyResponse {
 /// 6. Return structured response
 pub fn handle_verify(req: VerifyRequest) -> Result<VerifyResponse> {
     // 1. Validate request (exactly one of policy_id or ir must be provided)
-    let (ir, mode_name, policy_id_for_trace): (IrV1, &str, Option<String>) = match (&req.policy_id, &req.ir) {
+    let (ir, mode_name, policy_id_for_trace): (IrV1, &str, Option<String>) = match (
+        &req.policy_id,
+        &req.ir,
+    ) {
         (Some(policy_id), None) => {
             // Mode A: Policy ID Reference - retrieve IR from LRU cache
             use crate::api::policy_compiler::{get_cache, get_id_index};
 
             // Lookup policy_hash from ID index
             let id_index = get_id_index();
-            let index = id_index.lock()
+            let index = id_index
+                .lock()
                 .map_err(|e| anyhow!("Lock error accessing policy ID index: {}", e))?;
 
             let policy_hash = index.get(policy_id)
@@ -169,11 +173,19 @@ pub fn handle_verify(req: VerifyRequest) -> Result<VerifyResponse> {
 
             // Retrieve IR from LRU cache
             let cache = get_cache();
-            let mut lru = cache.lock()
+            let mut lru = cache
+                .lock()
                 .map_err(|e| anyhow!("Lock error accessing policy cache: {}", e))?;
 
-            let entry = lru.get(&policy_hash)
-                .ok_or_else(|| anyhow!("Policy not in cache: {}. Policy hash: {}", policy_id, policy_hash))?
+            let entry = lru
+                .get(&policy_hash)
+                .ok_or_else(|| {
+                    anyhow!(
+                        "Policy not in cache: {}. Policy hash: {}",
+                        policy_id,
+                        policy_hash
+                    )
+                })?
                 .clone();
             drop(lru); // Release lock early
 
@@ -184,7 +196,9 @@ pub fn handle_verify(req: VerifyRequest) -> Result<VerifyResponse> {
             (ir.clone(), "embedded_ir", None)
         }
         (Some(_), Some(_)) => {
-            return Err(anyhow!("Cannot specify both policy_id and ir - use one or the other"));
+            return Err(anyhow!(
+                "Cannot specify both policy_id and ir - use one or the other"
+            ));
         }
         (None, None) => {
             return Err(anyhow!("Must specify either policy_id or ir"));

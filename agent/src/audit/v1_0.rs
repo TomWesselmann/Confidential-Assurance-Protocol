@@ -39,7 +39,10 @@ impl AuditLog {
         let (last_digest, seq) = if path.as_ref().exists() {
             Self::read_last_entry(&path_str)?
         } else {
-            ("0x0000000000000000000000000000000000000000000000000000000000000000".to_string(), 0)
+            (
+                "0x0000000000000000000000000000000000000000000000000000000000000000".to_string(),
+                0,
+            )
         };
 
         Ok(AuditLog {
@@ -112,7 +115,11 @@ impl AuditLog {
     ///
     /// # Rückgabe
     /// Result mit () bei Erfolg
-    pub fn log_event(&mut self, event: &str, details: serde_json::Value) -> Result<(), Box<dyn Error>> {
+    pub fn log_event(
+        &mut self,
+        event: &str,
+        details: serde_json::Value,
+    ) -> Result<(), Box<dyn Error>> {
         self.seq += 1;
         let ts = Utc::now().to_rfc3339();
         let prev_digest = self.last_digest.clone();
@@ -204,7 +211,9 @@ mod tests {
         let mut audit = AuditLog::new(temp_path).unwrap();
         assert_eq!(audit.current_seq(), 0);
 
-        audit.log_event("test_event", json!({"foo": "bar"})).unwrap();
+        audit
+            .log_event("test_event", json!({"foo": "bar"}))
+            .unwrap();
         assert_eq!(audit.current_seq(), 1);
 
         let _ = fs::remove_file(temp_path); // Cleanup
@@ -231,20 +240,10 @@ mod tests {
 
     #[test]
     fn test_digest_chain() {
-        let digest1 = AuditLog::compute_digest(
-            1,
-            "2025-01-01T00:00:00Z",
-            "event1",
-            &json!({}),
-            "0x0000",
-        );
-        let digest2 = AuditLog::compute_digest(
-            2,
-            "2025-01-01T00:00:01Z",
-            "event2",
-            &json!({}),
-            &digest1,
-        );
+        let digest1 =
+            AuditLog::compute_digest(1, "2025-01-01T00:00:00Z", "event1", &json!({}), "0x0000");
+        let digest2 =
+            AuditLog::compute_digest(2, "2025-01-01T00:00:01Z", "event2", &json!({}), &digest1);
 
         // Digests sollten unterschiedlich sein
         assert_ne!(digest1, digest2);
@@ -259,8 +258,12 @@ mod tests {
 
         // Erstelle Audit-Log mit einigen Events
         let mut audit = AuditLog::new(temp_audit).unwrap();
-        audit.log_event("test_event", json!({"foo": "bar"})).unwrap();
-        audit.log_event("another_event", json!({"baz": "qux"})).unwrap();
+        audit
+            .log_event("test_event", json!({"foo": "bar"}))
+            .unwrap();
+        audit
+            .log_event("another_event", json!({"baz": "qux"}))
+            .unwrap();
 
         // Schreibe Tip
         audit.write_tip(temp_tip).unwrap();

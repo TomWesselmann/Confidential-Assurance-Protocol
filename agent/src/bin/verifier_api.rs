@@ -6,25 +6,22 @@
 /// - POST /verify - Verifiziert Proof-Kontext gegen Policy
 /// - GET /healthz - Health Check
 /// - GET /readyz - Readiness Check
-
 use axum::{
-    routing::{get, post},
-    Router,
-    Json,
     http::StatusCode,
     middleware,
     response::Response,
+    routing::{get, post},
+    Json, Router,
 };
-use serde::{Serialize};
-use std::net::SocketAddr;
-use tracing::info;
-use tracing_subscriber;
-use cap_agent::api::verify::{VerifyRequest, VerifyResponse, handle_verify};
 use cap_agent::api::auth::auth_middleware;
+use cap_agent::api::metrics_middleware::metrics_middleware;
 use cap_agent::api::policy::{handle_policy_compile, handle_policy_get};
 use cap_agent::api::policy_compiler::{handle_policy_v2_compile, handle_policy_v2_get};
-use cap_agent::api::metrics_middleware::metrics_middleware;
-use cap_agent::metrics::{init_metrics, get_metrics};
+use cap_agent::api::verify::{handle_verify, VerifyRequest, VerifyResponse};
+use cap_agent::metrics::{get_metrics, init_metrics};
+use serde::Serialize;
+use std::net::SocketAddr;
+use tracing::info;
 
 /// Health Check Response
 #[derive(Debug, Serialize)]
@@ -73,7 +70,11 @@ async fn readiness_check() -> Json<ReadinessResponse> {
     let all_ok = checks.iter().all(|c| c.status == "OK");
 
     Json(ReadinessResponse {
-        status: if all_ok { "OK".to_string() } else { "DEGRADED".to_string() },
+        status: if all_ok {
+            "OK".to_string()
+        } else {
+            "DEGRADED".to_string()
+        },
         checks,
     })
 }
@@ -121,7 +122,10 @@ async fn main() {
         .with_env_filter("cap_verifier_api=debug,tower_http=debug")
         .init();
 
-    info!("🚀 Starting CAP Verifier API v{}", env!("CARGO_PKG_VERSION"));
+    info!(
+        "🚀 Starting CAP Verifier API v{}",
+        env!("CARGO_PKG_VERSION")
+    );
 
     // Initialize metrics registry
     init_metrics();
@@ -158,7 +162,5 @@ async fn main() {
 
     // Start server
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-    axum::serve(listener, app)
-        .await
-        .unwrap();
+    axum::serve(listener, app).await.unwrap();
 }

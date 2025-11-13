@@ -32,6 +32,7 @@ pub struct Pkcs11InternalConfig {
 pub struct Pkcs11Provider {
     config: Pkcs11InternalConfig,
     /// Cache for KIDs and public keys
+    #[allow(dead_code)]
     key_cache: Arc<Mutex<HashMap<String, Vec<u8>>>>,
 }
 
@@ -46,7 +47,9 @@ impl Pkcs11Provider {
     pub fn new(config: Pkcs11InternalConfig) -> Result<Self, KeyError> {
         // Validate config
         if config.module_path.is_empty() {
-            return Err(KeyError::ConfigError("PKCS#11 module path is empty".to_string()));
+            return Err(KeyError::ConfigError(
+                "PKCS#11 module path is empty".to_string(),
+            ));
         }
 
         if config.key_label.is_empty() {
@@ -71,7 +74,7 @@ impl Pkcs11Provider {
     fn init_session(&self) -> Result<(), KeyError> {
         // Placeholder - to be implemented with pkcs11 crate
         Err(KeyError::ProviderError(
-            "PKCS#11 provider not yet implemented. Compile with --features pkcs11".to_string()
+            "PKCS#11 provider not yet implemented. Compile with --features pkcs11".to_string(),
         ))
     }
 
@@ -83,7 +86,7 @@ impl Pkcs11Provider {
     /// 3. C_FindObjectsFinal() - End search
     fn find_key_by_label(&self, _label: &str) -> Result<u64, KeyError> {
         Err(KeyError::ProviderError(
-            "PKCS#11 provider not yet implemented".to_string()
+            "PKCS#11 provider not yet implemented".to_string(),
         ))
     }
 
@@ -93,7 +96,7 @@ impl Pkcs11Provider {
     /// 1. C_GetAttributeValue() - Get CKA_VALUE (public key)
     fn get_public_key(&self, _key_handle: u64) -> Result<Vec<u8>, KeyError> {
         Err(KeyError::ProviderError(
-            "PKCS#11 provider not yet implemented".to_string()
+            "PKCS#11 provider not yet implemented".to_string(),
         ))
     }
 
@@ -104,7 +107,7 @@ impl Pkcs11Provider {
     /// 2. C_Sign() - Sign message
     fn sign_with_key(&self, _key_handle: u64, _msg: &[u8]) -> Result<Vec<u8>, KeyError> {
         Err(KeyError::ProviderError(
-            "PKCS#11 provider not yet implemented".to_string()
+            "PKCS#11 provider not yet implemented".to_string(),
         ))
     }
 }
@@ -161,7 +164,10 @@ impl KeyProvider for Pkcs11Provider {
             return self.get_public_key(key_handle);
         }
 
-        Err(KeyError::NotFound(format!("Key with KID {} not found", kid)))
+        Err(KeyError::NotFound(format!(
+            "Key with KID {} not found",
+            kid
+        )))
     }
 
     fn list_kids(&self) -> Result<Vec<String>, KeyError> {

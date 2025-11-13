@@ -3,9 +3,9 @@
 //! Implements progressive enforcement mode with shadow/enforced verdict pairs.
 //! Supports gradual rollout (0% → 25% → 100%) with drift monitoring.
 
-use crate::orchestrator::{OrchestratorContext, Orchestrator};
+use crate::orchestrator::{Orchestrator, OrchestratorContext};
 use crate::policy_v2::types::IrV1;
-use anyhow::{Result, Context as _};
+use anyhow::{Context as _, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -31,7 +31,7 @@ impl Default for EnforceOptions {
         Self {
             enforce: false,
             rollout_percent: 0,
-            drift_max_ratio: 0.005,  // 0.5% max drift
+            drift_max_ratio: 0.005, // 0.5% max drift
         }
     }
 }
@@ -49,6 +49,7 @@ pub enum Verdict {
 
 impl Verdict {
     /// Convert string result to Verdict
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Self {
         match s {
             "ok" => Verdict::Ok,
@@ -141,7 +142,9 @@ impl Enforcer {
     /// Compute shadow verdict (dry-run mode)
     fn compute_shadow_verdict(&self, ctx: &OrchestratorContext) -> Result<Verdict> {
         // Use orchestrator to compute plan
-        let plan = self.orchestrator.orchestrate(ctx)
+        let plan = self
+            .orchestrator
+            .orchestrate(ctx)
             .context("Failed to compute shadow plan")?;
 
         // Simulate verification (in real implementation, this would execute ZK proofs)
@@ -156,7 +159,9 @@ impl Enforcer {
     /// Compute enforced verdict (active enforcement)
     fn compute_enforced_verdict(&self, ctx: &OrchestratorContext) -> Result<Verdict> {
         // Use orchestrator to compute plan (same as shadow for now)
-        let plan = self.orchestrator.orchestrate(ctx)
+        let plan = self
+            .orchestrator
+            .orchestrate(ctx)
             .context("Failed to compute enforced plan")?;
 
         // In production, this would execute the plan actively
@@ -241,7 +246,10 @@ impl DriftTracker {
 
         if verdict_pair.has_drift() {
             self.drift_events += 1;
-            *self.drift_by_policy.entry(policy_id.to_string()).or_insert(0) += 1;
+            *self
+                .drift_by_policy
+                .entry(policy_id.to_string())
+                .or_insert(0) += 1;
         }
     }
 
@@ -303,21 +311,21 @@ pub struct DriftStats {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::policy_v2::types::{IrRule, IrExpression};
+    use crate::policy_v2::types::{IrExpression, IrRule};
 
     fn create_test_ir() -> IrV1 {
         IrV1 {
             ir_version: "1.0".to_string(),
             policy_id: "test.v1".to_string(),
             policy_hash: "sha3-256:0x1234567890abcdef".to_string(),
-            rules: vec![
-                IrRule {
-                    id: "rule1".to_string(),
-                    op: "eq".to_string(),
-                    lhs: IrExpression::Var { var: "supplier_hash".to_string() },
-                    rhs: IrExpression::Literal(serde_json::Value::String("0xabc".to_string())),
+            rules: vec![IrRule {
+                id: "rule1".to_string(),
+                op: "eq".to_string(),
+                lhs: IrExpression::Var {
+                    var: "supplier_hash".to_string(),
                 },
-            ],
+                rhs: IrExpression::Literal(serde_json::Value::String("0xabc".to_string())),
+            }],
             adaptivity: None,
             ir_hash: "sha3-256:def".to_string(),
         }
@@ -439,7 +447,7 @@ mod tests {
 
         let opts = EnforceOptions {
             enforce: true,
-            rollout_percent: 50,  // 50% rollout
+            rollout_percent: 50, // 50% rollout
             drift_max_ratio: 0.005,
         };
 
@@ -465,8 +473,11 @@ mod tests {
         }
 
         // Should be roughly 50% (allow ±20% variance due to hash distribution)
-        assert!(enforced_count >= 30 && enforced_count <= 70,
-            "Expected ~50% rollout, got {}%", enforced_count);
+        assert!(
+            (30..=70).contains(&enforced_count),
+            "Expected ~50% rollout, got {}%",
+            enforced_count
+        );
     }
 
     #[test]
@@ -519,7 +530,11 @@ mod tests {
         for i in 0..10 {
             let pair = VerdictPair {
                 shadow: Verdict::Ok,
-                enforced: if i % 3 == 0 { Verdict::Fail } else { Verdict::Ok },
+                enforced: if i % 3 == 0 {
+                    Verdict::Fail
+                } else {
+                    Verdict::Ok
+                },
                 enforced_applied: true,
             };
             tracker.record("policy1", &pair);
@@ -527,7 +542,7 @@ mod tests {
 
         let stats = tracker.stats();
         assert_eq!(stats.total_requests, 10);
-        assert_eq!(stats.drift_events, 4);  // 0, 3, 6, 9
+        assert_eq!(stats.drift_events, 4); // 0, 3, 6, 9
         assert!((stats.drift_ratio - 0.4).abs() < 0.001);
     }
 }

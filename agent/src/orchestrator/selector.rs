@@ -1,10 +1,9 @@
+use crate::orchestrator::OrchestratorContext;
 /// Rule Selector - IR-based predicate evaluation and rule activation
 ///
 /// Evaluates predicates from IR adaptivity section and determines which rules
 /// should be active based on runtime context.
-
-use crate::policy_v2::types::{IrV1, IrAdaptivity, IrPredicate, Activation};
-use crate::orchestrator::OrchestratorContext;
+use crate::policy_v2::types::{Activation, IrAdaptivity, IrPredicate, IrV1};
 use anyhow::{anyhow, Result};
 use std::collections::{HashMap, HashSet};
 
@@ -17,10 +16,7 @@ impl PredicateEvaluator {
     /// Currently supports simplified evaluation for Week 5 MVP:
     /// - Simple boolean literals
     /// - Basic comparisons (future: full IR expression evaluation)
-    pub fn evaluate(
-        expr: &serde_json::Value,
-        context: &OrchestratorContext,
-    ) -> Result<bool> {
+    pub fn evaluate(expr: &serde_json::Value, context: &OrchestratorContext) -> Result<bool> {
         match expr {
             // Simple boolean literal
             serde_json::Value::Bool(b) => Ok(*b),
@@ -33,11 +29,13 @@ impl PredicateEvaluator {
                     Ok(false)
                 } else {
                     // Try to resolve as variable
-                    context.variables.get(s)
+                    context
+                        .variables
+                        .get(s)
                         .and_then(|v| v.as_bool())
                         .ok_or_else(|| anyhow!("Cannot evaluate variable: {}", s))
                 }
-            },
+            }
 
             // Object (function call or complex expression)
             serde_json::Value::Object(obj) => {
@@ -47,7 +45,7 @@ impl PredicateEvaluator {
                 } else {
                     Err(anyhow!("Unsupported expression object: {:?}", obj))
                 }
-            },
+            }
 
             _ => Err(anyhow!("Unsupported predicate expression type: {:?}", expr)),
         }
@@ -63,7 +61,9 @@ impl PredicateEvaluator {
             "lt" => {
                 // Less than: lt(a, b) → a < b
                 let args = args.ok_or_else(|| anyhow!("Missing args for lt"))?;
-                let args_arr = args.as_array().ok_or_else(|| anyhow!("lt args must be array"))?;
+                let args_arr = args
+                    .as_array()
+                    .ok_or_else(|| anyhow!("lt args must be array"))?;
                 if args_arr.len() != 2 {
                     return Err(anyhow!("lt requires exactly 2 arguments"));
                 }
@@ -72,12 +72,14 @@ impl PredicateEvaluator {
                 let a = Self::extract_number(&args_arr[0], context)?;
                 let b = Self::extract_number(&args_arr[1], context)?;
                 Ok(a < b)
-            },
+            }
 
             "gt" => {
                 // Greater than: gt(a, b) → a > b
                 let args = args.ok_or_else(|| anyhow!("Missing args for gt"))?;
-                let args_arr = args.as_array().ok_or_else(|| anyhow!("gt args must be array"))?;
+                let args_arr = args
+                    .as_array()
+                    .ok_or_else(|| anyhow!("gt args must be array"))?;
                 if args_arr.len() != 2 {
                     return Err(anyhow!("gt requires exactly 2 arguments"));
                 }
@@ -85,19 +87,21 @@ impl PredicateEvaluator {
                 let a = Self::extract_number(&args_arr[0], context)?;
                 let b = Self::extract_number(&args_arr[1], context)?;
                 Ok(a > b)
-            },
+            }
 
             "eq" => {
                 // Equality: eq(a, b) → a == b
                 let args = args.ok_or_else(|| anyhow!("Missing args for eq"))?;
-                let args_arr = args.as_array().ok_or_else(|| anyhow!("eq args must be array"))?;
+                let args_arr = args
+                    .as_array()
+                    .ok_or_else(|| anyhow!("eq args must be array"))?;
                 if args_arr.len() != 2 {
                     return Err(anyhow!("eq requires exactly 2 arguments"));
                 }
 
                 // For MVP: Support simple value comparisons
                 Ok(args_arr[0] == args_arr[1])
-            },
+            }
 
             _ => Err(anyhow!("Unsupported function: {}", func)),
         }
@@ -106,14 +110,14 @@ impl PredicateEvaluator {
     /// Extracts a number from an expression (literal or variable)
     fn extract_number(expr: &serde_json::Value, context: &OrchestratorContext) -> Result<f64> {
         match expr {
-            serde_json::Value::Number(n) => {
-                n.as_f64().ok_or_else(|| anyhow!("Cannot convert number to f64"))
-            },
-            serde_json::Value::String(var) => {
-                context.variables.get(var)
-                    .and_then(|v| v.as_f64())
-                    .ok_or_else(|| anyhow!("Variable {} not found or not a number", var))
-            },
+            serde_json::Value::Number(n) => n
+                .as_f64()
+                .ok_or_else(|| anyhow!("Cannot convert number to f64")),
+            serde_json::Value::String(var) => context
+                .variables
+                .get(var)
+                .and_then(|v| v.as_f64())
+                .ok_or_else(|| anyhow!("Variable {} not found or not a number", var)),
             _ => Err(anyhow!("Expected number or variable, got {:?}", expr)),
         }
     }
@@ -129,7 +133,9 @@ impl RuleSelector {
     /// Creates a new rule selector from IR adaptivity
     pub fn new(adaptivity: Option<&IrAdaptivity>) -> Self {
         let (predicates, activations) = if let Some(adapt) = adaptivity {
-            let pred_map: HashMap<String, IrPredicate> = adapt.predicates.iter()
+            let pred_map: HashMap<String, IrPredicate> = adapt
+                .predicates
+                .iter()
                 .map(|p| (p.id.clone(), p.clone()))
                 .collect();
             (pred_map, adapt.activations.clone())
@@ -152,7 +158,9 @@ impl RuleSelector {
         // Evaluate each activation
         for activation in &self.activations {
             // Find the predicate
-            let predicate = self.predicates.get(&activation.when)
+            let predicate = self
+                .predicates
+                .get(&activation.when)
                 .ok_or_else(|| anyhow!("Predicate not found: {}", activation.when))?;
 
             // Evaluate predicate
@@ -185,9 +193,7 @@ pub struct Selector {
 impl Selector {
     /// Creates a new selector from IR
     pub fn new(ir: &IrV1) -> Result<Self> {
-        let all_rules: Vec<String> = ir.rules.iter()
-            .map(|r| r.id.clone())
-            .collect();
+        let all_rules: Vec<String> = ir.rules.iter().map(|r| r.id.clone()).collect();
 
         let has_adaptivity = ir.adaptivity.is_some();
         let rule_selector = RuleSelector::new(ir.adaptivity.as_ref());
@@ -320,21 +326,17 @@ mod tests {
 
     #[test]
     fn test_rule_selector_with_activation() {
-        use crate::policy_v2::types::{IrAdaptivity, IrPredicate, Activation};
+        use crate::policy_v2::types::{Activation, IrAdaptivity, IrPredicate};
 
         let adaptivity = IrAdaptivity {
-            predicates: vec![
-                IrPredicate {
-                    id: "is_high_risk".to_string(),
-                    expr: json!(true),
-                },
-            ],
-            activations: vec![
-                Activation {
-                    when: "is_high_risk".to_string(),
-                    rules: vec!["check_sanctions".to_string(), "verify_country".to_string()],
-                },
-            ],
+            predicates: vec![IrPredicate {
+                id: "is_high_risk".to_string(),
+                expr: json!(true),
+            }],
+            activations: vec![Activation {
+                when: "is_high_risk".to_string(),
+                rules: vec!["check_sanctions".to_string(), "verify_country".to_string()],
+            }],
         };
 
         let selector = RuleSelector::new(Some(&adaptivity));
@@ -356,7 +358,7 @@ mod tests {
 
     #[test]
     fn test_selector_all_rules_no_adaptivity() {
-        use crate::policy_v2::types::{IrV1, IrRule, IrExpression};
+        use crate::policy_v2::types::{IrExpression, IrRule, IrV1};
 
         let ir = IrV1 {
             ir_version: "1.0".to_string(),
@@ -366,13 +368,17 @@ mod tests {
                 IrRule {
                     id: "rule1".to_string(),
                     op: "eq".to_string(),
-                    lhs: IrExpression::Var { var: "x".to_string() },
+                    lhs: IrExpression::Var {
+                        var: "x".to_string(),
+                    },
                     rhs: IrExpression::Literal(json!(1)),
                 },
                 IrRule {
                     id: "rule2".to_string(),
                     op: "eq".to_string(),
-                    lhs: IrExpression::Var { var: "y".to_string() },
+                    lhs: IrExpression::Var {
+                        var: "y".to_string(),
+                    },
                     rhs: IrExpression::Literal(json!(2)),
                 },
             ],

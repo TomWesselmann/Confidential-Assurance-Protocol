@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 /// Cloud Provider Type
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 pub enum CloudProvider {
     /// Google Cloud Platform KMS
     Gcp,
@@ -69,9 +69,7 @@ impl CloudKmsProvider {
     pub fn new(config: CloudKmsInternalConfig) -> Result<Self, KeyError> {
         // Validate config
         if config.project_or_region.is_empty() {
-            return Err(KeyError::ConfigError(
-                "Project/Region is empty".to_string()
-            ));
+            return Err(KeyError::ConfigError("Project/Region is empty".to_string()));
         }
 
         if config.key_name.is_empty() {
@@ -81,7 +79,7 @@ impl CloudKmsProvider {
         // For GCP, keyring is required
         if config.provider == CloudProvider::Gcp && config.keyring.is_none() {
             return Err(KeyError::ConfigError(
-                "GCP requires keyring parameter".to_string()
+                "GCP requires keyring parameter".to_string(),
             ));
         }
 
@@ -96,6 +94,7 @@ impl CloudKmsProvider {
     /// GCP: projects/{project}/locations/{location}/keyRings/{keyring}/cryptoKeys/{key}/cryptoKeyVersions/{version}
     /// AWS: arn:aws:kms:{region}:account:key/{key-id}
     /// Azure: https://{vault}.vault.azure.net/keys/{key-name}/{version}
+    #[allow(dead_code)]
     fn build_resource_path(&self) -> String {
         match self.config.provider {
             CloudProvider::Gcp => {
@@ -119,9 +118,7 @@ impl CloudKmsProvider {
             CloudProvider::Azure => {
                 format!(
                     "https://{}.vault.azure.net/keys/{}/{}",
-                    self.config.project_or_region,
-                    self.config.key_name,
-                    self.config.key_version
+                    self.config.project_or_region, self.config.key_name, self.config.key_version
                 )
             }
         }
@@ -135,7 +132,7 @@ impl CloudKmsProvider {
     /// - Azure: keyVault.GetKey()
     fn get_public_key_from_kms(&self) -> Result<Vec<u8>, KeyError> {
         Err(KeyError::ProviderError(
-            "CloudKMS provider not yet implemented. Compile with --features cloudkms".to_string()
+            "CloudKMS provider not yet implemented. Compile with --features cloudkms".to_string(),
         ))
     }
 
@@ -147,7 +144,7 @@ impl CloudKmsProvider {
     /// - Azure: keyVault.Sign()
     fn sign_with_kms(&self, _msg: &[u8]) -> Result<Vec<u8>, KeyError> {
         Err(KeyError::ProviderError(
-            "CloudKMS provider not yet implemented".to_string()
+            "CloudKMS provider not yet implemented".to_string(),
         ))
     }
 }
@@ -169,7 +166,9 @@ impl KeyProvider for CloudKmsProvider {
         let kid = derive_kid(&pubkey, self.provider_id(), &self.config.key_name);
 
         // Cache it
-        let mut cache = self.key_cache.lock()
+        let mut cache = self
+            .key_cache
+            .lock()
             .map_err(|e| KeyError::ProviderError(format!("Lock error: {}", e)))?;
         cache.insert(kid.clone(), pubkey);
 
@@ -194,7 +193,9 @@ impl KeyProvider for CloudKmsProvider {
 
     fn public_key(&self, kid: &str) -> Result<Vec<u8>, KeyError> {
         // Check cache first
-        let cache = self.key_cache.lock()
+        let cache = self
+            .key_cache
+            .lock()
             .map_err(|e| KeyError::ProviderError(format!("Lock error: {}", e)))?;
 
         if let Some(pubkey) = cache.get(kid) {
@@ -210,7 +211,10 @@ impl KeyProvider for CloudKmsProvider {
             return Ok(pubkey);
         }
 
-        Err(KeyError::NotFound(format!("Key with KID {} not found", kid)))
+        Err(KeyError::NotFound(format!(
+            "Key with KID {} not found",
+            kid
+        )))
     }
 
     fn list_kids(&self) -> Result<Vec<String>, KeyError> {

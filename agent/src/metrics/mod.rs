@@ -1,7 +1,6 @@
 /// Prometheus Metrics Module (Week 5)
 ///
 /// Exports metrics for monitoring and SLO tracking
-
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
@@ -87,7 +86,8 @@ impl MetricsRegistry {
         let mut output = String::new();
 
         // cap_verifier_requests_total
-        output.push_str("# HELP cap_verifier_requests_total Total number of verification requests\n");
+        output
+            .push_str("# HELP cap_verifier_requests_total Total number of verification requests\n");
         output.push_str("# TYPE cap_verifier_requests_total counter\n");
         output.push_str(&format!(
             "cap_verifier_requests_total{{result=\"ok\"}} {}\n",
@@ -103,7 +103,9 @@ impl MetricsRegistry {
         ));
 
         // cap_auth_token_validation_failures_total
-        output.push_str("# HELP cap_auth_token_validation_failures_total Total authentication failures\n");
+        output.push_str(
+            "# HELP cap_auth_token_validation_failures_total Total authentication failures\n",
+        );
         output.push_str("# TYPE cap_auth_token_validation_failures_total counter\n");
         output.push_str(&format!(
             "cap_auth_token_validation_failures_total {}\n",
@@ -113,16 +115,21 @@ impl MetricsRegistry {
         // cap_cache_hit_ratio
         output.push_str("# HELP cap_cache_hit_ratio Cache hit ratio (0.0 to 1.0)\n");
         output.push_str("# TYPE cap_cache_hit_ratio gauge\n");
-        output.push_str(&format!("cap_cache_hit_ratio {:.4}\n", self.cache_hit_ratio()));
+        output.push_str(&format!(
+            "cap_cache_hit_ratio {:.4}\n",
+            self.cache_hit_ratio()
+        ));
 
         // cap_verifier_request_duration_seconds (histogram)
         let durations = self.request_durations.lock().unwrap();
         if !durations.is_empty() {
-            output.push_str("# HELP cap_verifier_request_duration_seconds Request duration in seconds\n");
+            output.push_str(
+                "# HELP cap_verifier_request_duration_seconds Request duration in seconds\n",
+            );
             output.push_str("# TYPE cap_verifier_request_duration_seconds histogram\n");
 
             // Calculate histogram buckets
-            let buckets = vec![0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0];
+            let buckets = [0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0];
             let mut counts = vec![0u64; buckets.len()];
             let mut sum = 0.0;
 
@@ -181,6 +188,7 @@ pub fn init_metrics() {
 }
 
 /// Get global metrics registry
+#[allow(static_mut_refs)]
 pub fn get_metrics() -> &'static MetricsRegistry {
     unsafe {
         METRICS

@@ -5,8 +5,7 @@
 /// - IT-M2: Metrics contain expected metric names
 /// - IT-M3: Histogram buckets are present after traffic
 /// - IT-M4: Cache hit ratio calculation is correct
-
-use cap_agent::metrics::{init_metrics, get_metrics, MetricsRegistry};
+use cap_agent::metrics::{get_metrics, init_metrics, MetricsRegistry};
 
 #[test]
 fn test_metrics_registry_creation() {
@@ -136,7 +135,11 @@ fn it_m4_cache_hit_ratio_calculation() {
     metrics.record_cache_miss();
 
     let ratio = metrics.cache_hit_ratio();
-    assert!((ratio - 0.75).abs() < 0.01, "Expected 75% hit rate, got {}", ratio);
+    assert!(
+        (ratio - 0.75).abs() < 0.01,
+        "Expected 75% hit rate, got {}",
+        ratio
+    );
 
     let output = metrics.export_prometheus();
     assert!(output.contains("cap_cache_hit_ratio 0.75"));
@@ -202,7 +205,11 @@ fn it_m6_high_traffic_simulation() {
 
     // Verify cache hit ratio (should be 80%)
     let ratio = metrics.cache_hit_ratio();
-    assert!((ratio - 0.8).abs() < 0.01, "Expected 80% hit rate, got {}", ratio);
+    assert!(
+        (ratio - 0.8).abs() < 0.01,
+        "Expected 80% hit rate, got {}",
+        ratio
+    );
 
     // Verify histogram count
     assert!(output.contains("cap_verifier_request_duration_seconds_count 1000"));
@@ -266,7 +273,7 @@ fn it_m9_histogram_percentile_buckets() {
     let metrics = MetricsRegistry::new();
 
     // Generate 100 samples with known distribution
-    for i in 0..95 {
+    for _ in 0..95 {
         metrics.record_request_duration(0.01); // 95% fast
     }
     for _ in 0..4 {
@@ -279,8 +286,8 @@ fn it_m9_histogram_percentile_buckets() {
     // Verify buckets capture the distribution
     assert!(output.contains("le=\"0.01\"")); // Should have 95 samples
     assert!(output.contains("le=\"0.5\"")); // Should have 99 samples
-    assert!(output.contains("le=\"1\""));  // Should have 99 samples
-    assert!(output.contains("le=\"5\""));  // Should have 100 samples
+    assert!(output.contains("le=\"1\"")); // Should have 99 samples
+    assert!(output.contains("le=\"5\"")); // Should have 100 samples
 
     println!("✅ Histogram buckets enable percentile calculations");
 }

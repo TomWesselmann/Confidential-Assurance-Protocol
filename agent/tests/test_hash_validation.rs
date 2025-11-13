@@ -1,7 +1,6 @@
 /// Integration test for bundle hash validation
 ///
 /// Tests that verify-bundle detects tampering via _meta.json hash mismatches.
-
 use std::fs;
 
 /// Helper: Create minimal test manifest
@@ -89,22 +88,18 @@ fn test_hash_validation_detects_manifest_tampering() {
 
     // Tamper with manifest
     let manifest_bundle_path = format!("{}/manifest.json", bundle_path);
-    let mut manifest: serde_json::Value = serde_json::from_str(
-        &fs::read_to_string(&manifest_bundle_path).unwrap()
-    ).unwrap();
+    let mut manifest: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&manifest_bundle_path).unwrap()).unwrap();
     manifest["audit"]["events_count"] = serde_json::json!(999);
-    fs::write(&manifest_bundle_path, serde_json::to_string_pretty(&manifest).unwrap())
-        .expect("Failed to write tampered manifest");
+    fs::write(
+        &manifest_bundle_path,
+        serde_json::to_string_pretty(&manifest).unwrap(),
+    )
+    .expect("Failed to write tampered manifest");
 
     // Try to verify (should fail due to hash mismatch)
     let output = std::process::Command::new("cargo")
-        .args(&[
-            "run",
-            "--",
-            "verify-bundle",
-            "--bundle",
-            &bundle_path,
-        ])
+        .args(&["run", "--", "verify-bundle", "--bundle", &bundle_path])
         .output()
         .expect("Failed to execute verify-bundle");
 
@@ -169,13 +164,7 @@ fn test_hash_validation_detects_proof_tampering() {
 
     // Try to verify (should fail due to hash mismatch)
     let output = std::process::Command::new("cargo")
-        .args(&[
-            "run",
-            "--",
-            "verify-bundle",
-            "--bundle",
-            &bundle_path,
-        ])
+        .args(&["run", "--", "verify-bundle", "--bundle", &bundle_path])
         .output()
         .expect("Failed to execute verify-bundle");
 
@@ -231,13 +220,7 @@ fn test_hash_validation_passes_for_valid_bundle() {
 
     // Verify without tampering (should succeed)
     let output = std::process::Command::new("cargo")
-        .args(&[
-            "run",
-            "--",
-            "verify-bundle",
-            "--bundle",
-            &bundle_path,
-        ])
+        .args(&["run", "--", "verify-bundle", "--bundle", &bundle_path])
         .output()
         .expect("Failed to execute verify-bundle");
 

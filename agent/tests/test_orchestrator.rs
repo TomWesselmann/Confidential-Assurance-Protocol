@@ -5,11 +5,12 @@
 /// - Rule selection
 /// - Deterministic planning
 /// - Cost-based ordering
-
-use cap_agent::orchestrator::{Orchestrator, OrchestratorContext, ExecutionPlan};
-use cap_agent::policy_v2::types::{IrV1, IrRule, IrExpression, IrAdaptivity, IrPredicate, Activation};
-use std::collections::HashMap;
+use cap_agent::orchestrator::{Orchestrator, OrchestratorContext};
+use cap_agent::policy_v2::types::{
+    Activation, IrAdaptivity, IrExpression, IrPredicate, IrRule, IrV1,
+};
 use serde_json::json;
+use std::collections::HashMap;
 
 #[test]
 fn test_orchestrator_no_adaptivity_all_rules_active() {
@@ -22,19 +23,27 @@ fn test_orchestrator_no_adaptivity_all_rules_active() {
             IrRule {
                 id: "check_sanctions".to_string(),
                 op: "non_membership".to_string(),
-                lhs: IrExpression::Var { var: "supplier_hash".to_string() },
-                rhs: IrExpression::Var { var: "sanctions_root".to_string() },
+                lhs: IrExpression::Var {
+                    var: "supplier_hash".to_string(),
+                },
+                rhs: IrExpression::Var {
+                    var: "sanctions_root".to_string(),
+                },
             },
             IrRule {
                 id: "check_age".to_string(),
                 op: "range_min".to_string(),
-                lhs: IrExpression::Var { var: "age".to_string() },
+                lhs: IrExpression::Var {
+                    var: "age".to_string(),
+                },
                 rhs: IrExpression::Literal(json!(18)),
             },
             IrRule {
                 id: "check_status".to_string(),
                 op: "eq".to_string(),
-                lhs: IrExpression::Var { var: "status".to_string() },
+                lhs: IrExpression::Var {
+                    var: "status".to_string(),
+                },
                 rhs: IrExpression::Literal(json!("active")),
             },
         ],
@@ -89,38 +98,44 @@ fn test_orchestrator_with_adaptivity_predicate_true() {
             IrRule {
                 id: "baseline_check".to_string(),
                 op: "eq".to_string(),
-                lhs: IrExpression::Var { var: "status".to_string() },
+                lhs: IrExpression::Var {
+                    var: "status".to_string(),
+                },
                 rhs: IrExpression::Literal(json!("active")),
             },
             IrRule {
                 id: "sanctions_check".to_string(),
                 op: "non_membership".to_string(),
-                lhs: IrExpression::Var { var: "hash".to_string() },
-                rhs: IrExpression::Var { var: "sanctions_root".to_string() },
+                lhs: IrExpression::Var {
+                    var: "hash".to_string(),
+                },
+                rhs: IrExpression::Var {
+                    var: "sanctions_root".to_string(),
+                },
             },
             IrRule {
                 id: "jurisdiction_check".to_string(),
                 op: "non_membership".to_string(),
-                lhs: IrExpression::Var { var: "hash".to_string() },
-                rhs: IrExpression::Var { var: "jurisdiction_root".to_string() },
+                lhs: IrExpression::Var {
+                    var: "hash".to_string(),
+                },
+                rhs: IrExpression::Var {
+                    var: "jurisdiction_root".to_string(),
+                },
             },
         ],
         adaptivity: Some(IrAdaptivity {
-            predicates: vec![
-                IrPredicate {
-                    id: "is_high_risk".to_string(),
-                    expr: json!(true), // Always true for this test
-                },
-            ],
-            activations: vec![
-                Activation {
-                    when: "is_high_risk".to_string(),
-                    rules: vec![
-                        "sanctions_check".to_string(),
-                        "jurisdiction_check".to_string(),
-                    ],
-                },
-            ],
+            predicates: vec![IrPredicate {
+                id: "is_high_risk".to_string(),
+                expr: json!(true), // Always true for this test
+            }],
+            activations: vec![Activation {
+                when: "is_high_risk".to_string(),
+                rules: vec![
+                    "sanctions_check".to_string(),
+                    "jurisdiction_check".to_string(),
+                ],
+            }],
         }),
         ir_hash: "sha3-256:ir_hash".to_string(),
     };
@@ -159,27 +174,25 @@ fn test_orchestrator_with_adaptivity_predicate_false() {
         ir_version: "1.0".to_string(),
         policy_id: "adaptive_policy.v1".to_string(),
         policy_hash: "sha3-256:adaptive_hash".to_string(),
-        rules: vec![
-            IrRule {
-                id: "sanctions_check".to_string(),
-                op: "non_membership".to_string(),
-                lhs: IrExpression::Var { var: "hash".to_string() },
-                rhs: IrExpression::Var { var: "sanctions_root".to_string() },
+        rules: vec![IrRule {
+            id: "sanctions_check".to_string(),
+            op: "non_membership".to_string(),
+            lhs: IrExpression::Var {
+                var: "hash".to_string(),
             },
-        ],
+            rhs: IrExpression::Var {
+                var: "sanctions_root".to_string(),
+            },
+        }],
         adaptivity: Some(IrAdaptivity {
-            predicates: vec![
-                IrPredicate {
-                    id: "is_high_risk".to_string(),
-                    expr: json!(false), // False → no activation
-                },
-            ],
-            activations: vec![
-                Activation {
-                    when: "is_high_risk".to_string(),
-                    rules: vec!["sanctions_check".to_string()],
-                },
-            ],
+            predicates: vec![IrPredicate {
+                id: "is_high_risk".to_string(),
+                expr: json!(false), // False → no activation
+            }],
+            activations: vec![Activation {
+                when: "is_high_risk".to_string(),
+                rules: vec!["sanctions_check".to_string()],
+            }],
         }),
         ir_hash: "sha3-256:ir_hash".to_string(),
     };
@@ -214,32 +227,32 @@ fn test_orchestrator_with_variable_predicate() {
             IrRule {
                 id: "age_check".to_string(),
                 op: "range_min".to_string(),
-                lhs: IrExpression::Var { var: "age".to_string() },
+                lhs: IrExpression::Var {
+                    var: "age".to_string(),
+                },
                 rhs: IrExpression::Literal(json!(18)),
             },
             IrRule {
                 id: "enhanced_check".to_string(),
                 op: "eq".to_string(),
-                lhs: IrExpression::Var { var: "verified".to_string() },
+                lhs: IrExpression::Var {
+                    var: "verified".to_string(),
+                },
                 rhs: IrExpression::Literal(json!(true)),
             },
         ],
         adaptivity: Some(IrAdaptivity {
-            predicates: vec![
-                IrPredicate {
-                    id: "is_young".to_string(),
-                    expr: json!({
-                        "func": "lt",
-                        "args": ["age", 25]
-                    }),
-                },
-            ],
-            activations: vec![
-                Activation {
-                    when: "is_young".to_string(),
-                    rules: vec!["enhanced_check".to_string()],
-                },
-            ],
+            predicates: vec![IrPredicate {
+                id: "is_young".to_string(),
+                expr: json!({
+                    "func": "lt",
+                    "args": ["age", 25]
+                }),
+            }],
+            activations: vec![Activation {
+                when: "is_young".to_string(),
+                rules: vec!["enhanced_check".to_string()],
+            }],
         }),
         ir_hash: "sha3-256:ir_hash".to_string(),
     };
@@ -291,19 +304,25 @@ fn test_orchestrator_deterministic_ordering() {
             IrRule {
                 id: "z_rule".to_string(),
                 op: "eq".to_string(),
-                lhs: IrExpression::Var { var: "x".to_string() },
+                lhs: IrExpression::Var {
+                    var: "x".to_string(),
+                },
                 rhs: IrExpression::Literal(json!(1)),
             },
             IrRule {
                 id: "a_rule".to_string(),
                 op: "eq".to_string(),
-                lhs: IrExpression::Var { var: "y".to_string() },
+                lhs: IrExpression::Var {
+                    var: "y".to_string(),
+                },
                 rhs: IrExpression::Literal(json!(2)),
             },
             IrRule {
                 id: "m_rule".to_string(),
                 op: "eq".to_string(),
-                lhs: IrExpression::Var { var: "z".to_string() },
+                lhs: IrExpression::Var {
+                    var: "z".to_string(),
+                },
                 rhs: IrExpression::Literal(json!(3)),
             },
         ],
@@ -342,31 +361,43 @@ fn test_orchestrator_mixed_costs() {
             IrRule {
                 id: "expensive_check".to_string(),
                 op: "non_membership".to_string(), // cost=10
-                lhs: IrExpression::Var { var: "hash".to_string() },
-                rhs: IrExpression::Var { var: "root".to_string() },
+                lhs: IrExpression::Var {
+                    var: "hash".to_string(),
+                },
+                rhs: IrExpression::Var {
+                    var: "root".to_string(),
+                },
             },
             IrRule {
                 id: "cheap_check_1".to_string(),
                 op: "eq".to_string(), // cost=1
-                lhs: IrExpression::Var { var: "a".to_string() },
+                lhs: IrExpression::Var {
+                    var: "a".to_string(),
+                },
                 rhs: IrExpression::Literal(json!(1)),
             },
             IrRule {
                 id: "medium_check".to_string(),
                 op: "range_min".to_string(), // cost=2
-                lhs: IrExpression::Var { var: "age".to_string() },
+                lhs: IrExpression::Var {
+                    var: "age".to_string(),
+                },
                 rhs: IrExpression::Literal(json!(18)),
             },
             IrRule {
                 id: "cheap_check_2".to_string(),
                 op: "eq".to_string(), // cost=1
-                lhs: IrExpression::Var { var: "b".to_string() },
+                lhs: IrExpression::Var {
+                    var: "b".to_string(),
+                },
                 rhs: IrExpression::Literal(json!(2)),
             },
             IrRule {
                 id: "very_expensive".to_string(),
                 op: "threshold".to_string(), // cost=20
-                lhs: IrExpression::Var { var: "count".to_string() },
+                lhs: IrExpression::Var {
+                    var: "count".to_string(),
+                },
                 rhs: IrExpression::Literal(json!(0.8)),
             },
         ],

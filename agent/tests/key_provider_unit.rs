@@ -7,8 +7,8 @@
 //! - Provider Factory
 //! - Configuration Loading
 
-use cap_agent::providers::{KeyError, KeyProvider, ProviderConfig, SoftwareProvider};
 use cap_agent::providers::key_provider::{create_provider, derive_kid};
+use cap_agent::providers::{KeyError, KeyProvider, ProviderConfig, SoftwareProvider};
 use tempfile::tempdir;
 
 #[test]
@@ -51,9 +51,18 @@ fn test_kid_different_providers_unique() {
     let kid_pkcs11 = derive_kid(pubkey, "pkcs11", key_name);
     let kid_cloudkms = derive_kid(pubkey, "cloudkms-gcp", key_name);
 
-    assert_ne!(kid_software, kid_pkcs11, "Different providers must have different KIDs");
-    assert_ne!(kid_software, kid_cloudkms, "Different providers must have different KIDs");
-    assert_ne!(kid_pkcs11, kid_cloudkms, "Different providers must have different KIDs");
+    assert_ne!(
+        kid_software, kid_pkcs11,
+        "Different providers must have different KIDs"
+    );
+    assert_ne!(
+        kid_software, kid_cloudkms,
+        "Different providers must have different KIDs"
+    );
+    assert_ne!(
+        kid_pkcs11, kid_cloudkms,
+        "Different providers must have different KIDs"
+    );
 }
 
 #[test]
@@ -64,7 +73,10 @@ fn test_kid_different_key_names_unique() {
     let kid1 = derive_kid(pubkey, provider_id, "key1");
     let kid2 = derive_kid(pubkey, provider_id, "key2");
 
-    assert_ne!(kid1, kid2, "Different key names must produce different KIDs");
+    assert_ne!(
+        kid1, kid2,
+        "Different key names must produce different KIDs"
+    );
 }
 
 #[test]

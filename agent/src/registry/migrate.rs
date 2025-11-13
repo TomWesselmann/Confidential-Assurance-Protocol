@@ -2,7 +2,7 @@
 //!
 //! Provides idempotent migration from v1.0 to v1.1 registry format.
 
-use super::schema::{RegistryV1_1, RegistryEntryV1_1, RegistryMeta};
+use super::schema::{RegistryEntryV1_1, RegistryMeta, RegistryV1_1};
 use super::v1_0::{Registry as RegistryV1_0, RegistryEntry as RegistryEntryV1_0};
 use anyhow::{anyhow, Result};
 
@@ -48,12 +48,8 @@ fn migrate_entry(v1_0: &RegistryEntryV1_0, idx: usize) -> Result<RegistryEntryV1
     let ir_hash = format!("sha3-256:migrated_{}", v1_0.manifest_hash); // Derived IR hash
 
     // Create v1.1 entry
-    let mut entry = RegistryEntryV1_1::new(
-        entry_id,
-        policy_id,
-        ir_hash,
-        v1_0.manifest_hash.clone(),
-    );
+    let mut entry =
+        RegistryEntryV1_1::new(entry_id, policy_id, ir_hash, v1_0.manifest_hash.clone());
 
     // Copy over optional fields that exist in both versions
     entry.created_at = v1_0.registered_at.clone();
@@ -143,6 +139,7 @@ fn derive_kid_from_pubkey(pubkey_b64: &str) -> Result<String> {
 }
 
 /// Checks if a registry is already v1.1
+#[allow(dead_code)]
 pub fn is_v1_1(meta_version: &str) -> bool {
     meta_version == "1.1"
 }
@@ -165,11 +162,7 @@ mod tests {
     #[test]
     fn test_migrate_single_entry() {
         let mut v1_0 = RegistryV1_0::new();
-        v1_0.add_entry(
-            "0xabc123".to_string(),
-            "0xdef456".to_string(),
-            None,
-        );
+        v1_0.add_entry("0xabc123".to_string(), "0xdef456".to_string(), None);
 
         let v1_1 = migrate_to_v1_1(v1_0, "cap-agent-test").unwrap();
 
@@ -185,7 +178,7 @@ mod tests {
 
     #[test]
     fn test_migrate_entry_preserves_optional_fields() {
-        let mut v1_0_entry = RegistryEntryV1_0 {
+        let v1_0_entry = RegistryEntryV1_0 {
             id: "test_001".to_string(),
             manifest_hash: "0xabc".to_string(),
             proof_hash: "0xdef".to_string(),

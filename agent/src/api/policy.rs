@@ -1,19 +1,14 @@
+use crate::policy::{Policy, PolicyInfo};
+use anyhow::{anyhow, Result};
 /// Policy API - REST Endpoints for Policy Management
 ///
 /// Endpoints:
 /// - POST /policy/compile - Compiles and validates a policy
 /// - GET /policy/:id - Retrieves a policy by hash
-
-use axum::{
-    extract::Path,
-    http::StatusCode,
-    Json,
-};
+use axum::{extract::Path, http::StatusCode, Json};
 use serde::{Deserialize, Serialize};
-use std::sync::{Arc, Mutex, OnceLock};
 use std::collections::HashMap;
-use anyhow::{anyhow, Result};
-use crate::policy::{Policy, PolicyInfo};
+use std::sync::{Arc, Mutex, OnceLock};
 
 // ============================================================================
 // In-Memory Policy Store (Thread-Safe)
@@ -22,7 +17,9 @@ use crate::policy::{Policy, PolicyInfo};
 static POLICY_STORE: OnceLock<Arc<Mutex<HashMap<String, Policy>>>> = OnceLock::new();
 
 fn get_store() -> Arc<Mutex<HashMap<String, Policy>>> {
-    POLICY_STORE.get_or_init(|| Arc::new(Mutex::new(HashMap::new()))).clone()
+    POLICY_STORE
+        .get_or_init(|| Arc::new(Mutex::new(HashMap::new())))
+        .clone()
 }
 
 // ============================================================================
@@ -64,8 +61,8 @@ pub struct PolicyGetResponse {
 fn compute_policy_hash(policy: &Policy) -> Result<String> {
     use sha3::{Digest, Sha3_256};
 
-    let json = serde_json::to_string(policy)
-        .map_err(|e| anyhow!("Failed to serialize policy: {}", e))?;
+    let json =
+        serde_json::to_string(policy).map_err(|e| anyhow!("Failed to serialize policy: {}", e))?;
 
     let mut hasher = Sha3_256::new();
     hasher.update(json.as_bytes());
@@ -77,7 +74,8 @@ fn compute_policy_hash(policy: &Policy) -> Result<String> {
 /// Stores a policy in the in-memory store
 fn store_policy(hash: String, policy: Policy) -> Result<()> {
     let store = get_store();
-    let mut map = store.lock()
+    let mut map = store
+        .lock()
         .map_err(|e| anyhow!("Failed to lock policy store: {}", e))?;
 
     map.insert(hash, policy);
@@ -87,7 +85,8 @@ fn store_policy(hash: String, policy: Policy) -> Result<()> {
 /// Retrieves a policy from the in-memory store
 fn get_policy(hash: &str) -> Result<Option<Policy>> {
     let store = get_store();
-    let map = store.lock()
+    let map = store
+        .lock()
         .map_err(|e| anyhow!("Failed to lock policy store: {}", e))?;
 
     Ok(map.get(hash).cloned())
@@ -104,25 +103,22 @@ pub async fn handle_policy_compile(
     Json(request): Json<PolicyCompileRequest>,
 ) -> Result<Json<PolicyCompileResponse>, StatusCode> {
     // Validate policy
-    request.policy.validate()
-        .map_err(|e| {
-            tracing::warn!("Policy validation failed: {}", e);
-            StatusCode::BAD_REQUEST
-        })?;
+    request.policy.validate().map_err(|e| {
+        tracing::warn!("Policy validation failed: {}", e);
+        StatusCode::BAD_REQUEST
+    })?;
 
     // Compute policy hash
-    let policy_hash = compute_policy_hash(&request.policy)
-        .map_err(|e| {
-            tracing::error!("Failed to compute policy hash: {}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
+    let policy_hash = compute_policy_hash(&request.policy).map_err(|e| {
+        tracing::error!("Failed to compute policy hash: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     // Store policy
-    store_policy(policy_hash.clone(), request.policy.clone())
-        .map_err(|e| {
-            tracing::error!("Failed to store policy: {}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
+    store_policy(policy_hash.clone(), request.policy.clone()).map_err(|e| {
+        tracing::error!("Failed to store policy: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     // Create policy info
     let policy_info = PolicyInfo {
@@ -147,11 +143,10 @@ pub async fn handle_policy_get(
     Path(policy_id): Path<String>,
 ) -> Result<Json<PolicyGetResponse>, StatusCode> {
     // Retrieve policy
-    let policy = get_policy(&policy_id)
-        .map_err(|e| {
-            tracing::error!("Failed to retrieve policy: {}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
+    let policy = get_policy(&policy_id).map_err(|e| {
+        tracing::error!("Failed to retrieve policy: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     match policy {
         Some(policy) => {

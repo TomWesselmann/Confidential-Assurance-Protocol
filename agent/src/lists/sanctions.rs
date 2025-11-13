@@ -52,9 +52,7 @@ pub fn compute_sanctions_root<P: AsRef<Path>>(
     csv_path: P,
 ) -> Result<(String, Vec<SanctionsEntry>), Box<dyn Error>> {
     let file = File::open(&csv_path)?;
-    let mut reader = ReaderBuilder::new()
-        .has_headers(true)
-        .from_reader(file);
+    let mut reader = ReaderBuilder::new().has_headers(true).from_reader(file);
 
     let mut entries = Vec::new();
     let mut hashes = Vec::new();
@@ -139,7 +137,8 @@ mod tests {
 
     #[test]
     fn sanctions_root_deterministic() {
-        let csv_content = "name,birthdate,nationality\nAli Hassan,1984-01-14,IR\nMaria Petrova,1973-05-22,RU\n";
+        let csv_content =
+            "name,birthdate,nationality\nAli Hassan,1984-01-14,IR\nMaria Petrova,1973-05-22,RU\n";
 
         let temp_csv = "/tmp/test_sanctions.csv";
         let mut file = File::create(temp_csv).unwrap();

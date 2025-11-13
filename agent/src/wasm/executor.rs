@@ -1,7 +1,6 @@
 /// WASM Executor - Orchestrates Bundle Verification
 ///
 /// Loads bundle files and executes WASM verifier with fallback to native.
-
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::path::Path;

@@ -7,7 +7,6 @@
 ///
 /// Note: These tests validate the TLS configuration module.
 /// Actual TLS termination would be handled by axum-server or ingress.
-
 use cap_agent::tls::{load_tls_config, CipherProfile, ClientCertValidation, TlsConfig, TlsVersion};
 
 #[test]
@@ -17,7 +16,7 @@ fn test_tls_config_load() {
 
     let config = load_tls_config(config_path).expect("Failed to load TLS config");
 
-    assert_eq!(config.require_mtls, true);
+    assert!(config.require_mtls);
     assert_eq!(config.tls_min_version, "1.2");
     assert_eq!(config.cipher_profile, "modern");
     assert_eq!(config.client_ca_bundle, "/etc/ssl/clients/ca.crt");
@@ -90,7 +89,6 @@ fn it_t1_mtls_required_without_cert() {
 
     if config.is_client_cert_required() && !has_client_cert {
         println!("✅ Connection without client cert rejected (403 Forbidden)");
-        assert!(true);
     } else {
         panic!("Expected rejection without client cert");
     }
@@ -117,7 +115,6 @@ fn it_t2_mtls_required_with_wrong_san() {
 
     if !config.validate_client_san(client_san) {
         println!("✅ Connection with wrong SAN rejected (403 Forbidden)");
-        assert!(true);
     } else {
         panic!("Expected rejection with wrong SAN");
     }
@@ -144,7 +141,6 @@ fn it_t3_mtls_required_with_valid_cert() {
 
     if config.is_client_cert_required() && config.validate_client_san(client_san) {
         println!("✅ Connection with valid cert and SAN accepted (200 OK)");
-        assert!(true);
     } else {
         panic!("Expected acceptance with valid cert and SAN");
     }
@@ -171,7 +167,6 @@ fn it_t4_optional_mtls_without_cert() {
 
     if !config.is_client_cert_required() || has_client_cert {
         println!("✅ Optional mTLS allows connection without cert (200 OK)");
-        assert!(true);
     }
 }
 

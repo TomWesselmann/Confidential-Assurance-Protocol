@@ -1,3 +1,4 @@
+use crate::crypto;
 /// Verifier Core – Pure Verification Logic
 ///
 /// This module provides portable, I/O-free verification logic that can be used
@@ -11,7 +12,6 @@
 /// - Deterministic verification results
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
-use crate::crypto;
 
 // ============================================================================
 // Core Types
@@ -111,7 +111,9 @@ pub struct VerifyReport {
 /// # Errors
 /// - Missing required fields (policy.hash, company_commitment_root)
 /// - Invalid hex format (not 0x-prefixed or wrong length)
-pub fn extract_statement_from_manifest(manifest_json: &serde_json::Value) -> Result<ProofStatement> {
+pub fn extract_statement_from_manifest(
+    manifest_json: &serde_json::Value,
+) -> Result<ProofStatement> {
     // Extract policy hash
     let policy_hash = manifest_json
         .get("policy")
@@ -172,7 +174,11 @@ fn validate_hex32(hex_str: &str, field_name: &str) -> Result<()> {
 
     let hex_part = &hex_str[2..];
     if hex_part.len() != 64 {
-        return Err(anyhow!("{}: expected 64 hex characters (32 bytes), got {}", field_name, hex_part.len()));
+        return Err(anyhow!(
+            "{}: expected 64 hex characters (32 bytes), got {}",
+            field_name,
+            hex_part.len()
+        ));
     }
 
     if !hex_part.chars().all(|c| c.is_ascii_hexdigit()) {
@@ -241,7 +247,10 @@ pub fn verify(
     let proof_hash_bytes = crypto::sha3_256(proof_bytes);
     let proof_hash = crypto::hex_lower_prefixed32(proof_hash_bytes);
 
-    details.insert("manifest_hash".to_string(), serde_json::json!(manifest_hash));
+    details.insert(
+        "manifest_hash".to_string(),
+        serde_json::json!(manifest_hash),
+    );
     details.insert("proof_hash".to_string(), serde_json::json!(proof_hash));
 
     // 2. Validate statement matches manifest
@@ -276,7 +285,10 @@ pub fn verify(
         checks_total += 1;
         // Note: Registry check requires external data (registry entries)
         // This is a placeholder - actual check needs registry data passed in
-        details.insert("registry_check".to_string(), serde_json::json!("not_implemented"));
+        details.insert(
+            "registry_check".to_string(),
+            serde_json::json!("not_implemented"),
+        );
         Some(false)
     } else {
         details.insert("registry_check".to_string(), serde_json::json!("disabled"));
@@ -285,13 +297,12 @@ pub fn verify(
 
     // 6. Determine overall status
     let all_required_passed = statement_valid && signature_valid;
-    let status = if all_required_passed {
-        "ok"
-    } else {
-        "fail"
-    }.to_string();
+    let status = if all_required_passed { "ok" } else { "fail" }.to_string();
 
-    details.insert("checks_passed".to_string(), serde_json::json!(checks_passed));
+    details.insert(
+        "checks_passed".to_string(),
+        serde_json::json!(checks_passed),
+    );
     details.insert("checks_total".to_string(), serde_json::json!(checks_total));
 
     Ok(VerifyReport {
@@ -332,7 +343,10 @@ fn validate_statement_matches_manifest(
     }
 
     // Check company commitment root
-    if let Some(root) = manifest.get("company_commitment_root").and_then(|r| r.as_str()) {
+    if let Some(root) = manifest
+        .get("company_commitment_root")
+        .and_then(|r| r.as_str())
+    {
         if root == stmt.company_commitment_root {
             checks.push(serde_json::json!({"field": "company_commitment_root", "status": "ok"}));
         } else {
@@ -346,7 +360,10 @@ fn validate_statement_matches_manifest(
         }
     }
 
-    details.insert("statement_validation".to_string(), serde_json::json!(checks));
+    details.insert(
+        "statement_validation".to_string(),
+        serde_json::json!(checks),
+    );
     Ok(all_ok)
 }
 
@@ -361,7 +378,10 @@ fn check_signature_presence(
         .map(|arr| !arr.is_empty())
         .unwrap_or(false);
 
-    details.insert("signature_present".to_string(), serde_json::json!(has_signatures));
+    details.insert(
+        "signature_present".to_string(),
+        serde_json::json!(has_signatures),
+    );
 
     if has_signatures {
         // Count signatures
@@ -384,7 +404,10 @@ fn check_timestamp_in_manifest(
     // Check if time_anchor field exists
     let has_time_anchor = manifest.get("time_anchor").is_some();
 
-    details.insert("timestamp_present".to_string(), serde_json::json!(has_time_anchor));
+    details.insert(
+        "timestamp_present".to_string(),
+        serde_json::json!(has_time_anchor),
+    );
 
     if !has_time_anchor {
         // No timestamp anchor present - this is acceptable
@@ -403,8 +426,14 @@ fn check_timestamp_in_manifest(
     let has_private = anchor.get("private").is_some();
     let has_public = anchor.get("public").is_some();
 
-    details.insert("dual_anchor_private".to_string(), serde_json::json!(has_private));
-    details.insert("dual_anchor_public".to_string(), serde_json::json!(has_public));
+    details.insert(
+        "dual_anchor_private".to_string(),
+        serde_json::json!(has_private),
+    );
+    details.insert(
+        "dual_anchor_public".to_string(),
+        serde_json::json!(has_public),
+    );
 
     // Validate private anchor consistency if present
     if has_private {
@@ -416,7 +445,9 @@ fn check_timestamp_in_manifest(
                 if priv_tip != anc_tip {
                     details.insert(
                         "dual_anchor_error".to_string(),
-                        serde_json::json!("Private anchor audit_tip_hex does not match time_anchor.audit_tip_hex"),
+                        serde_json::json!(
+                            "Private anchor audit_tip_hex does not match time_anchor.audit_tip_hex"
+                        ),
                     );
                     return false;
                 }
@@ -494,8 +525,14 @@ mod tests {
         let manifest = mock_manifest();
         let stmt = extract_statement_from_manifest(&manifest).unwrap();
 
-        assert_eq!(stmt.policy_hash, "0x0000000000000000000000000000000000000000000000000000000000000004");
-        assert_eq!(stmt.company_commitment_root, "0x0000000000000000000000000000000000000000000000000000000000000003");
+        assert_eq!(
+            stmt.policy_hash,
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+        );
+        assert_eq!(
+            stmt.company_commitment_root,
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+        );
         assert!(stmt.sanctions_root.is_none());
         assert!(stmt.jurisdiction_root.is_none());
     }
@@ -507,7 +544,10 @@ mod tests {
 
         let result = extract_statement_from_manifest(&manifest);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Missing policy.hash"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Missing policy.hash"));
     }
 
     #[test]
@@ -570,7 +610,8 @@ mod tests {
 
         // Create statement with different policy hash
         let mut stmt = extract_statement_from_manifest(&manifest).unwrap();
-        stmt.policy_hash = "0x9999999999999999999999999999999999999999999999999999999999999999".to_string();
+        stmt.policy_hash =
+            "0x9999999999999999999999999999999999999999999999999999999999999999".to_string();
 
         let opts = VerifyOptions {
             check_timestamp: false,
@@ -583,7 +624,11 @@ mod tests {
 
         // Check details for mismatch
         let details = report.details.as_object().unwrap();
-        let validation = details.get("statement_validation").unwrap().as_array().unwrap();
+        let validation = details
+            .get("statement_validation")
+            .unwrap()
+            .as_array()
+            .unwrap();
         let policy_check = &validation[0];
         assert_eq!(policy_check["status"], "mismatch");
     }

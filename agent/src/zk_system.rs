@@ -115,7 +115,11 @@ pub fn backend_from_cli(backend_str: &str) -> Result<ZkBackend, Box<dyn Error>> 
         "mock" => Ok(ZkBackend::Mock),
         "zkvm" | "zk-vm" | "risc0" => Ok(ZkBackend::ZkVm),
         "halo2" => Ok(ZkBackend::Halo2),
-        _ => Err(format!("Unknown ZK backend: '{}'. Available: mock, zkvm, halo2", backend_str).into()),
+        _ => Err(format!(
+            "Unknown ZK backend: '{}'. Available: mock, zkvm, halo2",
+            backend_str
+        )
+        .into()),
     }
 }
 
@@ -198,7 +202,10 @@ impl SimplifiedZK {
                     // Mock-Check: Prüfe ob UBO-Hashes nicht in Sanctions-Liste vorkommen
                     if let Some(ref sanctions_list) = witness.sanctions_list {
                         // Kein UBO darf auf der Sanktionsliste sein
-                        !witness.ubos.iter().any(|ubo_hash| sanctions_list.contains(ubo_hash))
+                        !witness
+                            .ubos
+                            .iter()
+                            .any(|ubo_hash| sanctions_list.contains(ubo_hash))
                     } else {
                         // Wenn keine Sanctions-Liste vorhanden, gilt Check als bestanden
                         true
@@ -283,7 +290,11 @@ impl ProofSystem for SimplifiedZK {
             system: self.name.clone(),
             proof_data: proof_bytes,
             public_inputs: statement.clone(),
-            status: if all_passed { "ok".to_string() } else { "failed".to_string() },
+            status: if all_passed {
+                "ok".to_string()
+            } else {
+                "failed".to_string()
+            },
             created_at: chrono::Utc::now().to_rfc3339(),
         })
     }
@@ -352,9 +363,7 @@ pub fn save_zk_proof_json<P: AsRef<std::path::Path>>(
 ///
 /// # Argumente
 /// * `path` - Pfad zur Datei
-pub fn load_zk_proof_json<P: AsRef<std::path::Path>>(
-    path: P,
-) -> Result<ZkProof, Box<dyn Error>> {
+pub fn load_zk_proof_json<P: AsRef<std::path::Path>>(path: P) -> Result<ZkProof, Box<dyn Error>> {
     let json = std::fs::read_to_string(path)?;
     let proof: ZkProof = serde_json::from_str(&json)?;
     Ok(proof)
@@ -381,9 +390,7 @@ pub fn save_zk_proof_dat<P: AsRef<std::path::Path>>(
 ///
 /// # Argumente
 /// * `path` - Pfad zur Datei
-pub fn load_zk_proof_dat<P: AsRef<std::path::Path>>(
-    path: P,
-) -> Result<ZkProof, Box<dyn Error>> {
+pub fn load_zk_proof_dat<P: AsRef<std::path::Path>>(path: P) -> Result<ZkProof, Box<dyn Error>> {
     use base64::{engine::general_purpose, Engine as _};
 
     let encoded = std::fs::read_to_string(path)?;
@@ -533,7 +540,10 @@ mod tests {
         // Deserialize zurück
         let deserialized: Statement = serde_json::from_str(&json_with_roots).unwrap();
         assert_eq!(deserialized.sanctions_root, Some("0x3a1f02bb".to_string()));
-        assert_eq!(deserialized.jurisdiction_root, Some("0x0c3f99aa".to_string()));
+        assert_eq!(
+            deserialized.jurisdiction_root,
+            Some("0x0c3f99aa".to_string())
+        );
 
         // Test ohne optionale Roots
         let statement_no_roots = Statement {

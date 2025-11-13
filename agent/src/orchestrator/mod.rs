@@ -1,20 +1,21 @@
+pub mod drift_analysis;
+pub mod enforcer; // Week 6: Adaptive Enforcement
+pub mod metrics; // Week 6: Prometheus Metrics
+pub mod planner;
 /// Adaptive Proof Orchestrator - Week 5 Track B1
 ///
 /// Provides IR-controlled activation of rules with deterministic ordering.
 /// Consists of two main components:
 /// - Selector: Evaluates predicates and determines active rules
 /// - Planner: Creates cost-based deterministic execution plan
+pub mod selector; // Week 6: Advanced Drift Analysis
 
-pub mod selector;
-pub mod planner;
-pub mod enforcer;  // Week 6: Adaptive Enforcement
-pub mod metrics;   // Week 6: Prometheus Metrics
-pub mod drift_analysis;  // Week 6: Advanced Drift Analysis
-
-pub use selector::{Selector, PredicateEvaluator, RuleSelector};
-pub use planner::{Planner, ExecutionPlan, PlanStep};
-pub use enforcer::{Enforcer, EnforceOptions, Verdict, VerdictPair, DriftTracker, DriftStats};
-pub use drift_analysis::{DriftAnalyzer, DriftEvent, DriftRingBuffer, DriftStats as DriftAnalysisStats};
+pub use drift_analysis::{
+    DriftAnalyzer, DriftEvent, DriftRingBuffer, DriftStats as DriftAnalysisStats,
+};
+pub use enforcer::{DriftStats, DriftTracker, EnforceOptions, Enforcer, Verdict, VerdictPair};
+pub use planner::{ExecutionPlan, PlanStep, Planner};
+pub use selector::{PredicateEvaluator, RuleSelector, Selector};
 
 use crate::policy_v2::types::IrV1;
 use anyhow::Result;
@@ -72,7 +73,7 @@ impl Orchestrator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::policy_v2::types::{IrV1, IrRule, IrExpression};
+    use crate::policy_v2::types::{IrExpression, IrRule, IrV1};
 
     #[test]
     fn test_orchestrator_no_adaptivity() {
@@ -80,14 +81,14 @@ mod tests {
             ir_version: "1.0".to_string(),
             policy_id: "test.v1".to_string(),
             policy_hash: "sha3-256:abc".to_string(),
-            rules: vec![
-                IrRule {
-                    id: "rule1".to_string(),
-                    op: "eq".to_string(),
-                    lhs: IrExpression::Var { var: "x".to_string() },
-                    rhs: IrExpression::Literal(serde_json::json!(1)),
+            rules: vec![IrRule {
+                id: "rule1".to_string(),
+                op: "eq".to_string(),
+                lhs: IrExpression::Var {
+                    var: "x".to_string(),
                 },
-            ],
+                rhs: IrExpression::Literal(serde_json::json!(1)),
+            }],
             adaptivity: None,
             ir_hash: "sha3-256:def".to_string(),
         };

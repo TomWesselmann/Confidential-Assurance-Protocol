@@ -2,10 +2,10 @@
 //!
 //! Tests for tamper detection and chain integrity verification.
 
-use cap_agent::audit::{AuditChain, AuditEvent, verify_chain};
-use tempfile::NamedTempFile;
-use std::io::Write;
+use cap_agent::audit::{verify_chain, AuditChain, AuditEvent};
 use std::fs::OpenOptions;
+use std::io::Write;
+use tempfile::NamedTempFile;
 
 #[test]
 fn test_tamper_modify_event_detected() {
@@ -13,9 +13,15 @@ fn test_tamper_modify_event_detected() {
     let mut chain = AuditChain::new(temp_file.path()).unwrap();
 
     // Append events
-    chain.append("event_1".to_string(), None, None, None, None, None).unwrap();
-    chain.append("event_2".to_string(), None, None, None, None, None).unwrap();
-    chain.append("event_3".to_string(), None, None, None, None, None).unwrap();
+    chain
+        .append("event_1".to_string(), None, None, None, None, None)
+        .unwrap();
+    chain
+        .append("event_2".to_string(), None, None, None, None, None)
+        .unwrap();
+    chain
+        .append("event_3".to_string(), None, None, None, None, None)
+        .unwrap();
 
     // Read all events
     let content = std::fs::read_to_string(temp_file.path()).unwrap();
@@ -27,7 +33,12 @@ fn test_tamper_modify_event_detected() {
 
     // Rewrite file with tampered event
     std::fs::write(temp_file.path(), "").unwrap(); // Clear file
-    let mut file = OpenOptions::new().create(true).write(true).open(temp_file.path()).unwrap();
+    let mut file = OpenOptions::new()
+        .create(true)
+        .truncate(true)
+        .write(true)
+        .open(temp_file.path())
+        .unwrap();
 
     writeln!(file, "{}", lines[0]).unwrap(); // Original event 1
     writeln!(file, "{}", serde_json::to_string(&event2).unwrap()).unwrap(); // Tampered event 2
@@ -47,9 +58,15 @@ fn test_tamper_break_chain_detected() {
     let mut chain = AuditChain::new(temp_file.path()).unwrap();
 
     // Append events
-    chain.append("event_1".to_string(), None, None, None, None, None).unwrap();
-    chain.append("event_2".to_string(), None, None, None, None, None).unwrap();
-    chain.append("event_3".to_string(), None, None, None, None, None).unwrap();
+    chain
+        .append("event_1".to_string(), None, None, None, None, None)
+        .unwrap();
+    chain
+        .append("event_2".to_string(), None, None, None, None, None)
+        .unwrap();
+    chain
+        .append("event_3".to_string(), None, None, None, None, None)
+        .unwrap();
 
     // Read all events
     let content = std::fs::read_to_string(temp_file.path()).unwrap();
@@ -64,7 +81,12 @@ fn test_tamper_break_chain_detected() {
 
     // Rewrite file
     std::fs::write(temp_file.path(), "").unwrap();
-    let mut file = OpenOptions::new().create(true).write(true).open(temp_file.path()).unwrap();
+    let mut file = OpenOptions::new()
+        .create(true)
+        .truncate(true)
+        .write(true)
+        .open(temp_file.path())
+        .unwrap();
 
     writeln!(file, "{}", lines[0]).unwrap();
     writeln!(file, "{}", lines[1]).unwrap();
@@ -84,9 +106,15 @@ fn test_tamper_reorder_events_detected() {
     let mut chain = AuditChain::new(temp_file.path()).unwrap();
 
     // Append events with distinct content
-    chain.append("event_A".to_string(), None, None, None, None, None).unwrap();
-    chain.append("event_B".to_string(), None, None, None, None, None).unwrap();
-    chain.append("event_C".to_string(), None, None, None, None, None).unwrap();
+    chain
+        .append("event_A".to_string(), None, None, None, None, None)
+        .unwrap();
+    chain
+        .append("event_B".to_string(), None, None, None, None, None)
+        .unwrap();
+    chain
+        .append("event_C".to_string(), None, None, None, None, None)
+        .unwrap();
 
     // Read all events
     let content = std::fs::read_to_string(temp_file.path()).unwrap();
@@ -94,7 +122,11 @@ fn test_tamper_reorder_events_detected() {
 
     // Tamper: reorder events (swap event_B and event_C)
     std::fs::write(temp_file.path(), "").unwrap();
-    let mut file = OpenOptions::new().create(true).write(true).open(temp_file.path()).unwrap();
+    let mut file = OpenOptions::new()
+        .create(true)
+        .write(true)
+        .open(temp_file.path())
+        .unwrap();
 
     writeln!(file, "{}", lines[0]).unwrap(); // event_A
     writeln!(file, "{}", lines[2]).unwrap(); // event_C (was 3rd)
@@ -114,9 +146,15 @@ fn test_tamper_delete_middle_event_detected() {
     let mut chain = AuditChain::new(temp_file.path()).unwrap();
 
     // Append events
-    chain.append("event_1".to_string(), None, None, None, None, None).unwrap();
-    chain.append("event_2".to_string(), None, None, None, None, None).unwrap();
-    chain.append("event_3".to_string(), None, None, None, None, None).unwrap();
+    chain
+        .append("event_1".to_string(), None, None, None, None, None)
+        .unwrap();
+    chain
+        .append("event_2".to_string(), None, None, None, None, None)
+        .unwrap();
+    chain
+        .append("event_3".to_string(), None, None, None, None, None)
+        .unwrap();
 
     // Read all events
     let content = std::fs::read_to_string(temp_file.path()).unwrap();
@@ -124,10 +162,14 @@ fn test_tamper_delete_middle_event_detected() {
 
     // Tamper: delete middle event
     std::fs::write(temp_file.path(), "").unwrap();
-    let mut file = OpenOptions::new().create(true).write(true).open(temp_file.path()).unwrap();
+    let mut file = OpenOptions::new()
+        .create(true)
+        .write(true)
+        .open(temp_file.path())
+        .unwrap();
 
     writeln!(file, "{}", lines[0]).unwrap(); // event_1
-    // Skip event_2 (deleted)
+                                             // Skip event_2 (deleted)
     writeln!(file, "{}", lines[2]).unwrap(); // event_3
 
     // Verify should detect broken chain
@@ -145,7 +187,9 @@ fn test_no_tamper_verification_passes() {
 
     // Append events
     for i in 0..50 {
-        chain.append(format!("event_{}", i), None, None, None, None, None).unwrap();
+        chain
+            .append(format!("event_{}", i), None, None, None, None, None)
+            .unwrap();
     }
 
     // Verify should pass

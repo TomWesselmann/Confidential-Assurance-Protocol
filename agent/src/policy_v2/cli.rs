@@ -37,7 +37,11 @@ pub enum PolicyCommand {
 
 pub fn run_lint(file: &str, strict: bool) -> Result<i32> {
     let policy = yaml_parser::parse_yaml(file)?;
-    let mode = if strict { LintMode::Strict } else { LintMode::Relaxed };
+    let mode = if strict {
+        LintMode::Strict
+    } else {
+        LintMode::Relaxed
+    };
     let diagnostics = lint(&policy, mode);
 
     for diag in &diagnostics {

@@ -36,10 +36,10 @@
 //! - All with TIER = 1 or 2
 //! - No sanctioned suppliers (SANCTION_FLAG = '')
 
-use std::env;
-use std::process::Command;
-use std::fs;
 use serde_json::Value;
+use std::env;
+use std::fs;
+use std::process::Command;
 
 /// Helper: Get required environment variable or panic with clear message
 fn get_env_or_panic(key: &str) -> String {
@@ -88,11 +88,15 @@ fn verify_via_api(context_json_path: &str) -> Result<Value, String> {
         .map_err(|e| format!("Failed to read context file: {}", e))?;
 
     let output = Command::new("curl")
-        .args(&[
-            "-s", "-k",  // Silent, insecure (for staging TLS)
-            "-H", &format!("Authorization: Bearer {}", api_token),
-            "-H", "Content-Type: application/json",
-            "-d", &context_data,
+        .args([
+            "-s",
+            "-k", // Silent, insecure (for staging TLS)
+            "-H",
+            &format!("Authorization: Bearer {}", api_token),
+            "-H",
+            "Content-Type: application/json",
+            "-d",
+            &context_data,
             &verify_url,
         ])
         .output()
@@ -107,8 +111,12 @@ fn verify_via_api(context_json_path: &str) -> Result<Value, String> {
     }
 
     let response_text = String::from_utf8_lossy(&output.stdout);
-    serde_json::from_str(&response_text)
-        .map_err(|e| format!("Failed to parse API response as JSON: {}\nResponse: {}", e, response_text))
+    serde_json::from_str(&response_text).map_err(|e| {
+        format!(
+            "Failed to parse API response as JSON: {}\nResponse: {}",
+            e, response_text
+        )
+    })
 }
 
 /// Helper: Query SAP table via OData (for idempotency validation)
@@ -125,9 +133,11 @@ fn query_sap_table(table: &str, filter: &str) -> Result<Value, String> {
     );
 
     let output = Command::new("curl")
-        .args(&[
-            "-s", "-k",  // Silent, insecure
-            "-u", &format!("{}:{}", sap_user, sap_password),
+        .args([
+            "-s",
+            "-k", // Silent, insecure
+            "-u",
+            &format!("{}:{}", sap_user, sap_password),
             &query_url,
         ])
         .output()
@@ -142,8 +152,12 @@ fn query_sap_table(table: &str, filter: &str) -> Result<Value, String> {
     }
 
     let response_text = String::from_utf8_lossy(&output.stdout);
-    serde_json::from_str(&response_text)
-        .map_err(|e| format!("Failed to parse OData response as JSON: {}\nResponse: {}", e, response_text))
+    serde_json::from_str(&response_text).map_err(|e| {
+        format!(
+            "Failed to parse OData response as JSON: {}\nResponse: {}",
+            e, response_text
+        )
+    })
 }
 
 #[test]
@@ -155,7 +169,13 @@ fn test_adapter_e2e_pull_verify_writeback() {
     let sap_url = get_env_or_panic("SAP_URL");
     let sap_client = get_env_or_panic("SAP_CLIENT");
     let sap_user = get_env_or_panic("SAP_USER");
-    let run_id = format!("TEST_RUN_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs());
+    let run_id = format!(
+        "TEST_RUN_{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+    );
 
     println!("📋 Test Configuration:");
     println!("  SAP URL: {}", sap_url);
@@ -169,12 +189,18 @@ fn test_adapter_e2e_pull_verify_writeback() {
 
     let pull_result = run_cap_adapter(&[
         "pull",
-        "--odata", &sap_url,
-        "--client", &sap_client,
-        "--user", &sap_user,
-        "--password-env", "SAP_PASSWORD",
-        "--filter", "TIER le 2",
-        "--out", context_json_path,
+        "--odata",
+        &sap_url,
+        "--client",
+        &sap_client,
+        "--user",
+        &sap_user,
+        "--password-env",
+        "SAP_PASSWORD",
+        "--filter",
+        "TIER le 2",
+        "--out",
+        context_json_path,
     ]);
 
     assert!(pull_result.is_ok(), "Pull failed: {:?}", pull_result.err());
@@ -182,26 +208,51 @@ fn test_adapter_e2e_pull_verify_writeback() {
 
     // Validate context.json
     let context_data: Value = serde_json::from_str(
-        &fs::read_to_string(context_json_path).expect("Failed to read context.json")
-    ).expect("Failed to parse context.json");
+        &fs::read_to_string(context_json_path).expect("Failed to read context.json"),
+    )
+    .expect("Failed to parse context.json");
 
     assert_eq!(context_data["policy_id"], "lksg.v1", "Policy ID mismatch");
-    assert!(context_data["context"]["supplier_hashes"].is_array(), "supplier_hashes not an array");
+    assert!(
+        context_data["context"]["supplier_hashes"].is_array(),
+        "supplier_hashes not an array"
+    );
 
-    let supplier_count = context_data["context"]["supplier_hashes"].as_array().unwrap().len();
-    assert!(supplier_count >= 10, "Expected at least 10 suppliers, got {}", supplier_count);
+    let supplier_count = context_data["context"]["supplier_hashes"]
+        .as_array()
+        .unwrap()
+        .len();
+    assert!(
+        supplier_count >= 10,
+        "Expected at least 10 suppliers, got {}",
+        supplier_count
+    );
     println!("📊 Pulled {} supplier records", supplier_count);
 
     // Phase 2: Verify via CAP API
     println!("\n🔍 Phase 2: Verifying via CAP API...");
     let verify_result = verify_via_api(context_json_path);
 
-    assert!(verify_result.is_ok(), "Verification failed: {:?}", verify_result.err());
+    assert!(
+        verify_result.is_ok(),
+        "Verification failed: {:?}",
+        verify_result.err()
+    );
     let verify_response = verify_result.unwrap();
 
-    assert_eq!(verify_response["result"], "ok", "Verification result not ok: {:?}", verify_response);
-    assert!(verify_response["manifest_hash"].is_string(), "manifest_hash missing");
-    assert!(verify_response["proof_hash"].is_string(), "proof_hash missing");
+    assert_eq!(
+        verify_response["result"], "ok",
+        "Verification result not ok: {:?}",
+        verify_response
+    );
+    assert!(
+        verify_response["manifest_hash"].is_string(),
+        "manifest_hash missing"
+    );
+    assert!(
+        verify_response["proof_hash"].is_string(),
+        "proof_hash missing"
+    );
 
     let manifest_hash = verify_response["manifest_hash"].as_str().unwrap();
     let proof_hash = verify_response["proof_hash"].as_str().unwrap();
@@ -211,23 +262,33 @@ fn test_adapter_e2e_pull_verify_writeback() {
 
     // Save verify response for writeback
     let verify_json_path = "/tmp/adapter_test_verify.json";
-    fs::write(verify_json_path, verify_response.to_string())
-        .expect("Failed to write verify.json");
+    fs::write(verify_json_path, verify_response.to_string()).expect("Failed to write verify.json");
 
     // Phase 3: Writeback to SAP
     println!("\n📝 Phase 3: Writing back to SAP...");
     let writeback_result = run_cap_adapter(&[
         "writeback",
-        "--in", verify_json_path,
-        "--odata", &sap_url,
-        "--table", "Z_CAP_SUPPLIER_STATUS",
-        "--idempotency", &run_id,
-        "--user", &sap_user,
-        "--password-env", "SAP_PASSWORD",
-        "--batch-size", "10",
+        "--in",
+        verify_json_path,
+        "--odata",
+        &sap_url,
+        "--table",
+        "Z_CAP_SUPPLIER_STATUS",
+        "--idempotency",
+        &run_id,
+        "--user",
+        &sap_user,
+        "--password-env",
+        "SAP_PASSWORD",
+        "--batch-size",
+        "10",
     ]);
 
-    assert!(writeback_result.is_ok(), "Writeback failed: {:?}", writeback_result.err());
+    assert!(
+        writeback_result.is_ok(),
+        "Writeback failed: {:?}",
+        writeback_result.err()
+    );
     println!("✅ Writeback successful");
 
     // Phase 4: Validate writeback via OData query
@@ -235,19 +296,37 @@ fn test_adapter_e2e_pull_verify_writeback() {
     let query_filter = format!("RUN_ID eq '{}'", run_id);
     let query_result = query_sap_table("Z_CAP_SUPPLIER_STATUS", &query_filter);
 
-    assert!(query_result.is_ok(), "Query failed: {:?}", query_result.err());
+    assert!(
+        query_result.is_ok(),
+        "Query failed: {:?}",
+        query_result.err()
+    );
     let query_response = query_result.unwrap();
 
-    let results = query_response["d"]["results"].as_array().expect("Results not an array");
-    assert_eq!(results.len(), supplier_count, "Record count mismatch: expected {}, got {}", supplier_count, results.len());
+    let results = query_response["d"]["results"]
+        .as_array()
+        .expect("Results not an array");
+    assert_eq!(
+        results.len(),
+        supplier_count,
+        "Record count mismatch: expected {}, got {}",
+        supplier_count,
+        results.len()
+    );
     println!("📊 Validated {} records in SAP", results.len());
 
     // Validate audit trail fields
     for record in results {
         assert_eq!(record["RUN_ID"], run_id, "RUN_ID mismatch");
-        assert_eq!(record["MANIFEST_HASH"], manifest_hash, "MANIFEST_HASH mismatch");
+        assert_eq!(
+            record["MANIFEST_HASH"], manifest_hash,
+            "MANIFEST_HASH mismatch"
+        );
         // Note: POLICY_HASH and IR_HASH validation would require parsing manifest
-        assert!(record["VERDICT"].as_str().unwrap() == "ok", "Verdict not ok");
+        assert!(
+            record["VERDICT"].as_str().unwrap() == "ok",
+            "Verdict not ok"
+        );
     }
     println!("✅ Audit trail validated");
 
@@ -262,7 +341,13 @@ fn test_adapter_idempotency() {
     let sap_url = get_env_or_panic("SAP_URL");
     let sap_client = get_env_or_panic("SAP_CLIENT");
     let sap_user = get_env_or_panic("SAP_USER");
-    let run_id = format!("IDEMPOTENCY_TEST_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs());
+    let run_id = format!(
+        "IDEMPOTENCY_TEST_{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+    );
 
     println!("📋 Run ID: {}", run_id);
 
@@ -273,61 +358,97 @@ fn test_adapter_idempotency() {
 
     run_cap_adapter(&[
         "pull",
-        "--odata", &sap_url,
-        "--client", &sap_client,
-        "--user", &sap_user,
-        "--password-env", "SAP_PASSWORD",
-        "--filter", "TIER le 2",
-        "--out", context_json_path,
-    ]).expect("Pull failed");
+        "--odata",
+        &sap_url,
+        "--client",
+        &sap_client,
+        "--user",
+        &sap_user,
+        "--password-env",
+        "SAP_PASSWORD",
+        "--filter",
+        "TIER le 2",
+        "--out",
+        context_json_path,
+    ])
+    .expect("Pull failed");
 
     let verify_response = verify_via_api(context_json_path).expect("Verify failed");
     fs::write(verify_json_path, verify_response.to_string()).expect("Failed to write verify.json");
 
-    let supplier_count = verify_response["context"]["supplier_hashes"].as_array().unwrap().len();
+    let supplier_count = verify_response["context"]["supplier_hashes"]
+        .as_array()
+        .unwrap()
+        .len();
     println!("📊 Using {} suppliers for test", supplier_count);
 
     // First writeback
     println!("\n📝 First writeback (Run ID: {})...", run_id);
     run_cap_adapter(&[
         "writeback",
-        "--in", verify_json_path,
-        "--odata", &sap_url,
-        "--table", "Z_CAP_SUPPLIER_STATUS",
-        "--idempotency", &run_id,
-        "--user", &sap_user,
-        "--password-env", "SAP_PASSWORD",
-        "--batch-size", "10",
-    ]).expect("First writeback failed");
+        "--in",
+        verify_json_path,
+        "--odata",
+        &sap_url,
+        "--table",
+        "Z_CAP_SUPPLIER_STATUS",
+        "--idempotency",
+        &run_id,
+        "--user",
+        &sap_user,
+        "--password-env",
+        "SAP_PASSWORD",
+        "--batch-size",
+        "10",
+    ])
+    .expect("First writeback failed");
 
     // Query SAP after first writeback
     let query_filter_1 = format!("RUN_ID eq '{}'", run_id);
-    let query_result_1 = query_sap_table("Z_CAP_SUPPLIER_STATUS", &query_filter_1).expect("Query 1 failed");
+    let query_result_1 =
+        query_sap_table("Z_CAP_SUPPLIER_STATUS", &query_filter_1).expect("Query 1 failed");
     let count_1 = query_result_1["d"]["results"].as_array().unwrap().len();
 
-    assert_eq!(count_1, supplier_count, "First writeback: expected {} records, got {}", supplier_count, count_1);
+    assert_eq!(
+        count_1, supplier_count,
+        "First writeback: expected {} records, got {}",
+        supplier_count, count_1
+    );
     println!("✅ First writeback: {} records", count_1);
 
     // Second writeback (same RUN_ID)
     println!("\n📝 Second writeback (SAME Run ID: {})...", run_id);
     run_cap_adapter(&[
         "writeback",
-        "--in", verify_json_path,
-        "--odata", &sap_url,
-        "--table", "Z_CAP_SUPPLIER_STATUS",
-        "--idempotency", &run_id,  // SAME RUN_ID
-        "--user", &sap_user,
-        "--password-env", "SAP_PASSWORD",
-        "--batch-size", "10",
-    ]).expect("Second writeback failed");
+        "--in",
+        verify_json_path,
+        "--odata",
+        &sap_url,
+        "--table",
+        "Z_CAP_SUPPLIER_STATUS",
+        "--idempotency",
+        &run_id, // SAME RUN_ID
+        "--user",
+        &sap_user,
+        "--password-env",
+        "SAP_PASSWORD",
+        "--batch-size",
+        "10",
+    ])
+    .expect("Second writeback failed");
 
     // Query SAP after second writeback
     let query_filter_2 = format!("RUN_ID eq '{}'", run_id);
-    let query_result_2 = query_sap_table("Z_CAP_SUPPLIER_STATUS", &query_filter_2).expect("Query 2 failed");
+    let query_result_2 =
+        query_sap_table("Z_CAP_SUPPLIER_STATUS", &query_filter_2).expect("Query 2 failed");
     let count_2 = query_result_2["d"]["results"].as_array().unwrap().len();
 
     // CRITICAL: Count should still be supplier_count, NOT 2 * supplier_count
-    assert_eq!(count_2, supplier_count, "Idempotency FAILED: expected {} records (no duplicates), got {}", supplier_count, count_2);
+    assert_eq!(
+        count_2, supplier_count,
+        "Idempotency FAILED: expected {} records (no duplicates), got {}",
+        supplier_count, count_2
+    );
     println!("✅ Second writeback: {} records (no duplicates)", count_2);
 
     println!("\n🎉 Idempotency Test PASSED");
@@ -346,7 +467,7 @@ fn test_adapter_rate_limiting() {
     println!("  This test deliberately triggers rate limits to verify retry logic.");
 
     // Configure adapter with very low rate limit
-    env::set_var("ADAPTER_RATE_LIMIT", "1");  // 1 req/s
+    env::set_var("ADAPTER_RATE_LIMIT", "1"); // 1 req/s
     env::set_var("ADAPTER_RETRY_MAX", "3");
 
     // Pull multiple times rapidly
@@ -360,12 +481,18 @@ fn test_adapter_rate_limiting() {
 
         let pull_result = run_cap_adapter(&[
             "pull",
-            "--odata", &sap_url,
-            "--client", &sap_client,
-            "--user", &sap_user,
-            "--password-env", "SAP_PASSWORD",
-            "--filter", "TIER le 2",
-            "--out", &context_json_path,
+            "--odata",
+            &sap_url,
+            "--client",
+            &sap_client,
+            "--user",
+            &sap_user,
+            "--password-env",
+            "SAP_PASSWORD",
+            "--filter",
+            "TIER le 2",
+            "--out",
+            &context_json_path,
         ]);
 
         match pull_result {
@@ -397,10 +524,17 @@ fn test_adapter_rate_limiting() {
     println!("  Retries/Rate limits: {}", retry_count);
 
     // We expect at least some retries due to rate limiting
-    assert!(retry_count > 0, "Expected rate limiting to be triggered, but no retries detected");
+    assert!(
+        retry_count > 0,
+        "Expected rate limiting to be triggered, but no retries detected"
+    );
 
     // But all requests should eventually succeed (with retries)
-    assert!(success_count >= 3, "Expected at least 3 successful pulls with retry logic, got {}", success_count);
+    assert!(
+        success_count >= 3,
+        "Expected at least 3 successful pulls with retry logic, got {}",
+        success_count
+    );
 
     println!("✅ Rate limiting test PASSED (adapter respects rate limits and retries)");
 }
@@ -413,7 +547,13 @@ fn test_adapter_audit_trail() {
     let sap_url = get_env_or_panic("SAP_URL");
     let sap_client = get_env_or_panic("SAP_CLIENT");
     let sap_user = get_env_or_panic("SAP_USER");
-    let run_id = format!("AUDIT_TEST_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs());
+    let run_id = format!(
+        "AUDIT_TEST_{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+    );
     let audit_log_path = "/tmp/adapter_audit_test.jsonl";
 
     println!("📋 Run ID: {}", run_id);
@@ -429,14 +569,22 @@ fn test_adapter_audit_trail() {
     println!("\n📥 Phase 1: Pull with audit logging...");
     run_cap_adapter(&[
         "pull",
-        "--odata", &sap_url,
-        "--client", &sap_client,
-        "--user", &sap_user,
-        "--password-env", "SAP_PASSWORD",
-        "--filter", "TIER le 2",
-        "--out", context_json_path,
-        "--audit", audit_log_path,
-    ]).expect("Pull failed");
+        "--odata",
+        &sap_url,
+        "--client",
+        &sap_client,
+        "--user",
+        &sap_user,
+        "--password-env",
+        "SAP_PASSWORD",
+        "--filter",
+        "TIER le 2",
+        "--out",
+        context_json_path,
+        "--audit",
+        audit_log_path,
+    ])
+    .expect("Pull failed");
 
     println!("\n🔍 Phase 2: Verify...");
     let verify_response = verify_via_api(context_json_path).expect("Verify failed");
@@ -445,22 +593,35 @@ fn test_adapter_audit_trail() {
     println!("\n📝 Phase 3: Writeback with audit logging...");
     run_cap_adapter(&[
         "writeback",
-        "--in", verify_json_path,
-        "--odata", &sap_url,
-        "--table", "Z_CAP_SUPPLIER_STATUS",
-        "--idempotency", &run_id,
-        "--user", &sap_user,
-        "--password-env", "SAP_PASSWORD",
-        "--batch-size", "10",
-        "--audit", audit_log_path,
-    ]).expect("Writeback failed");
+        "--in",
+        verify_json_path,
+        "--odata",
+        &sap_url,
+        "--table",
+        "Z_CAP_SUPPLIER_STATUS",
+        "--idempotency",
+        &run_id,
+        "--user",
+        &sap_user,
+        "--password-env",
+        "SAP_PASSWORD",
+        "--batch-size",
+        "10",
+        "--audit",
+        audit_log_path,
+    ])
+    .expect("Writeback failed");
 
     // Read and validate audit log
     println!("\n🔍 Validating audit log...");
     let audit_content = fs::read_to_string(audit_log_path).expect("Failed to read audit log");
     let audit_lines: Vec<&str> = audit_content.lines().collect();
 
-    assert!(audit_lines.len() >= 5, "Expected at least 5 audit events, got {}", audit_lines.len());
+    assert!(
+        audit_lines.len() >= 5,
+        "Expected at least 5 audit events, got {}",
+        audit_lines.len()
+    );
     println!("📊 Audit log contains {} events", audit_lines.len());
 
     // Parse and validate audit events
@@ -475,26 +636,50 @@ fn test_adapter_audit_trail() {
             .unwrap_or_else(|e| panic!("Failed to parse audit line {}: {}\nLine: {}", i, e, line));
 
         // Validate common fields
-        assert!(event["timestamp"].is_string(), "Audit line {}: timestamp missing", i);
-        assert!(event["event"].is_string(), "Audit line {}: event type missing", i);
-        assert!(event["payload"].is_object(), "Audit line {}: payload missing", i);
+        assert!(
+            event["timestamp"].is_string(),
+            "Audit line {}: timestamp missing",
+            i
+        );
+        assert!(
+            event["event"].is_string(),
+            "Audit line {}: event type missing",
+            i
+        );
+        assert!(
+            event["payload"].is_object(),
+            "Audit line {}: payload missing",
+            i
+        );
 
         // Track event types
         match event["event"].as_str().unwrap() {
             "pull_start" => pull_start_found = true,
             "pull_complete" => {
                 pull_complete_found = true;
-                assert!(event["payload"]["record_count"].is_number(), "pull_complete missing record_count");
+                assert!(
+                    event["payload"]["record_count"].is_number(),
+                    "pull_complete missing record_count"
+                );
             }
             "verify_request" => verify_request_found = true,
             "verify_response" => {
                 verify_response_found = true;
-                assert!(event["payload"]["manifest_hash"].is_string(), "verify_response missing manifest_hash");
-                assert!(event["payload"]["proof_hash"].is_string(), "verify_response missing proof_hash");
+                assert!(
+                    event["payload"]["manifest_hash"].is_string(),
+                    "verify_response missing manifest_hash"
+                );
+                assert!(
+                    event["payload"]["proof_hash"].is_string(),
+                    "verify_response missing proof_hash"
+                );
             }
             "writeback_complete" => {
                 writeback_complete_found = true;
-                assert!(event["payload"]["total_written"].is_number(), "writeback_complete missing total_written");
+                assert!(
+                    event["payload"]["total_written"].is_number(),
+                    "writeback_complete missing total_written"
+                );
             }
             _ => {}
         }
@@ -503,9 +688,18 @@ fn test_adapter_audit_trail() {
     // Validate that all critical events are present
     assert!(pull_start_found, "Audit log missing pull_start event");
     assert!(pull_complete_found, "Audit log missing pull_complete event");
-    assert!(verify_request_found, "Audit log missing verify_request event");
-    assert!(verify_response_found, "Audit log missing verify_response event");
-    assert!(writeback_complete_found, "Audit log missing writeback_complete event");
+    assert!(
+        verify_request_found,
+        "Audit log missing verify_request event"
+    );
+    assert!(
+        verify_response_found,
+        "Audit log missing verify_response event"
+    );
+    assert!(
+        writeback_complete_found,
+        "Audit log missing writeback_complete event"
+    );
 
     println!("✅ All critical audit events present");
     println!("  - pull_start: ✓");
@@ -529,34 +723,62 @@ fn test_adapter_error_handling() {
     println!("\n🔐 Test 1: Invalid credentials...");
     let pull_result = run_cap_adapter(&[
         "pull",
-        "--odata", &sap_url,
-        "--client", &sap_client,
-        "--user", "INVALID_USER",
-        "--password-env", "NONEXISTENT_PASSWORD",
-        "--filter", "TIER le 2",
-        "--out", "/tmp/adapter_error_test.json",
+        "--odata",
+        &sap_url,
+        "--client",
+        &sap_client,
+        "--user",
+        "INVALID_USER",
+        "--password-env",
+        "NONEXISTENT_PASSWORD",
+        "--filter",
+        "TIER le 2",
+        "--out",
+        "/tmp/adapter_error_test.json",
     ]);
 
-    assert!(pull_result.is_err(), "Expected pull to fail with invalid credentials");
+    assert!(
+        pull_result.is_err(),
+        "Expected pull to fail with invalid credentials"
+    );
     let error_msg = pull_result.err().unwrap();
-    assert!(error_msg.contains("401") || error_msg.contains("Unauthorized"), "Expected 401 error, got: {}", error_msg);
+    assert!(
+        error_msg.contains("401") || error_msg.contains("Unauthorized"),
+        "Expected 401 error, got: {}",
+        error_msg
+    );
     println!("✅ Invalid credentials correctly rejected");
 
     // Test 2: Invalid OData URL (connection error)
     println!("\n🌐 Test 2: Invalid OData URL...");
     let pull_result_2 = run_cap_adapter(&[
         "pull",
-        "--odata", "https://invalid-sap-url.example.com/invalid",
-        "--client", &sap_client,
-        "--user", "CAP_ADAPTER",
-        "--password-env", "SAP_PASSWORD",
-        "--filter", "TIER le 2",
-        "--out", "/tmp/adapter_error_test2.json",
+        "--odata",
+        "https://invalid-sap-url.example.com/invalid",
+        "--client",
+        &sap_client,
+        "--user",
+        "CAP_ADAPTER",
+        "--password-env",
+        "SAP_PASSWORD",
+        "--filter",
+        "TIER le 2",
+        "--out",
+        "/tmp/adapter_error_test2.json",
     ]);
 
-    assert!(pull_result_2.is_err(), "Expected pull to fail with invalid URL");
+    assert!(
+        pull_result_2.is_err(),
+        "Expected pull to fail with invalid URL"
+    );
     let error_msg_2 = pull_result_2.err().unwrap();
-    assert!(error_msg_2.contains("connection") || error_msg_2.contains("timeout") || error_msg_2.contains("resolve"), "Expected connection error, got: {}", error_msg_2);
+    assert!(
+        error_msg_2.contains("connection")
+            || error_msg_2.contains("timeout")
+            || error_msg_2.contains("resolve"),
+        "Expected connection error, got: {}",
+        error_msg_2
+    );
     println!("✅ Connection error correctly handled");
 
     // Test 3: Invalid filter syntax (400 Bad Request)
@@ -564,17 +786,32 @@ fn test_adapter_error_handling() {
     let sap_user = get_env_or_panic("SAP_USER");
     let pull_result_3 = run_cap_adapter(&[
         "pull",
-        "--odata", &sap_url,
-        "--client", &sap_client,
-        "--user", &sap_user,
-        "--password-env", "SAP_PASSWORD",
-        "--filter", "INVALID FILTER SYNTAX !!!",
-        "--out", "/tmp/adapter_error_test3.json",
+        "--odata",
+        &sap_url,
+        "--client",
+        &sap_client,
+        "--user",
+        &sap_user,
+        "--password-env",
+        "SAP_PASSWORD",
+        "--filter",
+        "INVALID FILTER SYNTAX !!!",
+        "--out",
+        "/tmp/adapter_error_test3.json",
     ]);
 
-    assert!(pull_result_3.is_err(), "Expected pull to fail with invalid filter");
+    assert!(
+        pull_result_3.is_err(),
+        "Expected pull to fail with invalid filter"
+    );
     let error_msg_3 = pull_result_3.err().unwrap();
-    assert!(error_msg_3.contains("400") || error_msg_3.contains("Bad Request") || error_msg_3.contains("filter"), "Expected 400 error, got: {}", error_msg_3);
+    assert!(
+        error_msg_3.contains("400")
+            || error_msg_3.contains("Bad Request")
+            || error_msg_3.contains("filter"),
+        "Expected 400 error, got: {}",
+        error_msg_3
+    );
     println!("✅ Invalid filter correctly rejected");
 
     println!("\n🎉 Error Handling Test PASSED");

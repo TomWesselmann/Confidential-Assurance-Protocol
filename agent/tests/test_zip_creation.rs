@@ -1,7 +1,6 @@
 /// Integration test for ZIP archive creation
 ///
 /// Tests that bundle-v2 --zip creates a valid ZIP archive
-
 use std::fs;
 use std::path::Path;
 
@@ -71,7 +70,7 @@ fn test_create_bundle_with_zip() {
 
     // Create bundle with ZIP
     let output = std::process::Command::new("cargo")
-        .args(&[
+        .args([
             "run",
             "--",
             "bundle-v2",
@@ -95,10 +94,7 @@ fn test_create_bundle_with_zip() {
     );
 
     // Verify ZIP file exists
-    assert!(
-        Path::new(&zip_path).exists(),
-        "ZIP file should be created"
-    );
+    assert!(Path::new(&zip_path).exists(), "ZIP file should be created");
 
     // Verify ZIP is not empty
     let zip_metadata = fs::metadata(&zip_path).expect("Failed to get ZIP metadata");
@@ -133,7 +129,7 @@ fn test_zip_contains_all_files() {
 
     // Create bundle with ZIP
     std::process::Command::new("cargo")
-        .args(&[
+        .args([
             "run",
             "--",
             "bundle-v2",
@@ -198,7 +194,7 @@ fn test_zip_extract_and_verify() {
 
     // Create bundle with ZIP
     std::process::Command::new("cargo")
-        .args(&[
+        .args([
             "run",
             "--",
             "bundle-v2",
@@ -218,7 +214,9 @@ fn test_zip_extract_and_verify() {
     fs::create_dir_all(&extract_path).ok();
     let zip_file = fs::File::open(&zip_path).expect("Failed to open ZIP");
     let mut archive = zip::ZipArchive::new(zip_file).expect("Failed to read ZIP");
-    archive.extract(&extract_path).expect("Failed to extract ZIP");
+    archive
+        .extract(&extract_path)
+        .expect("Failed to extract ZIP");
 
     // Verify extracted files exist
     assert!(Path::new(&format!("{}/manifest.json", extract_path)).exists());

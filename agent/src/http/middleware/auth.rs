@@ -1,7 +1,6 @@
 /// Authentication Middleware for HTTP endpoints (Week 5)
 ///
 /// Extracts Bearer tokens, validates JWT, and enforces scopes
-
 use crate::auth::{errors::AuthError, validate_scopes, validate_token, AuthConfig, JwksCache};
 use axum::{
     body::Body,
@@ -21,10 +20,7 @@ pub struct AuthState {
 
 impl AuthState {
     pub fn new(config: AuthConfig) -> Self {
-        let jwks_cache = JwksCache::new(
-            config.jwks_url.clone(),
-            config.jwks_cache_ttl_sec,
-        );
+        let jwks_cache = JwksCache::new(config.jwks_url.clone(), config.jwks_cache_ttl_sec);
 
         Self {
             config: Arc::new(config),
@@ -52,17 +48,20 @@ fn extract_bearer_token(auth_header: Option<&str>) -> Result<&str, AuthError> {
 /// Determine required scopes for an endpoint
 fn get_required_scopes_for_path(path: &str, config: &AuthConfig) -> Vec<String> {
     if path.starts_with("/verify") {
-        config.required_scopes
+        config
+            .required_scopes
             .get("verify")
             .cloned()
             .unwrap_or_default()
     } else if path.starts_with("/policy/compile") {
-        config.required_scopes
+        config
+            .required_scopes
             .get("policy_compile")
             .cloned()
             .unwrap_or_default()
     } else if path.starts_with("/policy/") {
-        config.required_scopes
+        config
+            .required_scopes
             .get("policy_read")
             .cloned()
             .unwrap_or_default()
@@ -86,8 +85,7 @@ pub async fn auth_middleware(
     let token = extract_bearer_token(auth_header)?;
 
     // 2. Validate JWT token
-    let claims = validate_token(token, &auth_state.config, &auth_state.jwks_cache)
-        .await?;
+    let claims = validate_token(token, &auth_state.config, &auth_state.jwks_cache).await?;
 
     // 3. Check required scopes for endpoint
     let path = req.uri().path();
@@ -116,8 +114,8 @@ impl From<AuthError> for AuthErrorResponse {
 
 impl IntoResponse for AuthErrorResponse {
     fn into_response(self) -> Response {
-        let status_code = StatusCode::from_u16(self.0.status_code())
-            .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+        let status_code =
+            StatusCode::from_u16(self.0.status_code()).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
 
         let body = serde_json::json!({
             "error": self.0.to_string(),
@@ -168,10 +166,9 @@ mod tests {
             jwks_cache_ttl_sec: 600,
             required_scopes: std::collections::HashMap::new(),
         };
-        config.required_scopes.insert(
-            "verify".to_string(),
-            vec!["verify:run".to_string()],
-        );
+        config
+            .required_scopes
+            .insert("verify".to_string(), vec!["verify:run".to_string()]);
 
         let scopes = get_required_scopes_for_path("/verify", &config);
         assert_eq!(scopes, vec!["verify:run"]);
@@ -204,10 +201,9 @@ mod tests {
             jwks_cache_ttl_sec: 600,
             required_scopes: std::collections::HashMap::new(),
         };
-        config.required_scopes.insert(
-            "policy_read".to_string(),
-            vec!["policy:read".to_string()],
-        );
+        config
+            .required_scopes
+            .insert("policy_read".to_string(), vec!["policy:read".to_string()]);
 
         let scopes = get_required_scopes_for_path("/policy/12345", &config);
         assert_eq!(scopes, vec!["policy:read"]);

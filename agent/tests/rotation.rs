@@ -11,10 +11,10 @@
 // - Rollback functionality
 // - E2E rotation cycle (integration, marked #[ignore])
 
+use serde_json::{json, Value};
 use std::fs;
 use std::process::Command;
 use tempfile::tempdir;
-use serde_json::{json, Value};
 
 // Helper: Run a shell script and return result
 fn run_script(script: &str, args: &[&str]) -> Result<String, String> {
@@ -80,18 +80,26 @@ fn test_kid_derivation_deterministic() {
 
     // Generate two keys with same owner
     let result1 = run_cargo_cli(&[
-        "keys", "keygen",
-        "--owner", "TestCompany",
-        "--out", key1_path.to_str().unwrap(),
-        "--valid-days", "730",
+        "keys",
+        "keygen",
+        "--owner",
+        "TestCompany",
+        "--out",
+        key1_path.to_str().unwrap(),
+        "--valid-days",
+        "730",
     ]);
     assert!(result1.is_ok(), "Key generation 1 failed: {:?}", result1);
 
     let result2 = run_cargo_cli(&[
-        "keys", "keygen",
-        "--owner", "TestCompany",
-        "--out", key2_path.to_str().unwrap(),
-        "--valid-days", "730",
+        "keys",
+        "keygen",
+        "--owner",
+        "TestCompany",
+        "--out",
+        key2_path.to_str().unwrap(),
+        "--valid-days",
+        "730",
     ]);
     assert!(result2.is_ok(), "Key generation 2 failed: {:?}", result2);
 
@@ -110,8 +118,14 @@ fn test_kid_derivation_deterministic() {
     assert_eq!(kid2.len(), 32, "KID should be 32 hex characters");
 
     // KIDs should only contain hex characters
-    assert!(kid1.chars().all(|c| c.is_ascii_hexdigit()), "KID should only contain hex characters");
-    assert!(kid2.chars().all(|c| c.is_ascii_hexdigit()), "KID should only contain hex characters");
+    assert!(
+        kid1.chars().all(|c| c.is_ascii_hexdigit()),
+        "KID should only contain hex characters"
+    );
+    assert!(
+        kid2.chars().all(|c| c.is_ascii_hexdigit()),
+        "KID should only contain hex characters"
+    );
 }
 
 // Test 2: Dual-accept mode accepts both old and new keys (before T1 end)
@@ -134,8 +148,10 @@ fn test_dual_accept_accepts_both_keys() {
     );
 
     // Read key metadata
-    let old_meta: Value = serde_json::from_str(&fs::read_to_string(&old_key_path).unwrap()).unwrap();
-    let new_meta: Value = serde_json::from_str(&fs::read_to_string(&new_key_path).unwrap()).unwrap();
+    let old_meta: Value =
+        serde_json::from_str(&fs::read_to_string(&old_key_path).unwrap()).unwrap();
+    let new_meta: Value =
+        serde_json::from_str(&fs::read_to_string(&new_key_path).unwrap()).unwrap();
 
     let old_kid = old_meta["kid"].as_str().unwrap();
     let new_kid = new_meta["kid"].as_str().unwrap();
@@ -156,17 +172,28 @@ fn test_dual_accept_accepts_both_keys() {
     });
 
     // Validate config structure
-    assert_eq!(dual_accept_config["verifier"]["signing"]["mode"], "dual-accept");
     assert_eq!(
-        dual_accept_config["verifier"]["signing"]["keys"].as_array().unwrap().len(),
+        dual_accept_config["verifier"]["signing"]["mode"],
+        "dual-accept"
+    );
+    assert_eq!(
+        dual_accept_config["verifier"]["signing"]["keys"]
+            .as_array()
+            .unwrap()
+            .len(),
         2,
         "Should have 2 keys in dual-accept mode"
     );
 
     // Validate both keys are active
-    let keys = dual_accept_config["verifier"]["signing"]["keys"].as_array().unwrap();
+    let keys = dual_accept_config["verifier"]["signing"]["keys"]
+        .as_array()
+        .unwrap();
     for key in keys {
-        assert_eq!(key["status"], "active", "Both keys should be active in dual-accept mode");
+        assert_eq!(
+            key["status"], "active",
+            "Both keys should be active in dual-accept mode"
+        );
     }
 }
 
@@ -190,8 +217,10 @@ fn test_sign_switch_changes_default_key() {
     );
 
     // Read key metadata
-    let old_meta: Value = serde_json::from_str(&fs::read_to_string(&old_key_path).unwrap()).unwrap();
-    let new_meta: Value = serde_json::from_str(&fs::read_to_string(&new_key_path).unwrap()).unwrap();
+    let old_meta: Value =
+        serde_json::from_str(&fs::read_to_string(&old_key_path).unwrap()).unwrap();
+    let new_meta: Value =
+        serde_json::from_str(&fs::read_to_string(&new_key_path).unwrap()).unwrap();
 
     let old_kid = old_meta["kid"].as_str().unwrap();
     let new_kid = new_meta["kid"].as_str().unwrap();
@@ -211,7 +240,10 @@ fn test_sign_switch_changes_default_key() {
         }
     });
 
-    assert_eq!(phase1_config["verifier"]["signing"]["default_key"], "/keys/old");
+    assert_eq!(
+        phase1_config["verifier"]["signing"]["default_key"],
+        "/keys/old"
+    );
 
     // Phase 2: Sign-switch to new key
     let phase2_config = json!({
@@ -228,7 +260,10 @@ fn test_sign_switch_changes_default_key() {
         }
     });
 
-    assert_eq!(phase2_config["verifier"]["signing"]["default_key"], "/keys/new");
+    assert_eq!(
+        phase2_config["verifier"]["signing"]["default_key"],
+        "/keys/new"
+    );
     assert_eq!(phase2_config["verifier"]["signing"]["mode"], "dual-accept");
 }
 
@@ -252,8 +287,10 @@ fn test_decommission_retires_old_key() {
     );
 
     // Read key metadata
-    let old_meta: Value = serde_json::from_str(&fs::read_to_string(&old_key_path).unwrap()).unwrap();
-    let new_meta: Value = serde_json::from_str(&fs::read_to_string(&new_key_path).unwrap()).unwrap();
+    let old_meta: Value =
+        serde_json::from_str(&fs::read_to_string(&old_key_path).unwrap()).unwrap();
+    let new_meta: Value =
+        serde_json::from_str(&fs::read_to_string(&new_key_path).unwrap()).unwrap();
 
     let old_kid = old_meta["kid"].as_str().unwrap();
     let new_kid = new_meta["kid"].as_str().unwrap();
@@ -273,15 +310,26 @@ fn test_decommission_retires_old_key() {
     });
 
     assert_eq!(phase3_config["verifier"]["signing"]["mode"], "single-key");
-    assert_eq!(phase3_config["verifier"]["signing"]["default_key"], "/keys/new");
+    assert_eq!(
+        phase3_config["verifier"]["signing"]["default_key"],
+        "/keys/new"
+    );
 
     // Validate old key is retired
-    let keys = phase3_config["verifier"]["signing"]["keys"].as_array().unwrap();
+    let keys = phase3_config["verifier"]["signing"]["keys"]
+        .as_array()
+        .unwrap();
     let old_key_config = keys.iter().find(|k| k["kid"] == old_kid).unwrap();
     let new_key_config = keys.iter().find(|k| k["kid"] == new_kid).unwrap();
 
-    assert_eq!(old_key_config["status"], "retired", "Old key should be retired");
-    assert_eq!(new_key_config["status"], "active", "New key should be active");
+    assert_eq!(
+        old_key_config["status"], "retired",
+        "Old key should be retired"
+    );
+    assert_eq!(
+        new_key_config["status"], "active",
+        "New key should be active"
+    );
 }
 
 // Test 5: Rollback Phase 2 → Phase 1 reverts to old key signing
@@ -304,8 +352,10 @@ fn test_rollback_phase2_to_phase1() {
     );
 
     // Read key metadata
-    let old_meta: Value = serde_json::from_str(&fs::read_to_string(&old_key_path).unwrap()).unwrap();
-    let new_meta: Value = serde_json::from_str(&fs::read_to_string(&new_key_path).unwrap()).unwrap();
+    let old_meta: Value =
+        serde_json::from_str(&fs::read_to_string(&old_key_path).unwrap()).unwrap();
+    let new_meta: Value =
+        serde_json::from_str(&fs::read_to_string(&new_key_path).unwrap()).unwrap();
 
     let old_kid = old_meta["kid"].as_str().unwrap();
     let new_kid = new_meta["kid"].as_str().unwrap();
@@ -325,7 +375,10 @@ fn test_rollback_phase2_to_phase1() {
         }
     });
 
-    assert_eq!(phase2_config["verifier"]["signing"]["default_key"], "/keys/new");
+    assert_eq!(
+        phase2_config["verifier"]["signing"]["default_key"],
+        "/keys/new"
+    );
 
     // Rollback: Revert to Phase 1 (signing with old key)
     let rollback_config = json!({
@@ -342,8 +395,14 @@ fn test_rollback_phase2_to_phase1() {
         }
     });
 
-    assert_eq!(rollback_config["verifier"]["signing"]["default_key"], "/keys/old");
-    assert_eq!(rollback_config["verifier"]["signing"]["mode"], "dual-accept");
+    assert_eq!(
+        rollback_config["verifier"]["signing"]["default_key"],
+        "/keys/old"
+    );
+    assert_eq!(
+        rollback_config["verifier"]["signing"]["mode"],
+        "dual-accept"
+    );
 }
 
 // Test 6: Rollback Phase 3 → Phase 2 re-activates dual-accept mode
@@ -366,8 +425,10 @@ fn test_rollback_phase3_to_phase2() {
     );
 
     // Read key metadata
-    let old_meta: Value = serde_json::from_str(&fs::read_to_string(&old_key_path).unwrap()).unwrap();
-    let new_meta: Value = serde_json::from_str(&fs::read_to_string(&new_key_path).unwrap()).unwrap();
+    let old_meta: Value =
+        serde_json::from_str(&fs::read_to_string(&old_key_path).unwrap()).unwrap();
+    let new_meta: Value =
+        serde_json::from_str(&fs::read_to_string(&new_key_path).unwrap()).unwrap();
 
     let old_kid = old_meta["kid"].as_str().unwrap();
     let new_kid = new_meta["kid"].as_str().unwrap();
@@ -403,17 +464,28 @@ fn test_rollback_phase3_to_phase2() {
         }
     });
 
-    assert_eq!(rollback_config["verifier"]["signing"]["mode"], "dual-accept");
     assert_eq!(
-        rollback_config["verifier"]["signing"]["keys"].as_array().unwrap().len(),
+        rollback_config["verifier"]["signing"]["mode"],
+        "dual-accept"
+    );
+    assert_eq!(
+        rollback_config["verifier"]["signing"]["keys"]
+            .as_array()
+            .unwrap()
+            .len(),
         2,
         "Should have 2 active keys after rollback"
     );
 
     // Validate old key is re-activated
-    let keys = rollback_config["verifier"]["signing"]["keys"].as_array().unwrap();
+    let keys = rollback_config["verifier"]["signing"]["keys"]
+        .as_array()
+        .unwrap();
     let old_key_config = keys.iter().find(|k| k["kid"] == old_kid).unwrap();
-    assert_eq!(old_key_config["status"], "active", "Old key should be re-activated");
+    assert_eq!(
+        old_key_config["status"], "active",
+        "Old key should be re-activated"
+    );
 }
 
 // Integration Test 1: Full rotation cycle (Phase 0 → 1 → 2 → 3)
@@ -427,10 +499,14 @@ fn test_full_rotation_cycle() {
 
     // Generate old key
     let result = run_cargo_cli(&[
-        "keys", "keygen",
-        "--owner", "TestCompany",
-        "--out", old_key_path.to_str().unwrap(),
-        "--valid-days", "730",
+        "keys",
+        "keygen",
+        "--owner",
+        "TestCompany",
+        "--out",
+        old_key_path.to_str().unwrap(),
+        "--valid-days",
+        "730",
     ]);
     assert!(result.is_ok(), "Old key generation failed: {:?}", result);
 
@@ -438,9 +514,12 @@ fn test_full_rotation_cycle() {
     let result = run_script(
         "./scripts/key_rotate.sh",
         &[
-            "--phase", "0",
-            "--old-key", old_key_path.to_str().unwrap(),
-            "--new-key", new_key_path.to_str().unwrap(),
+            "--phase",
+            "0",
+            "--old-key",
+            old_key_path.to_str().unwrap(),
+            "--new-key",
+            new_key_path.to_str().unwrap(),
             "--dry-run",
         ],
     );
@@ -450,18 +529,22 @@ fn test_full_rotation_cycle() {
     assert!(new_key_path.exists(), "New key should exist after Phase 0");
 
     // Verify attestation was created
-    let attestation_path = temp_dir.path().join("new.v1.attestation.json");
+    let _attestation_path = temp_dir.path().join("new.v1.attestation.json");
     // Note: In dry-run mode, attestation won't be created
-    // assert!(attestation_path.exists(), "Attestation should exist after Phase 0");
+    // assert!(_attestation_path.exists(), "Attestation should exist after Phase 0");
 
     // Phase 1: Dual-Accept (dry-run, no kubectl)
     let _result = run_script(
         "./scripts/key_rotate.sh",
         &[
-            "--phase", "1",
-            "--old-key", old_key_path.to_str().unwrap(),
-            "--new-key", new_key_path.to_str().unwrap(),
-            "--namespace", "cap-test",
+            "--phase",
+            "1",
+            "--old-key",
+            old_key_path.to_str().unwrap(),
+            "--new-key",
+            new_key_path.to_str().unwrap(),
+            "--namespace",
+            "cap-test",
             "--dry-run",
         ],
     );
@@ -472,10 +555,14 @@ fn test_full_rotation_cycle() {
     let _result = run_script(
         "./scripts/key_rotate.sh",
         &[
-            "--phase", "2",
-            "--old-key", old_key_path.to_str().unwrap(),
-            "--new-key", new_key_path.to_str().unwrap(),
-            "--namespace", "cap-test",
+            "--phase",
+            "2",
+            "--old-key",
+            old_key_path.to_str().unwrap(),
+            "--new-key",
+            new_key_path.to_str().unwrap(),
+            "--namespace",
+            "cap-test",
             "--dry-run",
         ],
     );
@@ -485,9 +572,12 @@ fn test_full_rotation_cycle() {
     let _result = run_script(
         "./scripts/key_rotate.sh",
         &[
-            "--phase", "3",
-            "--old-key", old_key_path.to_str().unwrap(),
-            "--namespace", "cap-test",
+            "--phase",
+            "3",
+            "--old-key",
+            old_key_path.to_str().unwrap(),
+            "--namespace",
+            "cap-test",
             "--dry-run",
         ],
     );
@@ -509,5 +599,5 @@ fn test_smoke_test_after_rotation() {
     // 7. Verify old signatures fail after decommission
 
     // Placeholder for future implementation
-    assert!(true, "Smoke test placeholder");
+    // (Test structure documented in comments above)
 }

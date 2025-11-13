@@ -1,22 +1,22 @@
-/// OAuth2 Authentication Middleware
-///
-/// Provides JWT token validation for OAuth2 Client Credentials flow.
-///
-/// Security Model:
-/// - Bearer tokens in Authorization header
-/// - JWT validation with RS256 (asymmetric)
-/// - Audience and issuer validation
-/// - Scope-based authorization (optional)
+//! OAuth2 Authentication Middleware
+//!
+//! Provides JWT token validation for OAuth2 Client Credentials flow.
+//!
+//! Security Model:
+//! - Bearer tokens in Authorization header
+//! - JWT validation with RS256 (asymmetric)
+//! - Audience and issuer validation
+//! - Scope-based authorization (optional)
 
+use anyhow::{anyhow, Result};
 use axum::{
     extract::Request,
-    http::{StatusCode, HeaderMap},
+    http::{HeaderMap, StatusCode},
     middleware::Next,
     response::Response,
 };
-use jsonwebtoken::{decode, decode_header, DecodingKey, Validation, Algorithm};
+use jsonwebtoken::{decode, decode_header, Algorithm, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
-use anyhow::{anyhow, Result};
 
 // ============================================================================
 // JWT Claims Structure
@@ -92,8 +92,7 @@ qwIDAQAB
 /// Validates a JWT Bearer token
 pub fn validate_token(token: &str, config: &OAuth2Config) -> Result<Claims> {
     // Decode header to check algorithm
-    let header = decode_header(token)
-        .map_err(|e| anyhow!("Invalid token header: {}", e))?;
+    let header = decode_header(token).map_err(|e| anyhow!("Invalid token header: {}", e))?;
 
     if header.alg != Algorithm::RS256 {
         return Err(anyhow!("Invalid algorithm, expected RS256"));
@@ -156,16 +155,14 @@ pub async fn auth_middleware(
     next: Next,
 ) -> Result<Response, StatusCode> {
     // Extract token
-    let token = extract_bearer_token(&headers)
-        .map_err(|_| StatusCode::UNAUTHORIZED)?;
+    let token = extract_bearer_token(&headers).map_err(|_| StatusCode::UNAUTHORIZED)?;
 
     // Validate token (using mock config for now)
     let config = OAuth2Config::mock();
-    let _claims = validate_token(&token, &config)
-        .map_err(|e| {
-            tracing::warn!("Token validation failed: {}", e);
-            StatusCode::UNAUTHORIZED
-        })?;
+    let _claims = validate_token(&token, &config).map_err(|e| {
+        tracing::warn!("Token validation failed: {}", e);
+        StatusCode::UNAUTHORIZED
+    })?;
 
     // Token is valid, proceed with request
     Ok(next.run(request).await)
@@ -276,6 +273,9 @@ pub mod tests {
 
         let result = validate_token(&token, &config);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Missing required scope"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Missing required scope"));
     }
 }

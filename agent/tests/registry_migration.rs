@@ -3,11 +3,10 @@
 //! Testet die End-to-End-Migration von v1.0 zu v1.1 Format.
 
 use cap_agent::registry::{
-    Registry as RegistryV1_0, RegistryEntry as RegistryEntryV1_0,
-    UnifiedRegistry, migrate_to_v1_1
+    migrate_to_v1_1, Registry as RegistryV1_0, RegistryEntry as RegistryEntryV1_0, UnifiedRegistry,
 };
-use tempfile::NamedTempFile;
 use std::io::Write;
+use tempfile::NamedTempFile;
 
 #[test]
 fn test_migrate_empty_v1_0_registry() {
@@ -29,16 +28,8 @@ fn test_migrate_empty_v1_0_registry() {
 fn test_migrate_v1_0_with_entries() {
     // Create v1.0 registry with entries
     let mut v1_0 = RegistryV1_0::new();
-    v1_0.add_entry(
-        "0xabc123".to_string(),
-        "0xdef456".to_string(),
-        None,
-    );
-    v1_0.add_entry(
-        "0x111222".to_string(),
-        "0x333444".to_string(),
-        None,
-    );
+    v1_0.add_entry("0xabc123".to_string(), "0xdef456".to_string(), None);
+    v1_0.add_entry("0x111222".to_string(), "0x333444".to_string(), None);
 
     // Migrate to v1.1
     let v1_1 = migrate_to_v1_1(v1_0, "test-tool").unwrap();
@@ -267,7 +258,10 @@ fn test_backfill_kid_skips_existing() {
 
     // Verify original KID unchanged
     let entries = &registry.as_v1_1().entries;
-    assert_eq!(entries[0].kid.as_ref().unwrap(), "existing_kid_1234567890abcdef");
+    assert_eq!(
+        entries[0].kid.as_ref().unwrap(),
+        "existing_kid_1234567890abcdef"
+    );
 }
 
 #[test]
@@ -285,9 +279,18 @@ fn test_migration_idempotency() {
 
     // Compare structure (timestamps will differ, so compare key fields only)
     assert_eq!(v1_1_first.count(), v1_1_second.count());
-    assert_eq!(v1_1_first.entries[0].entry_id, v1_1_second.entries[0].entry_id);
-    assert_eq!(v1_1_first.entries[0].manifest_hash, v1_1_second.entries[0].manifest_hash);
-    assert_eq!(v1_1_first.entries[0].policy_id, v1_1_second.entries[0].policy_id);
+    assert_eq!(
+        v1_1_first.entries[0].entry_id,
+        v1_1_second.entries[0].entry_id
+    );
+    assert_eq!(
+        v1_1_first.entries[0].manifest_hash,
+        v1_1_second.entries[0].manifest_hash
+    );
+    assert_eq!(
+        v1_1_first.entries[0].policy_id,
+        v1_1_second.entries[0].policy_id
+    );
 }
 
 #[test]

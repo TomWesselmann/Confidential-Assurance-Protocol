@@ -20,7 +20,6 @@ fn test_timestamp_provider_architecture_exists() {
     println!("✅ provider_from_cli() helper exists");
 
     // Architecture is ready for CLI integration
-    assert!(true, "Provider architecture successfully implemented");
 }
 
 #[test]
@@ -46,5 +45,4 @@ fn test_provider_factory_ready() {
     // When CLI integration is complete, this will test:
     // - make_provider(ProviderKind::MockRfc3161) returns MockRfc3161Provider
     // - make_provider(ProviderKind::RealRfc3161 {...}) returns RealRfc3161Provider
-    assert!(true, "Provider factory architecture verified");
 }

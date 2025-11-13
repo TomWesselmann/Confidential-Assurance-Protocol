@@ -2,7 +2,6 @@
 ///
 /// Speichert Proof-Package-Komponenten (Manifest, Proof, WASM, ABI) als
 /// deduplizierte BLOBs mit BLAKE3/SHA3-256 Content-Addressing.
-
 use anyhow::{anyhow, Result};
 use rusqlite::{params, Connection};
 use std::path::Path;
@@ -24,6 +23,7 @@ pub trait BlobStore {
     fn pin(&mut self, blob_id: &str) -> Result<()>;
 
     /// Decrement reference count for a BLOB
+    #[allow(dead_code)]
     fn unpin(&mut self, blob_id: &str) -> Result<()>;
 
     /// Garbage collect BLOBs with refcount=0

@@ -9,9 +9,9 @@
 //! **IMPORTANT**: Some tests require a Kubernetes cluster and are marked with `#[ignore]`.
 //! Run with: `cargo test --test backup_restore -- --ignored --nocapture`
 
+use serde_json::Value;
 use std::fs;
 use std::process::Command;
-use serde_json::Value;
 
 /// Helper: Execute shell script and return output
 fn run_script(script: &str, args: &[&str]) -> Result<String, String> {
@@ -77,18 +77,13 @@ fn create_test_policy_store(path: &str) {
 #[allow(dead_code)]
 fn _compute_sha3_fallback(file_path: &str) -> String {
     let output = Command::new("openssl")
-        .args(&["dgst", "-sha3-256", "-hex", file_path])
+        .args(["dgst", "-sha3-256", "-hex", file_path])
         .output()
         .expect("Failed to execute openssl");
 
     let output_str = String::from_utf8_lossy(&output.stdout);
     // Parse "SHA3-256(file)= abc123..." format
-    output_str
-        .split('=')
-        .nth(1)
-        .unwrap()
-        .trim()
-        .to_string()
+    output_str.split('=').nth(1).unwrap().trim().to_string()
 }
 
 #[test]
@@ -112,10 +107,14 @@ fn test_backup_manifest_generation() {
     let result = run_script(
         "./scripts/backup.sh",
         &[
-            "--output", output_path.to_str().unwrap(),
-            "--registry", registry_path.to_str().unwrap(),
-            "--policy-store", policy_store_path.to_str().unwrap(),
-            "--manifest", manifest_path.to_str().unwrap(),
+            "--output",
+            output_path.to_str().unwrap(),
+            "--registry",
+            registry_path.to_str().unwrap(),
+            "--policy-store",
+            policy_store_path.to_str().unwrap(),
+            "--manifest",
+            manifest_path.to_str().unwrap(),
         ],
     );
 
@@ -128,24 +127,44 @@ fn test_backup_manifest_generation() {
 
     // Parse manifest
     let manifest_content = fs::read_to_string(&manifest_path).expect("Failed to read manifest");
-    let manifest: Value = serde_json::from_str(&manifest_content).expect("Failed to parse manifest JSON");
+    let manifest: Value =
+        serde_json::from_str(&manifest_content).expect("Failed to parse manifest JSON");
 
     // Validate manifest structure
-    assert_eq!(manifest["version"], "backup.manifest.v1", "Manifest version mismatch");
+    assert_eq!(
+        manifest["version"], "backup.manifest.v1",
+        "Manifest version mismatch"
+    );
     assert!(manifest["created_at"].is_string(), "created_at missing");
     assert!(manifest["backup_id"].is_string(), "backup_id missing");
     assert!(manifest["files"].is_array(), "files array missing");
 
     let files = manifest["files"].as_array().unwrap();
-    assert!(files.len() >= 2, "Expected at least 2 files (registry + policy_store), got {}", files.len());
+    assert!(
+        files.len() >= 2,
+        "Expected at least 2 files (registry + policy_store), got {}",
+        files.len()
+    );
     println!("✅ Manifest structure valid ({} files)", files.len());
 
     // Validate hashes are present
     for file in files {
-        assert!(file["sha3_256"].is_string(), "sha3_256 hash missing for file: {:?}", file["path"]);
+        assert!(
+            file["sha3_256"].is_string(),
+            "sha3_256 hash missing for file: {:?}",
+            file["path"]
+        );
         let hash = file["sha3_256"].as_str().unwrap();
-        assert!(hash.starts_with("0x"), "Hash should be 0x-prefixed: {}", hash);
-        assert!(hash.len() == 66, "Hash should be 66 chars (0x + 64 hex), got {}", hash.len());
+        assert!(
+            hash.starts_with("0x"),
+            "Hash should be 0x-prefixed: {}",
+            hash
+        );
+        assert!(
+            hash.len() == 66,
+            "Hash should be 66 chars (0x + 64 hex), got {}",
+            hash.len()
+        );
     }
     println!("✅ All file hashes present and valid format");
 
@@ -174,11 +193,15 @@ fn test_restore_hash_integrity() {
     run_script(
         "./scripts/backup.sh",
         &[
-            "--output", output_path.to_str().unwrap(),
-            "--registry", registry_path.to_str().unwrap(),
-            "--policy-store", policy_store_path.to_str().unwrap(),
+            "--output",
+            output_path.to_str().unwrap(),
+            "--registry",
+            registry_path.to_str().unwrap(),
+            "--policy-store",
+            policy_store_path.to_str().unwrap(),
         ],
-    ).expect("Backup failed");
+    )
+    .expect("Backup failed");
 
     // Extract backup for restore
     let restore_dir = temp_dir.join("restore");
@@ -186,7 +209,12 @@ fn test_restore_hash_integrity() {
 
     println!("📂 Extracting backup...");
     let extract_result = Command::new("tar")
-        .args(&["-xzf", output_path.to_str().unwrap(), "-C", restore_dir.to_str().unwrap()])
+        .args([
+            "-xzf",
+            output_path.to_str().unwrap(),
+            "-C",
+            restore_dir.to_str().unwrap(),
+        ])
         .status()
         .expect("Failed to extract backup");
 
@@ -199,13 +227,19 @@ fn test_restore_hash_integrity() {
     let result = run_script(
         "./scripts/restore.sh",
         &[
-            "--backup-dir", restore_dir.to_str().unwrap(),
-            "--manifest", manifest_path.to_str().unwrap(),
+            "--backup-dir",
+            restore_dir.to_str().unwrap(),
+            "--manifest",
+            manifest_path.to_str().unwrap(),
             "--verify-only",
         ],
     );
 
-    assert!(result.is_ok(), "Restore verification failed: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "Restore verification failed: {:?}",
+        result.err()
+    );
     println!("✅ Restore verification passed");
 
     // Cleanup
@@ -233,18 +267,27 @@ fn test_no_pii_in_backup() {
     run_script(
         "./scripts/backup.sh",
         &[
-            "--output", output_path.to_str().unwrap(),
-            "--registry", registry_path.to_str().unwrap(),
-            "--policy-store", policy_store_path.to_str().unwrap(),
+            "--output",
+            output_path.to_str().unwrap(),
+            "--registry",
+            registry_path.to_str().unwrap(),
+            "--policy-store",
+            policy_store_path.to_str().unwrap(),
         ],
-    ).expect("Backup failed");
+    )
+    .expect("Backup failed");
 
     // Extract backup
     let extract_dir = temp_dir.join("extract");
     fs::create_dir_all(&extract_dir).expect("Failed to create extract dir");
 
     Command::new("tar")
-        .args(&["-xzf", output_path.to_str().unwrap(), "-C", extract_dir.to_str().unwrap()])
+        .args([
+            "-xzf",
+            output_path.to_str().unwrap(),
+            "-C",
+            extract_dir.to_str().unwrap(),
+        ])
         .status()
         .expect("Failed to extract backup");
 
@@ -263,8 +306,10 @@ fn test_no_pii_in_backup() {
         "credit_card",
     ];
 
-    let registry_content = fs::read_to_string(extract_dir.join("registry.json")).expect("Failed to read registry");
-    let policy_content = fs::read_to_string(extract_dir.join("policy_store.json")).expect("Failed to read policy store");
+    let registry_content =
+        fs::read_to_string(extract_dir.join("registry.json")).expect("Failed to read registry");
+    let policy_content = fs::read_to_string(extract_dir.join("policy_store.json"))
+        .expect("Failed to read policy store");
 
     for pattern in &pii_patterns {
         assert!(
@@ -282,8 +327,14 @@ fn test_no_pii_in_backup() {
     println!("✅ No PII patterns detected");
 
     // Verify only hashes/commitments present
-    assert!(registry_content.contains("0x"), "Registry should contain hashes (0x-prefixed)");
-    assert!(policy_content.contains("0x"), "Policy store should contain hashes (0x-prefixed)");
+    assert!(
+        registry_content.contains("0x"),
+        "Registry should contain hashes (0x-prefixed)"
+    );
+    assert!(
+        policy_content.contains("0x"),
+        "Policy store should contain hashes (0x-prefixed)"
+    );
 
     println!("✅ Only hashes/commitments present in backup");
 
@@ -322,7 +373,8 @@ fn test_restored_policy_hash_determinism() {
         ]
     });
 
-    fs::write(&policy_store_path, policy_store_json.to_string()).expect("Failed to write policy store");
+    fs::write(&policy_store_path, policy_store_json.to_string())
+        .expect("Failed to write policy store");
 
     // Create backup
     let registry_path = temp_dir.join("registry.json");
@@ -332,29 +384,45 @@ fn test_restored_policy_hash_determinism() {
     run_script(
         "./scripts/backup.sh",
         &[
-            "--output", output_path.to_str().unwrap(),
-            "--registry", registry_path.to_str().unwrap(),
-            "--policy-store", policy_store_path.to_str().unwrap(),
+            "--output",
+            output_path.to_str().unwrap(),
+            "--registry",
+            registry_path.to_str().unwrap(),
+            "--policy-store",
+            policy_store_path.to_str().unwrap(),
         ],
-    ).expect("Backup failed");
+    )
+    .expect("Backup failed");
 
     // Extract and verify
     let restore_dir = temp_dir.join("restore");
     fs::create_dir_all(&restore_dir).expect("Failed to create restore dir");
 
     Command::new("tar")
-        .args(&["-xzf", output_path.to_str().unwrap(), "-C", restore_dir.to_str().unwrap()])
+        .args([
+            "-xzf",
+            output_path.to_str().unwrap(),
+            "-C",
+            restore_dir.to_str().unwrap(),
+        ])
         .status()
         .expect("Failed to extract");
 
     // Read restored policy store
-    let restored_content = fs::read_to_string(restore_dir.join("policy_store.json")).expect("Failed to read restored policy store");
-    let restored_json: Value = serde_json::from_str(&restored_content).expect("Failed to parse restored JSON");
+    let restored_content = fs::read_to_string(restore_dir.join("policy_store.json"))
+        .expect("Failed to read restored policy store");
+    let restored_json: Value =
+        serde_json::from_str(&restored_content).expect("Failed to parse restored JSON");
 
-    let restored_hash = restored_json["policies"][0]["policy_hash"].as_str().unwrap();
+    let restored_hash = restored_json["policies"][0]["policy_hash"]
+        .as_str()
+        .unwrap();
 
     // CRITICAL: Hash must match exactly
-    assert_eq!(restored_hash, policy_hash, "Policy hash changed after backup/restore!");
+    assert_eq!(
+        restored_hash, policy_hash,
+        "Policy hash changed after backup/restore!"
+    );
     println!("✅ Policy hash deterministic: {}", restored_hash);
 
     // Cleanup
@@ -378,13 +446,16 @@ fn test_full_backup_restore_cycle() {
 
     // Step 1: Get current registry from running pod
     println!("📥 Step 1: Fetching current registry from cluster...");
-    let get_pod_cmd = "kubectl -n cap get pod -l app=cap-verifier-api -o jsonpath='{.items[0].metadata.name}'";
+    let get_pod_cmd =
+        "kubectl -n cap get pod -l app=cap-verifier-api -o jsonpath='{.items[0].metadata.name}'";
     let pod_output = Command::new("sh")
-        .args(&["-c", get_pod_cmd])
+        .args(["-c", get_pod_cmd])
         .output()
         .expect("Failed to get pod name");
 
-    let pod_name = String::from_utf8_lossy(&pod_output.stdout).trim().to_string();
+    let pod_name = String::from_utf8_lossy(&pod_output.stdout)
+        .trim()
+        .to_string();
     assert!(!pod_name.is_empty(), "No CAP API pod found");
 
     // Copy registry from pod
@@ -396,7 +467,7 @@ fn test_full_backup_restore_cycle() {
     );
 
     Command::new("sh")
-        .args(&["-c", &cp_cmd])
+        .args(["-c", &cp_cmd])
         .status()
         .expect("Failed to copy registry from pod");
 
@@ -412,11 +483,15 @@ fn test_full_backup_restore_cycle() {
     run_script(
         "./scripts/backup.sh",
         &[
-            "--output", output_path.to_str().unwrap(),
-            "--registry", registry_path.to_str().unwrap(),
-            "--policy-store", policy_store_path.to_str().unwrap(),
+            "--output",
+            output_path.to_str().unwrap(),
+            "--registry",
+            registry_path.to_str().unwrap(),
+            "--policy-store",
+            policy_store_path.to_str().unwrap(),
         ],
-    ).expect("Backup failed");
+    )
+    .expect("Backup failed");
 
     println!("✅ Backup created");
 
@@ -426,7 +501,12 @@ fn test_full_backup_restore_cycle() {
     fs::create_dir_all(&restore_dir).expect("Failed to create restore dir");
 
     Command::new("tar")
-        .args(&["-xzf", output_path.to_str().unwrap(), "-C", restore_dir.to_str().unwrap()])
+        .args([
+            "-xzf",
+            output_path.to_str().unwrap(),
+            "-C",
+            restore_dir.to_str().unwrap(),
+        ])
         .status()
         .expect("Failed to extract");
 
@@ -437,11 +517,14 @@ fn test_full_backup_restore_cycle() {
     run_script(
         "./scripts/restore.sh",
         &[
-            "--backup-dir", restore_dir.to_str().unwrap(),
-            "--manifest", manifest_path.to_str().unwrap(),
+            "--backup-dir",
+            restore_dir.to_str().unwrap(),
+            "--manifest",
+            manifest_path.to_str().unwrap(),
             "--verify-only",
         ],
-    ).expect("Verification failed");
+    )
+    .expect("Verification failed");
 
     println!("✅ Backup verified");
 
@@ -450,14 +533,21 @@ fn test_full_backup_restore_cycle() {
     let restore_result = run_script(
         "./scripts/restore.sh",
         &[
-            "--backup-dir", restore_dir.to_str().unwrap(),
-            "--manifest", manifest_path.to_str().unwrap(),
-            "--target-namespace", "cap-test",
+            "--backup-dir",
+            restore_dir.to_str().unwrap(),
+            "--manifest",
+            manifest_path.to_str().unwrap(),
+            "--target-namespace",
+            "cap-test",
             "--skip-smoke", // Skip smoke tests in CI
         ],
     );
 
-    assert!(restore_result.is_ok(), "Restore failed: {:?}", restore_result.err());
+    assert!(
+        restore_result.is_ok(),
+        "Restore failed: {:?}",
+        restore_result.err()
+    );
     println!("✅ Restore completed");
 
     // Step 6: Validate restored system
@@ -465,11 +555,12 @@ fn test_full_backup_restore_cycle() {
     let health_cmd = "kubectl -n cap-test exec $(kubectl -n cap-test get pod -l app=cap-verifier-api -o jsonpath='{.items[0].metadata.name}') -- curl -s http://localhost:8080/healthz";
 
     let health_output = Command::new("sh")
-        .args(&["-c", health_cmd])
+        .args(["-c", health_cmd])
         .output()
         .expect("Failed to check health");
 
-    let health_json: Value = serde_json::from_slice(&health_output.stdout).expect("Failed to parse health response");
+    let health_json: Value =
+        serde_json::from_slice(&health_output.stdout).expect("Failed to parse health response");
     assert_eq!(health_json["status"], "OK", "Health check failed");
 
     println!("✅ Health check passed");
@@ -477,7 +568,7 @@ fn test_full_backup_restore_cycle() {
     // Cleanup namespace
     println!("🧹 Cleanup: Deleting test namespace...");
     Command::new("kubectl")
-        .args(&["delete", "namespace", "cap-test"])
+        .args(["delete", "namespace", "cap-test"])
         .status()
         .ok();
 
@@ -507,12 +598,18 @@ fn test_smoke_ready_after_restore() {
         namespace
     );
     let pod_output = Command::new("sh")
-        .args(&["-c", &get_pod_cmd])
+        .args(["-c", &get_pod_cmd])
         .output()
         .expect("Failed to get pod");
 
-    let pod_name = String::from_utf8_lossy(&pod_output.stdout).trim().to_string();
-    assert!(!pod_name.is_empty(), "No pod found in namespace {}", namespace);
+    let pod_name = String::from_utf8_lossy(&pod_output.stdout)
+        .trim()
+        .to_string();
+    assert!(
+        !pod_name.is_empty(),
+        "No pod found in namespace {}",
+        namespace
+    );
 
     // Test 1: Health check
     println!("🔍 Test 1: Health check...");
@@ -522,11 +619,12 @@ fn test_smoke_ready_after_restore() {
     );
 
     let health_output = Command::new("sh")
-        .args(&["-c", &health_cmd])
+        .args(["-c", &health_cmd])
         .output()
         .expect("Health check failed");
 
-    let health_json: Value = serde_json::from_slice(&health_output.stdout).expect("Failed to parse health JSON");
+    let health_json: Value =
+        serde_json::from_slice(&health_output.stdout).expect("Failed to parse health JSON");
     assert_eq!(health_json["status"], "OK");
     println!("✅ Health check passed");
 
@@ -538,11 +636,13 @@ fn test_smoke_ready_after_restore() {
     );
 
     let registry_output = Command::new("sh")
-        .args(&["-c", &registry_cmd])
+        .args(["-c", &registry_cmd])
         .output()
         .expect("Registry query failed");
 
-    let count_str = String::from_utf8_lossy(&registry_output.stdout).trim().to_string();
+    let count_str = String::from_utf8_lossy(&registry_output.stdout)
+        .trim()
+        .to_string();
     let count: i32 = count_str.parse().unwrap_or(0);
     assert!(count > 0, "Registry has no entries");
     println!("✅ Registry accessible ({} entries)", count);

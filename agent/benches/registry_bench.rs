@@ -1,3 +1,7 @@
+use cap_agent::registry::v1_0::Registry as RegistryV1_0;
+use cap_agent::registry::{
+    open_store, RegistryBackend, RegistryEntry, RegistryEntryV1_1, UnifiedRegistry,
+};
 /// Registry Performance Benchmarks
 ///
 /// Measures performance of v1.0 and v1.1 registry operations:
@@ -13,11 +17,9 @@
 /// - unified_registry_load_v1_1: Loading native v1.1 files
 /// - unified_registry_save: Saving as v1.1 format
 /// - migration_v1_0_to_v1_1: Migration performance
-
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
-use cap_agent::registry::{RegistryEntry, RegistryBackend, open_store, UnifiedRegistry, RegistryEntryV1_1, Registry as RegistryV1_0};
-use std::path::Path;
 use std::fs;
+use std::path::Path;
 
 /// Helper: Create mock registry entry
 fn create_mock_entry(id: usize) -> RegistryEntry {
@@ -93,7 +95,8 @@ fn bench_registry_load(c: &mut Criterion) {
 
         group.bench_with_input(BenchmarkId::new("json", size), size, |b, _size| {
             b.iter(|| {
-                let store = open_store(black_box(RegistryBackend::Json), Path::new(json_path)).unwrap();
+                let store =
+                    open_store(black_box(RegistryBackend::Json), Path::new(json_path)).unwrap();
                 let _reg = store.load().unwrap();
             });
         });
@@ -106,7 +109,8 @@ fn bench_registry_load(c: &mut Criterion) {
 
         group.bench_with_input(BenchmarkId::new("sqlite", size), size, |b, _size| {
             b.iter(|| {
-                let store = open_store(black_box(RegistryBackend::Sqlite), Path::new(sqlite_path)).unwrap();
+                let store =
+                    open_store(black_box(RegistryBackend::Sqlite), Path::new(sqlite_path)).unwrap();
                 let _reg = store.load().unwrap();
             });
         });
@@ -135,10 +139,12 @@ fn bench_registry_find(c: &mut Criterion) {
 
     group.bench_function("json", |b| {
         b.iter(|| {
-            let _result = json_store.find_by_hashes(
-                black_box(&middle_entry.manifest_hash),
-                black_box(&middle_entry.proof_hash)
-            ).unwrap();
+            let _result = json_store
+                .find_by_hashes(
+                    black_box(&middle_entry.manifest_hash),
+                    black_box(&middle_entry.proof_hash),
+                )
+                .unwrap();
         });
     });
 
@@ -151,10 +157,12 @@ fn bench_registry_find(c: &mut Criterion) {
 
     group.bench_function("sqlite", |b| {
         b.iter(|| {
-            let _result = sqlite_store.find_by_hashes(
-                black_box(&middle_entry.manifest_hash),
-                black_box(&middle_entry.proof_hash)
-            ).unwrap();
+            let _result = sqlite_store
+                .find_by_hashes(
+                    black_box(&middle_entry.manifest_hash),
+                    black_box(&middle_entry.proof_hash),
+                )
+                .unwrap();
         });
     });
 
@@ -249,11 +257,15 @@ fn bench_unified_registry_load_v1_0(c: &mut Criterion) {
         let path = "bench_unified_v1_0.json";
         setup_v1_0_registry(*size, path);
 
-        group.bench_with_input(BenchmarkId::new("v1.0_auto_migrate", size), size, |b, _size| {
-            b.iter(|| {
-                let _registry = UnifiedRegistry::load(black_box(Path::new(path))).unwrap();
-            });
-        });
+        group.bench_with_input(
+            BenchmarkId::new("v1.0_auto_migrate", size),
+            size,
+            |b, _size| {
+                b.iter(|| {
+                    let _registry = UnifiedRegistry::load(black_box(Path::new(path))).unwrap();
+                });
+            },
+        );
 
         fs::remove_file(path).ok();
     }
@@ -320,7 +332,9 @@ fn bench_migration(c: &mut Criterion) {
                         None,
                     );
                 }
-                let _v1_1 = cap_agent::registry::migrate_to_v1_1(black_box(v1_0), "cap-agent-bench").unwrap();
+                let _v1_1 =
+                    cap_agent::registry::migrate_to_v1_1(black_box(v1_0), "cap-agent-bench")
+                        .unwrap();
             });
         });
     }

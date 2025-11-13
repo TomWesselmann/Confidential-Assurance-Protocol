@@ -28,6 +28,7 @@ pub struct RegistryMeta {
 
 impl RegistryMeta {
     /// Creates new v1.1 metadata
+    #[allow(dead_code)]
     pub fn new_v1_1(tool_version: &str) -> Self {
         Self {
             schema_version: "1.1".to_string(),
@@ -190,6 +191,7 @@ pub struct RegistryV1_1 {
 
 impl RegistryV1_1 {
     /// Creates a new empty v1.1 registry
+    #[allow(dead_code)]
     pub fn new(tool_version: &str) -> Self {
         Self {
             meta: RegistryMeta::new_v1_1(tool_version),
@@ -214,9 +216,9 @@ impl RegistryV1_1 {
         }
 
         for (idx, entry) in self.entries.iter().enumerate() {
-            entry.validate().map_err(|e| {
-                format!("Entry {} validation failed: {}", idx, e)
-            })?;
+            entry
+                .validate()
+                .map_err(|e| format!("Entry {} validation failed: {}", idx, e))?;
         }
 
         Ok(())

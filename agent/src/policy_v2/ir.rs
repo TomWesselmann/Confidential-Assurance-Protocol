@@ -1,32 +1,34 @@
-use super::types::{PolicyV2, IrV1, IrRule, IrExpression, IrAdaptivity, IrPredicate};
+use super::types::{IrAdaptivity, IrExpression, IrPredicate, IrRule, IrV1, PolicyV2};
 use anyhow::Result;
 
 /// Generate IR v1 from PolicyV2
 pub fn generate_ir(policy: &PolicyV2, policy_hash: String) -> Result<IrV1> {
     // Convert rules
-    let mut ir_rules: Vec<IrRule> = policy.rules.iter().map(|r| {
-        IrRule {
+    let mut ir_rules: Vec<IrRule> = policy
+        .rules
+        .iter()
+        .map(|r| IrRule {
             id: r.id.clone(),
             op: r.op.clone(),
             lhs: convert_expression(&r.lhs),
             rhs: convert_expression(&r.rhs),
-        }
-    }).collect();
+        })
+        .collect();
 
     // IMPORTANT: Canonical ordering - sort by rule ID
     ir_rules.sort_by(|a, b| a.id.cmp(&b.id));
 
     // Convert adaptivity (if present)
-    let ir_adaptivity = policy.adaptivity.as_ref().map(|adapt| {
-        IrAdaptivity {
-            predicates: adapt.predicates.iter().map(|p| {
-                IrPredicate {
-                    id: p.id.clone(),
-                    expr: p.expr.clone(),
-                }
-            }).collect(),
-            activations: adapt.activations.clone(),
-        }
+    let ir_adaptivity = policy.adaptivity.as_ref().map(|adapt| IrAdaptivity {
+        predicates: adapt
+            .predicates
+            .iter()
+            .map(|p| IrPredicate {
+                id: p.id.clone(),
+                expr: p.expr.clone(),
+            })
+            .collect(),
+        activations: adapt.activations.clone(),
     });
 
     let ir = IrV1 {

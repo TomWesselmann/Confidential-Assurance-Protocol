@@ -13,7 +13,9 @@ pub mod pkcs11;
 pub mod cloudkms;
 
 // Re-exports
-pub use key_provider::{create_provider, derive_kid, load_config, KeyError, KeyProvider, ProviderConfig, ProviderType};
+pub use key_provider::{
+    create_provider, derive_kid, load_config, KeyError, KeyProvider, ProviderConfig, ProviderType,
+};
 pub use software::SoftwareProvider;
 
 #[cfg(feature = "pkcs11")]

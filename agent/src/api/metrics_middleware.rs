@@ -1,18 +1,12 @@
+use crate::metrics::get_metrics;
 /// Metrics Middleware für automatisches Request-Tracking
 ///
 /// Tracked:
 /// - Request Count (per Endpoint + Status)
 /// - Request Duration (Histogram)
 /// - Auth Failures
-
-use axum::{
-    extract::Request,
-    middleware::Next,
-    response::Response,
-    http::StatusCode,
-};
+use axum::{extract::Request, http::StatusCode, middleware::Next, response::Response};
 use std::time::Instant;
-use crate::metrics::get_metrics;
 
 /// Metrics Middleware
 ///
@@ -20,10 +14,7 @@ use crate::metrics::get_metrics;
 /// - cap_verifier_requests_total (mit result label)
 /// - cap_verifier_request_duration_seconds (histogram)
 /// - cap_auth_token_validation_failures_total (bei 401)
-pub async fn metrics_middleware(
-    req: Request,
-    next: Next,
-) -> Response {
+pub async fn metrics_middleware(req: Request, next: Next) -> Response {
     let start = Instant::now();
     let path = req.uri().path().to_string();
 
@@ -61,10 +52,6 @@ pub async fn metrics_middleware(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use axum::{body::Body, http::Request as HttpRequest};
-    use tower::ServiceExt; // for `oneshot`
-
     #[tokio::test]
     async fn test_metrics_middleware_ok() {
         // TODO: Test mit Mock-Handler
