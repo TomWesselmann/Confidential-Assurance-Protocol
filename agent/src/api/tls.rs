@@ -84,9 +84,7 @@ impl TlsConfig {
     /// Build rustls ServerConfig from this configuration
     pub fn build_server_config(&self) -> Result<Arc<ServerConfig>, TlsError> {
         match self.mode {
-            TlsMode::Disabled => Err(TlsError::InvalidCert(
-                "TLS is disabled".to_string(),
-            )),
+            TlsMode::Disabled => Err(TlsError::InvalidCert("TLS is disabled".to_string())),
             TlsMode::Tls => self.build_tls_config(),
             TlsMode::Mtls => self.build_mtls_config(),
         }

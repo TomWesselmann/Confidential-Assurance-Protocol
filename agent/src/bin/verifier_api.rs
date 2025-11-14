@@ -14,6 +14,7 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
+use axum_server::tls_rustls::RustlsConfig;
 use cap_agent::api::auth::auth_middleware;
 use cap_agent::api::metrics_middleware::metrics_middleware;
 use cap_agent::api::policy::{handle_policy_compile, handle_policy_get};
@@ -21,7 +22,6 @@ use cap_agent::api::policy_compiler::{handle_policy_v2_compile, handle_policy_v2
 use cap_agent::api::tls::{TlsConfig, TlsMode};
 use cap_agent::api::verify::{handle_verify, VerifyRequest, VerifyResponse};
 use cap_agent::metrics::{get_metrics, init_metrics};
-use axum_server::tls_rustls::RustlsConfig;
 use clap::Parser;
 use serde::Serialize;
 use std::net::SocketAddr;
@@ -260,7 +260,8 @@ async fn main() {
             info!("🔏 CA certificate: {}", ca_cert_path);
 
             // Build custom rustls ServerConfig for mTLS
-            let tls_config = TlsConfig::new(cert_path.clone(), key_path.clone()).with_mtls(ca_cert_path);
+            let tls_config =
+                TlsConfig::new(cert_path.clone(), key_path.clone()).with_mtls(ca_cert_path);
 
             let server_config = match tls_config.build_server_config() {
                 Ok(config) => config,
