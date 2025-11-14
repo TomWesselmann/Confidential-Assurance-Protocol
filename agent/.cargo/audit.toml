@@ -1,0 +1,12 @@
+# cargo-audit configuration
+#
+# Ignored advisories for dev-dependencies that don't affect production
+
+[advisories]
+# rsa 0.9.8 - Marvin Attack (RUSTSEC-2023-0071)
+# - Only used in dev-dependencies for test fixtures
+# - No fixed version available
+# - Does not affect production runtime
+ignore = [
+    "RUSTSEC-2023-0071",
+]
