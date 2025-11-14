@@ -45,6 +45,11 @@ tower = "0.4"
 tower-http = { version = "0.5", features = ["trace", "cors"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+# TLS dependencies (Phase 1)
+axum-server = { version = "0.6", features = ["tls-rustls"] }
+rustls = "0.21"
+rustls-pemfile = "1.0"
+tokio-rustls = "0.24"
 # OAuth2 dependencies
 jsonwebtoken = "9.2"
 axum-extra = { version = "0.9", features = ["typed-header"] }
