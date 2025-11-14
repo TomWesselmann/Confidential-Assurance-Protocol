@@ -2260,10 +2260,115 @@ curl -X POST http://localhost:8080/policy/compile \
 
 ---
 
+## Phase 1: Production Readiness (✅ Completed)
+
+### TLS/mTLS Support (v0.11.0)
+
+Die REST API ist nun vollständig production-ready mit TLS/mTLS-Unterstützung.
+
+#### Implementierung (src/api/tls.rs:1-238)
+
+**TLS Module Features:**
+- ✅ TLS-only mode (server certificate authentication)
+- ✅ mTLS mode (mutual authentication with client certificates)
+- ✅ rustls 0.21 (production-grade TLS library)
+- ✅ Certificate and private key loading (PEM format, PKCS#8)
+- ✅ CA certificate trust store for client verification
+- ✅ axum-server integration with RustlsConfig
+
+**TLS Mode Enum:**
+```rust
+pub enum TlsMode {
+    Disabled,  // HTTP-only (development)
+    Tls,       // Server certificate only
+    Mtls,      // Mutual authentication
+}
+```
+
+**CLI Flags (verifier_api.rs:34-58):**
+```bash
+# HTTP-only (development)
+cargo run --bin cap-verifier-api --bind 127.0.0.1:8080
+
+# TLS mode (production)
+cargo run --bin cap-verifier-api \
+  --bind 0.0.0.0:8443 \
+  --tls \
+  --tls-cert certs/server.crt \
+  --tls-key certs/server.key
+
+# mTLS mode (high-security)
+cargo run --bin cap-verifier-api \
+  --bind 0.0.0.0:8443 \
+  --tls \
+  --tls-cert certs/server.crt \
+  --tls-key certs/server.key \
+  --mtls \
+  --tls-ca certs/ca.crt
+```
+
+**Sicherheitsfeatures:**
+- Certificate validation (PEM parsing with error handling)
+- Private key validation (PKCS#8 format required)
+- Client certificate verification (rustls AllowAnyAuthenticatedClient)
+- Safe defaults (rustls ServerConfig::builder().with_safe_defaults())
+- File existence validation before server start
+
+#### Security Audit Integration (cargo audit)
+
+**GitHub Actions CI Integration:**
+- ✅ cargo audit in CI pipeline (.github/workflows/ci.yml:130-149)
+- ✅ Automatische Dependency-Vulnerability-Scans bei jedem Push/PR
+- ✅ Separate Security-Job (unabhängig von Tests)
+
+**CI Job Konfiguration:**
+```yaml
+security:
+  name: Security Audit
+  runs-on: ubuntu-latest
+  steps:
+    - name: Install cargo-audit
+      run: cargo install cargo-audit
+    - name: Run security audit
+      run: cargo audit
+```
+
+**Bekannte Advisories (nicht kritisch):**
+- `rsa@0.9.6` (RUSTSEC-2023-0071) - dev-dependency only, kein Runtime-Risiko
+- `wasmtime@27.0.1` (RUSTSEC-2024-0386) - WASM-Sandbox, kein Production-Impact
+
+#### Deployment-Optionen
+
+**Docker (kubernetes/deployment.yml):**
+```yaml
+env:
+  - name: BIND_ADDRESS
+    value: "0.0.0.0:8443"
+  - name: TLS_MODE
+    value: "tls"
+volumeMounts:
+  - name: tls-certs
+    mountPath: /certs
+    readOnly: true
+```
+
+**TLS Certificate Sources:**
+- Self-signed (Development): `openssl req -x509 -newkey rsa:4096 ...`
+- Let's Encrypt (Production): `certbot` + Auto-Renewal
+- Enterprise PKI: Internal CA mit Certificate Management System
+- Cloud Provider: AWS ACM, Google Cloud Certificate Manager
+
+#### Commit & CI Status
+
+**Commit:** 9aced6d - feat(phase1): Add TLS/mTLS support and cargo audit to CI
+**CI Pipeline:** https://github.com/TomWesselmann/Confidential-Assurance-Protocol/actions
+**Status:** ✅ All Phase 1 components production-ready
+
+---
+
 ## Nächste Schritte (v0.11.0+)
 
-1. **REST API Production Features:**
-   - TLS/mTLS für Production (Port 8443)
+1. **REST API Additional Features:**
    - Rate Limiting & Request Throttling
    - OpenAPI/Swagger Spezifikation
    - API Key Management (alternative zu OAuth2)
