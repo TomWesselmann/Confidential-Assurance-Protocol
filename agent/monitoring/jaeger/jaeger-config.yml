@@ -1,0 +1,62 @@
+# Jaeger All-in-One Configuration
+# Includes Collector, Query, Agent, and UI
+
+service_name: jaeger
+
+# Sampling configuration
+sampling:
+  default_strategy:
+    type: probabilistic
+    param: 1.0  # 100% sampling for development/testing; reduce in production
+
+# Storage configuration
+storage:
+  type: memory  # Use 'cassandra', 'elasticsearch', or 'kafka' for production
+  memory:
+    max_traces: 10000
+
+# Query service configuration
+query:
+  base_path: /
+  static_files: /go/jaeger-ui/
+  ui:
+    dependencies:
+      menu_enabled: true
+    header_template: /go/jaeger-ui/index.html
+
+# Collector configuration
+collector:
+  zipkin:
+    http_port: 9411  # Zipkin-compatible HTTP endpoint
+  grpc:
+    server:
+      host_port: 14250  # gRPC port for spans
+  http:
+    server:
+      host_port: 14268  # HTTP port for spans
+
+# Agent configuration
+agent:
+  grpc:
+    server:
+      host_port: 14250
+  http:
+    server:
+      host_port: 5778
+
+# Ports configuration
+ports:
+  agent:
+    compact: 6831
+    binary: 6832
+    http: 5778
+  collector:
+    http: 14268
+    grpc: 14250
+    zipkin: 9411
+  query:
+    http: 16686
+    grpc: 16685
+
+# Logging
+log_level: info

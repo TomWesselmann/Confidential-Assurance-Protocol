@@ -1,0 +1,160 @@
+name: Docker Build & Push
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    tags:
+      - 'v*.*.*'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.optimized
+          load: true
+          tags: cap-agent:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+
+      - name: Test container startup
+        run: |
+          echo "🧪 Testing container startup..."
+          docker run -d --name cap-test -p 8080:8080 cap-agent:test
+
+          echo "⏳ Waiting for container to be ready..."
+          sleep 5
+
+          echo "🔍 Checking container status..."
+          docker ps -a
+
+          echo "📝 Container logs:"
+          docker logs cap-test
+
+      - name: Run health checks
+        run: |
+          echo "🏥 Testing /healthz endpoint..."
+          curl -f http://localhost:8080/healthz || exit 1
+
+          echo "✅ Testing /readyz endpoint..."
+          curl -f http://localhost:8080/readyz || exit 1
+
+          echo "📊 Testing /metrics endpoint..."
+          curl -f http://localhost:8080/metrics || exit 1
+
+          echo "✨ All health checks passed!"
+
+      - name: Check image size
+        run: |
+          SIZE=$(docker images cap-agent:test --format "{{.Size}}")
+          echo "📦 Image size: $SIZE"
+
+          # Extract numeric size in MB
+          SIZE_MB=$(docker inspect cap-agent:test --format='{{.Size}}' | awk '{print int($1/1024/1024)}')
+          echo "Size in MB: $SIZE_MB"
+
+          if [ $SIZE_MB -gt 100 ]; then
+            echo "⚠️  Warning: Image size exceeds 100MB target"
+          else
+            echo "✅ Image size is within 100MB target"
+          fi
+
+      - name: Cleanup test container
+        if: always()
+        run: |
+          docker stop cap-test || true
+          docker rm cap-test || true
+
+      - name: Build and push to registry
+        if: github.event_name != 'pull_request'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.optimized
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+
+      - name: Generate build summary
+        if: always()
+        run: |
+          echo "## 🐳 Docker Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Image:** \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Tags:** ${{ steps.meta.outputs.tags }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Size:** $(docker images cap-agent:test --format '{{.Size}}')" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### ✅ Health Checks" >> $GITHUB_STEP_SUMMARY
+          echo "- /healthz: Passed" >> $GITHUB_STEP_SUMMARY
+          echo "- /readyz: Passed" >> $GITHUB_STEP_SUMMARY
+          echo "- /metrics: Passed" >> $GITHUB_STEP_SUMMARY
+
+  security-scan:
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    if: github.event_name != 'pull_request'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.sarif'

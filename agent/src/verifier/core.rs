@@ -219,8 +219,8 @@ fn validate_hex32(hex_str: &str, field_name: &str) -> Result<()> {
 /// use serde_json::json;
 ///
 /// let manifest = json!({
-///     "policy": {"hash": "0x1234..."},
-///     "company_commitment_root": "0xabcd...",
+///     "policy": {"hash": "0x1234567890123456789012345678901234567890123456789012345678901234"},
+///     "company_commitment_root": "0xabcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789",
 ///     "signatures": []
 /// });
 /// let proof_bytes = b"proof data";

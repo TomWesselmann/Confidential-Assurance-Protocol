@@ -1,0 +1,77 @@
+# Production-Optimized Multi-Stage Dockerfile for CAP Agent & Verifier API
+# Target: <100 MB Image Size
+
+# ============================================================================
+# Stage 1: Dependency Builder (Cached Layer)
+# ============================================================================
+FROM rust:1.90-alpine AS deps
+RUN apk add --no-cache musl-dev pkgconfig openssl-dev openssl-libs-static
+WORKDIR /app
+
+# Copy dependency files first (better caching)
+COPY Cargo.toml Cargo.lock ./
+
+# Create dummy src and benches to build dependencies only
+RUN mkdir -p src/bin benches && \
+    echo "fn main() {}" > src/main.rs && \
+    echo "pub fn dummy() {}" > src/lib.rs && \
+    echo "fn main() {}" > src/bin/verifier_api.rs && \
+    echo "fn main() {}" > benches/registry_bench.rs && \
+    echo "fn main() {}" > benches/compile_bench.rs && \
+    cargo build --release && \
+    rm -rf src benches
+
+# ============================================================================
+# Stage 2: Application Builder
+# ============================================================================
+FROM rust:1.90-alpine AS builder
+RUN apk add --no-cache musl-dev pkgconfig openssl-dev openssl-libs-static
+WORKDIR /app
+
+# Copy only Cargo registry cache, NOT the target directory
+COPY --from=deps /usr/local/cargo /usr/local/cargo
+
+# Copy source code
+COPY Cargo.toml Cargo.lock ./
+COPY src ./src
+COPY benches ./benches
+
+# Build with optimizations (will reuse dependency cache but rebuild binaries)
+RUN cargo build --release --bin cap-agent && \
+    cargo build --release --bin cap-verifier-api && \
+    strip /app/target/release/cap-agent && \
+    strip /app/target/release/cap-verifier-api
+
+# ============================================================================
+# Stage 3: Runtime (Minimal Alpine)
+# ============================================================================
+FROM alpine:3.19 AS runtime
+
+# Install runtime dependencies only
+RUN apk add --no-cache ca-certificates curl libgcc
+
+# Create non-root user
+RUN addgroup -g 1000 capuser && \
+    adduser -D -u 1000 -G capuser capuser
+
+# Setup working directory
+WORKDIR /app
+RUN mkdir -p /app/build /app/keys /app/config && \
+    chown -R capuser:capuser /app
+
+# Copy binaries from builder
+COPY --from=builder --chown=capuser:capuser /app/target/release/cap-agent /usr/local/bin/
+COPY --from=builder --chown=capuser:capuser /app/target/release/cap-verifier-api /usr/local/bin/
+
+# Switch to non-root user
+USER capuser
+
+# Expose API port
+EXPOSE 8080
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:8080/healthz || exit 1
+
+# Default command: Run Verifier API
+CMD ["cap-verifier-api", "--bind", "0.0.0.0:8080"]

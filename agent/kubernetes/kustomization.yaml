@@ -1,0 +1,17 @@
+# Kustomize configuration for CAP Verifier API
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - serviceaccount.yaml
+  - configmap.yaml
+  - pvc.yaml
+  - deployment.yaml
+  - service.yaml
+  - servicemonitor.yaml
+
+commonLabels:
+  app.kubernetes.io/name: cap-verifier-api
+  app.kubernetes.io/version: v0.11.0
+  app.kubernetes.io/component: api
+  app.kubernetes.io/part-of: cap-agent

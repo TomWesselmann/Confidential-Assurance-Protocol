@@ -3,7 +3,7 @@
 /// Binary container format for proof packages with versioning and metadata.
 ///
 /// # Header Layout (Little Endian, 78 bytes fixed)
-/// ```
+/// ```text
 /// magic[4]      = b"CAPZ"
 /// version[2]    = 0x0002 (u16 LE)
 /// backend[1]    = 0=mock, 1=zkvm, 2=halo2

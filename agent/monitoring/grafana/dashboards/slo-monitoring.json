@@ -1,0 +1,552 @@
+{
+  "dashboard": {
+    "uid": "slo-monitoring",
+    "title": "CAP Verifier API - SLO Monitoring",
+    "tags": ["slo", "sli", "error-budget", "cap-verifier"],
+    "timezone": "browser",
+    "schemaVersion": 39,
+    "version": 1,
+    "refresh": "30s",
+    "time": {
+      "from": "now-30d",
+      "to": "now"
+    },
+    "templating": {
+      "list": [
+        {
+          "name": "namespace",
+          "type": "query",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "query": "label_values(cap_verifier_requests_total, namespace)",
+          "refresh": 1,
+          "multi": false,
+          "includeAll": false,
+          "allValue": ".*"
+        },
+        {
+          "name": "time_window",
+          "type": "custom",
+          "options": [
+            {"text": "1 Hour", "value": "1h"},
+            {"text": "6 Hours", "value": "6h"},
+            {"text": "1 Day", "value": "1d"},
+            {"text": "7 Days", "value": "7d"},
+            {"text": "30 Days", "value": "30d"}
+          ],
+          "current": {
+            "text": "30 Days",
+            "value": "30d"
+          }
+        }
+      ]
+    },
+    "panels": [
+      {
+        "id": 1,
+        "type": "row",
+        "title": "SLO Compliance Overview",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0},
+        "collapsed": false
+      },
+      {
+        "id": 2,
+        "type": "stat",
+        "title": "Availability SLO (99.9%)",
+        "gridPos": {"h": 8, "w": 6, "x": 0, "y": 1},
+        "targets": [
+          {
+            "expr": "sum(rate(cap_verifier_requests_total{namespace=\"$namespace\",result=\"ok\"}[$time_window])) / sum(rate(cap_verifier_requests_total{namespace=\"$namespace\"}[$time_window])) * 100",
+            "legendFormat": "Current SLI"
+          }
+        ],
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          },
+          "orientation": "auto",
+          "textMode": "value_and_name",
+          "colorMode": "value",
+          "graphMode": "area"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "decimals": 3,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "red"},
+                {"value": 99.9, "color": "green"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 3,
+        "type": "stat",
+        "title": "Error Rate SLO (< 0.1%)",
+        "gridPos": {"h": 8, "w": 6, "x": 6, "y": 1},
+        "targets": [
+          {
+            "expr": "sum(rate(cap_verifier_requests_total{namespace=\"$namespace\",result=\"fail\"}[$time_window])) / sum(rate(cap_verifier_requests_total{namespace=\"$namespace\"}[$time_window])) * 100",
+            "legendFormat": "Current Error Rate"
+          }
+        ],
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          },
+          "orientation": "auto",
+          "textMode": "value_and_name",
+          "colorMode": "value",
+          "graphMode": "area"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "decimals": 3,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 0.1, "color": "yellow"},
+                {"value": 0.5, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 4,
+        "type": "stat",
+        "title": "Auth Success SLO (99.95%)",
+        "gridPos": {"h": 8, "w": 6, "x": 12, "y": 1},
+        "targets": [
+          {
+            "expr": "((sum(rate(cap_verifier_requests_total{namespace=\"$namespace\"}[$time_window])) - sum(rate(cap_auth_token_validation_failures_total{namespace=\"$namespace\"}[$time_window]))) / sum(rate(cap_verifier_requests_total{namespace=\"$namespace\"}[$time_window]))) * 100",
+            "legendFormat": "Auth Success Rate"
+          }
+        ],
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          },
+          "orientation": "auto",
+          "textMode": "value_and_name",
+          "colorMode": "value",
+          "graphMode": "area"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "decimals": 3,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "red"},
+                {"value": 99.95, "color": "green"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 5,
+        "type": "stat",
+        "title": "Cache Hit Rate SLO (> 70%)",
+        "gridPos": {"h": 8, "w": 6, "x": 18, "y": 1},
+        "targets": [
+          {
+            "expr": "avg(cap_cache_hit_ratio{namespace=\"$namespace\"}) * 100",
+            "legendFormat": "Cache Hit Rate"
+          }
+        ],
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          },
+          "orientation": "auto",
+          "textMode": "value_and_name",
+          "colorMode": "value",
+          "graphMode": "area"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "decimals": 2,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "red"},
+                {"value": 60, "color": "yellow"},
+                {"value": 70, "color": "green"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 6,
+        "type": "row",
+        "title": "Error Budget Status (30 Days)",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 9},
+        "collapsed": false
+      },
+      {
+        "id": 7,
+        "type": "gauge",
+        "title": "Availability Error Budget Remaining",
+        "description": "Based on 99.9% SLO (0.1% error budget = 43.2 minutes/month)",
+        "gridPos": {"h": 8, "w": 8, "x": 0, "y": 10},
+        "targets": [
+          {
+            "expr": "clamp_min((1 - (1 - (sum(rate(cap_verifier_requests_total{namespace=\"$namespace\",result=\"ok\"}[30d])) / sum(rate(cap_verifier_requests_total{namespace=\"$namespace\"}[30d])))) / 0.001) * 100, 0)",
+            "legendFormat": "Error Budget %"
+          }
+        ],
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          },
+          "showThresholdLabels": true,
+          "showThresholdMarkers": true
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "red"},
+                {"value": 25, "color": "yellow"},
+                {"value": 50, "color": "green"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 8,
+        "type": "gauge",
+        "title": "Error Rate Budget Remaining",
+        "description": "Based on < 0.1% error rate SLO",
+        "gridPos": {"h": 8, "w": 8, "x": 8, "y": 10},
+        "targets": [
+          {
+            "expr": "clamp_min((1 - (sum(rate(cap_verifier_requests_total{namespace=\"$namespace\",result=\"fail\"}[30d])) / sum(rate(cap_verifier_requests_total{namespace=\"$namespace\"}[30d]))) / 0.001) * 100, 0)",
+            "legendFormat": "Error Budget %"
+          }
+        ],
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          },
+          "showThresholdLabels": true,
+          "showThresholdMarkers": true
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "red"},
+                {"value": 25, "color": "yellow"},
+                {"value": 50, "color": "green"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 9,
+        "type": "gauge",
+        "title": "Auth Success Budget Remaining",
+        "description": "Based on 99.95% auth success SLO",
+        "gridPos": {"h": 8, "w": 8, "x": 16, "y": 10},
+        "targets": [
+          {
+            "expr": "clamp_min((1 - (sum(rate(cap_auth_token_validation_failures_total{namespace=\"$namespace\"}[30d])) / sum(rate(cap_verifier_requests_total{namespace=\"$namespace\"}[30d]))) / 0.0005) * 100, 0)",
+            "legendFormat": "Error Budget %"
+          }
+        ],
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          },
+          "showThresholdLabels": true,
+          "showThresholdMarkers": true
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "red"},
+                {"value": 25, "color": "yellow"},
+                {"value": 50, "color": "green"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 10,
+        "type": "row",
+        "title": "Error Budget Burn Rate",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 18},
+        "collapsed": false
+      },
+      {
+        "id": 11,
+        "type": "timeseries",
+        "title": "Availability Error Budget Burn Rate",
+        "description": "How fast is the error budget being consumed (1.0 = normal rate)",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 19},
+        "targets": [
+          {
+            "expr": "(1 - (sum(rate(cap_verifier_requests_total{namespace=\"$namespace\",result=\"ok\"}[1h])) / sum(rate(cap_verifier_requests_total{namespace=\"$namespace\"}[1h])))) / 0.001",
+            "legendFormat": "1h burn rate"
+          },
+          {
+            "expr": "(1 - (sum(rate(cap_verifier_requests_total{namespace=\"$namespace\",result=\"ok\"}[6h])) / sum(rate(cap_verifier_requests_total{namespace=\"$namespace\"}[6h])))) / 0.001",
+            "legendFormat": "6h burn rate"
+          }
+        ],
+        "options": {
+          "tooltip": {"mode": "multi"},
+          "legend": {"displayMode": "list", "placement": "bottom"}
+        },
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth",
+              "fillOpacity": 10,
+              "spanNulls": true
+            },
+            "unit": "none",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 6, "color": "yellow"},
+                {"value": 14.4, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 12,
+        "type": "timeseries",
+        "title": "Error Rate Burn Rate",
+        "description": "How fast is the error rate budget being consumed",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 19},
+        "targets": [
+          {
+            "expr": "(sum(rate(cap_verifier_requests_total{namespace=\"$namespace\",result=\"fail\"}[1h])) / sum(rate(cap_verifier_requests_total{namespace=\"$namespace\"}[1h]))) / 0.001",
+            "legendFormat": "1h burn rate"
+          },
+          {
+            "expr": "(sum(rate(cap_verifier_requests_total{namespace=\"$namespace\",result=\"fail\"}[6h])) / sum(rate(cap_verifier_requests_total{namespace=\"$namespace\"}[6h]))) / 0.001",
+            "legendFormat": "6h burn rate"
+          }
+        ],
+        "options": {
+          "tooltip": {"mode": "multi"},
+          "legend": {"displayMode": "list", "placement": "bottom"}
+        },
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth",
+              "fillOpacity": 10,
+              "spanNulls": true
+            },
+            "unit": "none",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 6, "color": "yellow"},
+                {"value": 14.4, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 13,
+        "type": "row",
+        "title": "SLI Trends (30 Days)",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 27},
+        "collapsed": false
+      },
+      {
+        "id": 14,
+        "type": "timeseries",
+        "title": "Availability Trend (30d)",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 28},
+        "targets": [
+          {
+            "expr": "sum(rate(cap_verifier_requests_total{namespace=\"$namespace\",result=\"ok\"}[5m])) / sum(rate(cap_verifier_requests_total{namespace=\"$namespace\"}[5m])) * 100",
+            "legendFormat": "Availability %"
+          }
+        ],
+        "options": {
+          "tooltip": {"mode": "single"},
+          "legend": {"displayMode": "list", "placement": "bottom"}
+        },
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth",
+              "fillOpacity": 20,
+              "spanNulls": true
+            },
+            "unit": "percent",
+            "min": 99,
+            "max": 100,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 99, "color": "red"},
+                {"value": 99.9, "color": "green"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 15,
+        "type": "timeseries",
+        "title": "Error Rate Trend (30d)",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 28},
+        "targets": [
+          {
+            "expr": "sum(rate(cap_verifier_requests_total{namespace=\"$namespace\",result=\"fail\"}[5m])) / sum(rate(cap_verifier_requests_total{namespace=\"$namespace\"}[5m])) * 100",
+            "legendFormat": "Error Rate %"
+          }
+        ],
+        "options": {
+          "tooltip": {"mode": "single"},
+          "legend": {"displayMode": "list", "placement": "bottom"}
+        },
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth",
+              "fillOpacity": 20,
+              "spanNulls": true
+            },
+            "unit": "percent",
+            "min": 0,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 0.1, "color": "yellow"},
+                {"value": 0.5, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 16,
+        "type": "timeseries",
+        "title": "Auth Success Rate Trend",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 36},
+        "targets": [
+          {
+            "expr": "((sum(rate(cap_verifier_requests_total{namespace=\"$namespace\"}[5m])) - sum(rate(cap_auth_token_validation_failures_total{namespace=\"$namespace\"}[5m]))) / sum(rate(cap_verifier_requests_total{namespace=\"$namespace\"}[5m]))) * 100",
+            "legendFormat": "Auth Success %"
+          }
+        ],
+        "options": {
+          "tooltip": {"mode": "single"},
+          "legend": {"displayMode": "list", "placement": "bottom"}
+        },
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth",
+              "fillOpacity": 20,
+              "spanNulls": true
+            },
+            "unit": "percent",
+            "min": 99,
+            "max": 100,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 99, "color": "red"},
+                {"value": 99.95, "color": "green"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 17,
+        "type": "timeseries",
+        "title": "Cache Hit Rate Trend",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 36},
+        "targets": [
+          {
+            "expr": "avg(cap_cache_hit_ratio{namespace=\"$namespace\"}) * 100",
+            "legendFormat": "Cache Hit %"
+          }
+        ],
+        "options": {
+          "tooltip": {"mode": "single"},
+          "legend": {"displayMode": "list", "placement": "bottom"}
+        },
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth",
+              "fillOpacity": 20,
+              "spanNulls": true
+            },
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "red"},
+                {"value": 60, "color": "yellow"},
+                {"value": 70, "color": "green"}
+              ]
+            }
+          }
+        }
+      }
+    ]
+  }
+}

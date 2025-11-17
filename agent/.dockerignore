@@ -1,6 +1,55 @@
+# Build artifacts
 target/
 build/
-keys/
+*.log
+
+# Git
 .git/
+.gitignore
+.github/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# CI/CD
+.gitlab-ci.yml
+.travis.yml
+
+# Documentation
+docs/
 *.md
+!README.md
+
+# Tests (not needed in production image)
+tests/
+examples/
+
+# Local config
 .env
+.env.local
+*.local
+
+# Mac
+.DS_Store
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Keys (NEVER include in image!)
+keys/
+*.pem
+*.key
+*.crt
+*.pub
+*.ed25519
+
+# Docker
+Dockerfile.optimized
+docker-compose*.yml
+.dockerignore

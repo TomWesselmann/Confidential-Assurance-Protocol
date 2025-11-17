@@ -1,0 +1,16 @@
+# Prometheus ServiceMonitor for CAP Verifier API
+# Requires Prometheus Operator to be installed
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: cap-verifier-api
+  labels:
+    app: cap-verifier-api
+spec:
+  selector:
+    matchLabels:
+      app: cap-verifier-api
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 15s

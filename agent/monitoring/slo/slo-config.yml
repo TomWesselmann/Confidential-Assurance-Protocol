@@ -1,0 +1,150 @@
+# SLO/SLI Configuration for CAP Verifier API
+# Based on Google SRE Workbook principles
+
+version: "slo.v1"
+service_name: "cap-verifier-api"
+owner: "platform-team"
+
+# Time windows for SLO calculation
+time_windows:
+  - name: "30_days"
+    duration: "30d"
+    rolling: true
+  - name: "7_days"
+    duration: "7d"
+    rolling: true
+
+# Service Level Indicators (SLIs)
+slis:
+  # Availability SLI: Percentage of successful requests
+  - name: "availability"
+    description: "Ratio of successful requests to total requests"
+    metric: |
+      sum(rate(cap_verifier_requests_total{result="ok"}[5m]))
+      /
+      sum(rate(cap_verifier_requests_total[5m]))
+    unit: "ratio"
+    good_event: 'cap_verifier_requests_total{result="ok"}'
+    total_event: 'cap_verifier_requests_total'
+
+  # Error Rate SLI: Percentage of failed requests
+  - name: "error_rate"
+    description: "Ratio of failed requests to total requests"
+    metric: |
+      sum(rate(cap_verifier_requests_total{result="fail"}[5m]))
+      /
+      sum(rate(cap_verifier_requests_total[5m]))
+    unit: "ratio"
+    bad_event: 'cap_verifier_requests_total{result="fail"}'
+    total_event: 'cap_verifier_requests_total'
+
+  # Auth Success SLI: Authentication success rate
+  - name: "auth_success"
+    description: "Ratio of successful authentications"
+    metric: |
+      (
+        sum(rate(cap_verifier_requests_total[5m]))
+        -
+        sum(rate(cap_auth_token_validation_failures_total[5m]))
+      )
+      /
+      sum(rate(cap_verifier_requests_total[5m]))
+    unit: "ratio"
+    bad_event: 'cap_auth_token_validation_failures_total'
+    total_event: 'cap_verifier_requests_total'
+
+  # Cache Effectiveness SLI
+  - name: "cache_hit_rate"
+    description: "Cache hit ratio"
+    metric: "cap_cache_hit_ratio"
+    unit: "ratio"
+    threshold: 0.5  # 50% minimum
+
+# Service Level Objectives (SLOs)
+slos:
+  # Availability SLO: 99.9% (Three Nines)
+  - name: "availability_999"
+    description: "99.9% of requests must succeed"
+    sli: "availability"
+    target: 0.999  # 99.9%
+    time_window: "30_days"
+    error_budget: 0.001  # 0.1% (43.2 minutes/month)
+    alerting:
+      burn_rate_fast: 14.4  # Alert if burning budget 14.4x faster
+      burn_rate_slow: 6.0
+      lookback_fast: "1h"
+      lookback_slow: "6h"
+
+  # Error Rate SLO: < 0.1%
+  - name: "error_rate_001"
+    description: "Error rate must stay below 0.1%"
+    sli: "error_rate"
+    target: 0.001  # < 0.1%
+    time_window: "30_days"
+    error_budget: 0.001
+    alerting:
+      burn_rate_fast: 14.4
+      burn_rate_slow: 6.0
+      lookback_fast: "1h"
+      lookback_slow: "6h"
+
+  # Auth Success SLO: 99.95%
+  - name: "auth_success_9995"
+    description: "99.95% of auth attempts must succeed"
+    sli: "auth_success"
+    target: 0.9995  # 99.95%
+    time_window: "30_days"
+    error_budget: 0.0005  # 0.05%
+    alerting:
+      burn_rate_fast: 14.4
+      burn_rate_slow: 6.0
+      lookback_fast: "1h"
+      lookback_slow: "6h"
+
+  # Cache Hit Rate SLO: > 70%
+  - name: "cache_hit_rate_70"
+    description: "Cache hit rate must be above 70%"
+    sli: "cache_hit_rate"
+    target: 0.70  # 70%
+    time_window: "7_days"
+    alerting:
+      threshold: 0.60  # Warn if below 60%
+      lookback: "15m"
+
+# Error Budget Policies
+error_budget_policies:
+  - name: "slow_rollout"
+    description: "Slow down deployments when error budget is low"
+    trigger:
+      error_budget_remaining_percent: 25  # < 25% remaining
+    actions:
+      - "Pause automated deployments"
+      - "Require manual approval for releases"
+      - "Increase monitoring cadence"
+
+  - name: "emergency_freeze"
+    description: "Freeze all changes when error budget is exhausted"
+    trigger:
+      error_budget_remaining_percent: 5  # < 5% remaining
+    actions:
+      - "Freeze all deployments"
+      - "Incident response team activation"
+      - "Root cause analysis required"
+
+# Reporting
+reporting:
+  frequency: "weekly"
+  recipients:
+    - "platform-team@example.com"
+    - "sre-team@example.com"
+  metrics:
+    - "slo_compliance_percent"
+    - "error_budget_remaining"
+    - "incidents_count"
+    - "mttr"  # Mean Time To Recovery
+
+# Data Sources
+data_sources:
+  prometheus_url: "http://prometheus:9090"
+  loki_url: "http://loki:3100"
+  jaeger_url: "http://jaeger-query:16686"

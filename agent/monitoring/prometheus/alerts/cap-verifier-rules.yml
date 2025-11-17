@@ -1,0 +1,161 @@
+groups:
+  - name: cap_verifier_api_alerts
+    interval: 30s
+    rules:
+      # ========================================
+      # Critical Alerts (Page immediately)
+      # ========================================
+
+      - alert: CAPVerifierAPIDown
+        expr: up{job="cap-verifier-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: cap-verifier-api
+        annotations:
+          summary: "CAP Verifier API is down"
+          description: "CAP Verifier API {{ $labels.instance }} has been down for more than 1 minute."
+          runbook_url: "https://docs.example.com/runbooks/cap-verifier-down"
+
+      - alert: CAPVerifierHighErrorRate
+        expr: |
+          (
+            sum(rate(cap_verifier_requests_total{result="fail"}[5m]))
+            /
+            sum(rate(cap_verifier_requests_total[5m]))
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          component: cap-verifier-api
+        annotations:
+          summary: "CAP Verifier API has high error rate"
+          description: "Error rate is {{ $value | humanizePercentage }} (threshold: 5%)"
+          runbook_url: "https://docs.example.com/runbooks/high-error-rate"
+
+      - alert: CAPVerifierAuthFailureSpike
+        expr: |
+          rate(cap_auth_token_validation_failures_total[5m]) > 5
+        for: 2m
+        labels:
+          severity: critical
+          component: cap-verifier-api
+          security: "true"
+        annotations:
+          summary: "High authentication failure rate detected"
+          description: "Authentication failures: {{ $value | humanize }} per second (possible security incident)"
+          runbook_url: "https://docs.example.com/runbooks/auth-failures"
+
+      # ========================================
+      # Warning Alerts (Investigate soon)
+      # ========================================
+
+      - alert: CAPVerifierElevatedErrorRate
+        expr: |
+          (
+            sum(rate(cap_verifier_requests_total{result="fail"}[5m]))
+            /
+            sum(rate(cap_verifier_requests_total[5m]))
+          ) > 0.01
+        for: 10m
+        labels:
+          severity: warning
+          component: cap-verifier-api
+        annotations:
+          summary: "CAP Verifier API has elevated error rate"
+          description: "Error rate is {{ $value | humanizePercentage }} (threshold: 1%)"
+          runbook_url: "https://docs.example.com/runbooks/elevated-error-rate"
+
+      - alert: CAPVerifierLowCacheHitRatio
+        expr: |
+          avg(cap_cache_hit_ratio) < 0.5
+        for: 15m
+        labels:
+          severity: warning
+          component: cap-verifier-api
+          performance: "true"
+        annotations:
+          summary: "CAP Verifier API cache hit ratio is low"
+          description: "Cache hit ratio is {{ $value | humanizePercentage }} (threshold: 50%)"
+          runbook_url: "https://docs.example.com/runbooks/low-cache-hit-ratio"
+
+      - alert: CAPVerifierAuthFailuresIncreasing
+        expr: |
+          rate(cap_auth_token_validation_failures_total[5m]) > 1
+        for: 10m
+        labels:
+          severity: warning
+          component: cap-verifier-api
+          security: "true"
+        annotations:
+          summary: "Elevated authentication failure rate"
+          description: "Authentication failures: {{ $value | humanize }} per second"
+          runbook_url: "https://docs.example.com/runbooks/auth-failures"
+
+      - alert: CAPVerifierNoTrafficDetected
+        expr: |
+          rate(cap_verifier_requests_total[5m]) == 0
+        for: 30m
+        labels:
+          severity: warning
+          component: cap-verifier-api
+        annotations:
+          summary: "CAP Verifier API is receiving no traffic"
+          description: "No requests received in the last 30 minutes (possible misconfiguration)"
+          runbook_url: "https://docs.example.com/runbooks/no-traffic"
+
+      # ========================================
+      # Info Alerts (For trending/capacity planning)
+      # ========================================
+
+      - alert: CAPVerifierHighRequestRate
+        expr: |
+          sum(rate(cap_verifier_requests_total[5m])) > 100
+        for: 15m
+        labels:
+          severity: info
+          component: cap-verifier-api
+          capacity: "true"
+        annotations:
+          summary: "CAP Verifier API request rate is high"
+          description: "Request rate: {{ $value | humanize }} req/s (consider scaling if sustained)"
+          runbook_url: "https://docs.example.com/runbooks/high-request-rate"
+
+      - alert: CAPVerifierCacheAlmostFull
+        expr: |
+          cap_cache_hit_ratio < 0.7 and cap_cache_hit_ratio >= 0.5
+        for: 1h
+        labels:
+          severity: info
+          component: cap-verifier-api
+          performance: "true"
+        annotations:
+          summary: "CAP Verifier API cache performance degrading"
+          description: "Cache hit ratio is {{ $value | humanizePercentage }} (trending downward)"
+          runbook_url: "https://docs.example.com/runbooks/cache-degradation"
+
+  # ========================================
+  # SLO-Based Alerts
+  # ========================================
+
+  - name: cap_verifier_slo_alerts
+    interval: 1m
+    rules:
+      - alert: CAPVerifierSLOErrorBudgetBurning
+        expr: |
+          (
+            1 - (
+              sum(rate(cap_verifier_requests_total{result="ok"}[1h]))
+              /
+              sum(rate(cap_verifier_requests_total[1h]))
+            )
+          ) > 0.001
+        for: 5m
+        labels:
+          severity: warning
+          component: cap-verifier-api
+          slo: "availability"
+        annotations:
+          summary: "CAP Verifier API SLO error budget is burning fast"
+          description: "Current error rate {{ $value | humanizePercentage }} exceeds SLO target (99.9% availability)"
+          runbook_url: "https://docs.example.com/runbooks/slo-budget-burn"

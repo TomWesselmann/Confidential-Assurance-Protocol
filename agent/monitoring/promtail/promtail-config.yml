@@ -1,0 +1,170 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+  log_level: info
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+    timeout: 10s
+    batchwait: 1s
+    batchsize: 1048576
+
+scrape_configs:
+  # CAP Verifier API logs from Docker containers
+  - job_name: cap-verifier-api
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+    relabel_configs:
+      # Only keep containers with label app=cap-verifier-api
+      - source_labels: ['__meta_docker_container_label_app']
+        regex: 'cap-verifier-api'
+        action: keep
+
+      # Add container name as label
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/(.*)'
+        target_label: 'container'
+
+      # Add container ID
+      - source_labels: ['__meta_docker_container_id']
+        target_label: 'container_id'
+
+      # Add image name
+      - source_labels: ['__meta_docker_container_label_image']
+        target_label: 'image'
+
+      # Set log path
+      - source_labels: ['__meta_docker_container_id']
+        target_label: '__path__'
+        replacement: '/var/lib/docker/containers/$1/$1-json.log'
+
+    # Pipeline stages for log parsing
+    pipeline_stages:
+      # Parse JSON logs from Docker
+      - json:
+          expressions:
+            timestamp: time
+            level: level
+            message: message
+            target: target
+
+      # Extract log level
+      - labels:
+          level:
+
+      # Parse timestamp
+      - timestamp:
+          source: timestamp
+          format: RFC3339Nano
+
+      # Add static labels
+      - static_labels:
+          app: cap-verifier-api
+          component: verifier
+          environment: production
+
+  # Kubernetes Pod logs (alternative to Docker)
+  - job_name: kubernetes-pods
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names:
+            - default
+    relabel_configs:
+      # Only keep pods with label app=cap-verifier-api
+      - source_labels: [__meta_kubernetes_pod_label_app]
+        action: keep
+        regex: cap-verifier-api
+
+      # Add namespace
+      - source_labels: [__meta_kubernetes_namespace]
+        target_label: namespace
+
+      # Add pod name
+      - source_labels: [__meta_kubernetes_pod_name]
+        target_label: pod
+
+      # Add container name
+      - source_labels: [__meta_kubernetes_pod_container_name]
+        target_label: container
+
+      # Set log path
+      - source_labels: [__meta_kubernetes_pod_uid, __meta_kubernetes_pod_container_name]
+        target_label: __path__
+        separator: /
+        replacement: /var/log/pods/*$1*/*/*.log
+
+    pipeline_stages:
+      # Parse container runtime logs (CRI format)
+      - cri: {}
+
+      # Parse JSON logs from application
+      - json:
+          expressions:
+            timestamp: timestamp
+            level: level
+            message: message
+            target: target
+            span_id: span_id
+            trace_id: trace_id
+
+      # Extract labels
+      - labels:
+          level:
+          target:
+
+      # Parse timestamp
+      - timestamp:
+          source: timestamp
+          format: RFC3339Nano
+
+      # Extract metrics
+      - metrics:
+          # Count log lines by level
+          log_lines_total:
+            type: Counter
+            description: "Total number of log lines"
+            source: level
+            config:
+              action: inc
+
+          # Track auth failures
+          auth_failures_total:
+            type: Counter
+            description: "Authentication failures"
+            source: message
+            config:
+              match_all: true
+              action: inc
+            match:
+              selector: '{app="cap-verifier-api"} |~ "(?i)auth.*fail"'
+
+      # Add static labels
+      - static_labels:
+          environment: production
+
+  # System logs
+  - job_name: system-logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: system
+          __path__: /var/log/*.log
+
+    pipeline_stages:
+      - match:
+          selector: '{job="system"}'
+          stages:
+            - regex:
+                expression: '^(?P<timestamp>\S+\s+\S+)\s+(?P<hostname>\S+)\s+(?P<process>\S+)\[(?P<pid>\d+)\]:\s+(?P<message>.*)$'
+            - labels:
+                hostname:
+                process:
+            - timestamp:
+                source: timestamp
+                format: 'Jan  2 15:04:05'

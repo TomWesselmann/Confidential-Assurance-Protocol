@@ -1,0 +1,9 @@
+# Kubernetes ConfigMap for CAP Verifier API
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cap-verifier-config
+data:
+  RUST_LOG: "info"
+  BIND_ADDRESS: "0.0.0.0:8080"
+  TLS_MODE: "disabled"

@@ -26,6 +26,7 @@ use sha3::{Digest, Sha3_256};
 ///
 /// # Example
 /// ```
+/// use cap_agent::crypto::sha3_256;
 /// let hash = sha3_256(b"hello world");
 /// assert_eq!(hash.len(), 32);
 /// ```
@@ -46,6 +47,7 @@ pub fn sha3_256(input: &[u8]) -> [u8; 32] {
 ///
 /// # Example
 /// ```
+/// use cap_agent::crypto::blake3_256;
 /// let hash = blake3_256(b"hello world");
 /// assert_eq!(hash.len(), 32);
 /// ```
@@ -143,6 +145,7 @@ impl Ed25519Signature {
 ///
 /// # Example
 /// ```
+/// use cap_agent::crypto::{Ed25519SecretKey, ed25519_sign};
 /// let sk = Ed25519SecretKey::from_bytes(&[0u8; 32]);
 /// let sig = ed25519_sign(&sk, b"hello").unwrap();
 /// ```
@@ -163,6 +166,7 @@ pub fn ed25519_sign(sk: &Ed25519SecretKey, msg: &[u8]) -> Result<Ed25519Signatur
 ///
 /// # Example
 /// ```
+/// use cap_agent::crypto::{Ed25519PublicKey, Ed25519Signature, ed25519_verify};
 /// let pk = Ed25519PublicKey::from_bytes(&[0u8; 32]).unwrap();
 /// let sig = Ed25519Signature::from_bytes(&[0u8; 64]);
 /// let valid = ed25519_verify(&pk, b"hello", &sig);
@@ -185,6 +189,7 @@ pub fn ed25519_verify(pk: &Ed25519PublicKey, msg: &[u8], sig: &Ed25519Signature)
 ///
 /// # Example
 /// ```
+/// use cap_agent::crypto::hex_lower_prefixed32;
 /// let hash = [0u8; 32];
 /// let hex = hex_lower_prefixed32(hash);
 /// assert_eq!(hex.len(), 66);
@@ -208,6 +213,7 @@ pub fn hex_lower_prefixed32(bytes32: [u8; 32]) -> String {
 ///
 /// # Example
 /// ```
+/// use cap_agent::crypto::hex_to_32b;
 /// let bytes = hex_to_32b("0x0000000000000000000000000000000000000000000000000000000000000000").unwrap();
 /// assert_eq!(bytes.len(), 32);
 /// ```

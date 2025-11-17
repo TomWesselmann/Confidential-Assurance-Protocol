@@ -14,7 +14,7 @@ use prometheus::{
 /// None
 ///
 /// # Example
-/// ```
+/// ```text
 /// adapt_enforce_rollout_percent 25.0
 /// ```
 pub static ADAPT_ROLLOUT_PERCENT: Lazy<Gauge> = Lazy::new(|| {
@@ -32,7 +32,7 @@ pub static ADAPT_ROLLOUT_PERCENT: Lazy<Gauge> = Lazy::new(|| {
 /// - `policy_id`: Policy identifier (e.g., "lksg.v1")
 ///
 /// # Example
-/// ```
+/// ```text
 /// adapt_requests_total{mode="shadow",policy_id="lksg.v1"} 1000
 /// adapt_requests_total{mode="enforced",policy_id="lksg.v1"} 250
 /// ```
@@ -53,7 +53,7 @@ pub static ADAPT_REQUESTS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
 /// - `policy_id`: Policy identifier
 ///
 /// # Example
-/// ```
+/// ```text
 /// adapt_drift_events_total{policy_id="lksg.v1"} 12
 /// ```
 pub static ADAPT_DRIFT_EVENTS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
@@ -73,7 +73,7 @@ pub static ADAPT_DRIFT_EVENTS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
 /// - `window`: Time window (e.g., "5m")
 ///
 /// # Example
-/// ```
+/// ```text
 /// adapt_drift_ratio{window="5m"} 0.003
 /// ```
 pub static ADAPT_DRIFT_RATIO_5M: Lazy<Gauge> = Lazy::new(|| {
@@ -88,7 +88,7 @@ pub static ADAPT_DRIFT_RATIO_5M: Lazy<Gauge> = Lazy::new(|| {
 /// - 1ms, 5ms, 10ms, 50ms, 100ms, 500ms, 1s, 5s
 ///
 /// # Example
-/// ```
+/// ```text
 /// adapt_selection_latency_seconds_bucket{le="0.01"} 50
 /// adapt_selection_latency_seconds_bucket{le="0.05"} 120
 /// adapt_selection_latency_seconds_sum 45.2

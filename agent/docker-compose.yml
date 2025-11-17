@@ -1,145 +1,76 @@
-version: '3.8'
+version: '3.9'
+
+# Docker Compose for local development and testing
+# Usage: docker-compose up
 
 services:
-  # ============================================================================
-  # CAP Verifier API - REST API Server
-  # ============================================================================
-  cap-api:
+  # CAP Verifier API (REST API Server)
+  api:
     build:
       context: .
-      dockerfile: Dockerfile
-    image: cap-agent:0.11.0
+      dockerfile: Dockerfile.optimized
+    image: cap-agent:v0.11.0-alpine
     container_name: cap-verifier-api
-    restart: unless-stopped
-
-    # Ports
     ports:
-      - "8080:8080"  # HTTP API
-      # - "8443:8443"  # HTTPS API (uncomment when TLS configured)
-
-    # Environment variables
+      - "8080:8080"
     environment:
-      - RUST_LOG=info,cap_agent=debug
-      - RUST_BACKTRACE=1
-      - CAP_BIND_ADDRESS=0.0.0.0:8080
-      - CAP_REGISTRY_PATH=/app/build/registry.sqlite
-      - CAP_BLOB_STORE_PATH=/app/build/test_blobs.sqlite
-      - CAP_KEYS_DIR=/app/keys
-      - CAP_AUDIT_LOG=/app/build/audit_chain.jsonl
-
-    # Volumes
+      - RUST_LOG=info
+      - BIND_ADDRESS=0.0.0.0:8080
+      - TLS_MODE=disabled
     volumes:
-      # Persistent data
-      - cap-registry:/app/build
-      - cap-keys:/app/keys
-      # Config (read-only)
+      - ./build:/app/build
+      - ./keys:/app/keys:ro
       - ./config:/app/config:ro
-      # Examples (read-only)
-      - ./examples:/app/examples:ro
-
-    # Health check
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/healthz"]
       interval: 30s
-      timeout: 5s
+      timeout: 3s
       retries: 3
       start_period: 10s
-
-    # Resource limits
-    deploy:
-      resources:
-        limits:
-          cpus: '2.0'
-          memory: 2G
-        reservations:
-          cpus: '0.5'
-          memory: 512M
-
-    # Networking
     networks:
       - cap-network
+    restart: unless-stopped
 
-    # Logging
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-
-  # ============================================================================
-  # CAP CLI - Command-line interface (for manual operations)
-  # ============================================================================
-  cap-cli:
-    image: cap-agent:0.11.0
-    container_name: cap-agent-cli
-    entrypoint: ["/usr/local/bin/cap-agent"]
-    command: ["--help"]
-
-    # Environment
-    environment:
-      - RUST_LOG=info,cap_agent=debug
-
-    # Volumes (shared with API)
+  # Prometheus (Metrics Collection)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
     volumes:
-      - cap-registry:/app/build
-      - cap-keys:/app/keys
-      - ./config:/app/config:ro
-      - ./examples:/app/examples:ro
-
-    # Networking
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
     networks:
       - cap-network
+    restart: unless-stopped
 
-    # Lifecycle
-    profiles:
-      - cli  # Only start when explicitly requested
+  # Grafana (Metrics Visualization)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+      - grafana-data:/var/lib/grafana
+    networks:
+      - cap-network
+    restart: unless-stopped
+    depends_on:
+      - prometheus
 
-# ============================================================================
-# Volumes - Persistent storage
-# ============================================================================
-volumes:
-  cap-registry:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ./build
-
-  cap-keys:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ./keys
-
-# ============================================================================
-# Networks
-# ============================================================================
 networks:
   cap-network:
     driver: bridge
-    ipam:
-      config:
-        - subnet: 172.28.0.0/16
 
-# ============================================================================
-# Example Usage:
-# ============================================================================
-# Start API:
-#   docker-compose up -d cap-api
-#
-# View logs:
-#   docker-compose logs -f cap-api
-#
-# Run CLI command:
-#   docker-compose run --rm cap-cli version
-#
-# Run CLI with specific command:
-#   docker-compose run --rm cap-cli audit verify --file /app/build/audit_chain.jsonl
-#
-# Stop all:
-#   docker-compose down
-#
-# Rebuild:
-#   docker-compose build --no-cache
-# ============================================================================
+volumes:
+  prometheus-data:
+  grafana-data:

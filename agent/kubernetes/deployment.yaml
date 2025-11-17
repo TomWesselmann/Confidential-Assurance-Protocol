@@ -1,0 +1,70 @@
+# Kubernetes Deployment for CAP Verifier API
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cap-verifier-api
+  labels:
+    app: cap-verifier-api
+    version: v0.11.0
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: cap-verifier-api
+  template:
+    metadata:
+      labels:
+        app: cap-verifier-api
+        version: v0.11.0
+    spec:
+      containers:
+      - name: api
+        image: cap-agent:v0.11.0-alpine
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        env:
+        - name: RUST_LOG
+          value: "info"
+        - name: BIND_ADDRESS
+          value: "0.0.0.0:8080"
+        - name: TLS_MODE
+          value: "disabled"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 30
+          timeoutSeconds: 3
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 3
+        volumeMounts:
+        - name: build
+          mountPath: /app/build
+        - name: keys
+          mountPath: /app/keys
+          readOnly: true
+      volumes:
+      - name: build
+        persistentVolumeClaim:
+          claimName: cap-build-pvc
+      - name: keys
+        secret:
+          secretName: cap-keys
+          optional: true
