@@ -1,0 +1,81 @@
+{
+  "schema_version": "v1",
+  "suppliers": [
+    {
+      "id_hash": "0xd847ab7566eab1c8c77417a157648d62483de89b010e955cd9cf298297ff803b",
+      "country": "DE",
+      "tier": "1",
+      "audit_date": "2025-10-15",
+      "ubo_count": 2
+    },
+    {
+      "id_hash": "0x5d1d32ad6823eecc3dc6aa92c9303cecc7dbb6b88cd7d9c229b7b73925ee5c6a",
+      "country": "US",
+      "tier": "2",
+      "audit_date": "2025-09-20",
+      "ubo_count": 1
+    },
+    {
+      "id_hash": "0x0aff30870a68391e060af3bb719c01e4bfc94cb7a715389976d5d8f5888ac4fa",
+      "country": "FR",
+      "tier": "1",
+      "audit_date": "2025-11-01",
+      "ubo_count": 3
+    },
+    {
+      "id_hash": "0xb4781c22756156693df326c0027bfb16ed0939afe636c1a822b06905b90b6fe0",
+      "country": "GB",
+      "tier": "2",
+      "audit_date": "2025-08-10",
+      "ubo_count": 1
+    },
+    {
+      "id_hash": "0x6cfcba6056e0f221d87040de936f2d61803acae9957d1bdad48b4a083df71f14",
+      "country": "CN",
+      "tier": "3",
+      "audit_date": "2025-07-25",
+      "ubo_count": 2
+    },
+    {
+      "id_hash": "0xc253fa6c0fa4f618a35054fce50910ec7411fb1e020ac2962c947e3afda3736a",
+      "country": "SE",
+      "tier": "1",
+      "audit_date": "2025-10-05",
+      "ubo_count": 2
+    },
+    {
+      "id_hash": "0xf8ee0c5a24c9c8e25700465570d7b303c57e326faff6537635d263bb20baab7b",
+      "country": "IT",
+      "tier": "2",
+      "audit_date": "2025-09-15",
+      "ubo_count": 1
+    },
+    {
+      "id_hash": "0x7f0cc90d9646eff6ff3d62056d7f560d10d793aa1fe8c48fcb782f307f3a8720",
+      "country": "NL",
+      "tier": "2",
+      "audit_date": "2025-10-20",
+      "ubo_count": 2
+    },
+    {
+      "id_hash": "0xe0045d20ced146771f3596c974062e22c0c51a57d95dfd9e19ea827c1b7b944f",
+      "country": "AT",
+      "tier": "1",
+      "audit_date": "2025-08-30",
+      "ubo_count": 1
+    },
+    {
+      "id_hash": "0x8ce44623a803f37faee0332cb2537a4ae8a4ad8442ed8f5b66cf942321e1c105",
+      "country": "CH",
+      "tier": "1",
+      "audit_date": "2025-11-02",
+      "ubo_count": 2
+    }
+  ],
+  "total_count": 10,
+  "metadata": {
+    "source": "Mock: examples/suppliers.json",
+    "extracted_at": "2025-11-17T17:55:57.719440+00:00",
+    "adapter_version": "0.3.0"
+  }
+}

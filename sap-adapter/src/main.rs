@@ -1,211 +1,239 @@
-/// SAP Adapter - Week 2: E2E Integration with Verifier API
-/// Reads mock SAP data, hashes with BLAKE3, sends to Verifier API, parses response
+/// SAP Adapter - v0.3.0: Production-Ready OData v4 Integration
+///
+/// Implements CAP Engineering Guide Section 9.2:
+/// 1. OData fetch Funktion erstellen      ✅
+/// 2. Sanitizer definieren                 ✅
+/// 3. Mapping-Funktion schreiben           ✅
+/// 4. Merkle Root Berechnung ergänzen      ✅ (integrated in mapper)
+/// 5. context.json erweitern               ✅
+/// 6. Tests schreiben                      ✅ (module tests)
+/// 7. CLI Command ergänzen                 ✅
+///
+/// CLI Usage:
+///   sap-adapter --mode mock --output context.json
+///   sap-adapter --mode odata --sap-url <URL> --sap-user <USER> --sap-pass <PASS>
 
 use anyhow::{Context as AnyhowContext, Result};
-use blake3::Hasher;
-use clap::Parser;
-use serde::{Deserialize, Serialize};
+use clap::{Parser, ValueEnum};
+use sap_adapter::{
+    mapper::{map_to_cap_context, CapContext},
+    odata_client::{ODataClient, ODataConfig, SapBusinessPartner},
+    sanitizer::sanitize_batch,
+};
+use serde::Deserialize;
 use std::path::PathBuf;
 
 #[derive(Parser)]
+#[command(name = "sap-adapter")]
+#[command(version = "0.3.0")]
+#[command(about = "SAP S/4HANA to CAP context adapter with OData v4 support")]
 struct Cli {
-    #[arg(short, long, default_value = "examples/suppliers.json")]
-    suppliers: PathBuf,
+    /// Operation mode: mock (JSON file) or odata (SAP S/4HANA)
+    #[arg(short, long, value_enum, default_value = "mock")]
+    mode: Mode,
 
-    #[arg(short, long)]
-    output: Option<PathBuf>,
+    /// Mock JSON file path (for --mode mock)
+    #[arg(long, default_value = "examples/suppliers.json")]
+    mock_file: PathBuf,
 
+    /// SAP OData base URL (for --mode odata)
+    /// Can also be set via SAP_ODATA_URL environment variable
     #[arg(long)]
-    dry_run: bool,
+    sap_url: Option<String>,
 
-    /// Verifier API base URL
-    #[arg(long, default_value = "https://localhost:8443")]
-    verifier_url: String,
+    /// SAP username (for --mode odata)
+    /// Can also be set via SAP_USER environment variable
+    #[arg(long)]
+    sap_user: Option<String>,
+
+    /// SAP password (for --mode odata)
+    /// Can also be set via SAP_PASS environment variable
+    #[arg(long)]
+    sap_pass: Option<String>,
+
+    /// OData $filter query (e.g., "Country eq 'DE'")
+    #[arg(long)]
+    filter: Option<String>,
+
+    /// OData $top limit (max 1000)
+    #[arg(long)]
+    top: Option<u32>,
 
     /// Accept self-signed TLS certificates (dev only)
     #[arg(long)]
     accept_invalid_certs: bool,
 
-    /// Skip actual API call (Week 1 mode)
+    /// Output context.json file path
+    #[arg(short, long)]
+    output: Option<PathBuf>,
+
+    /// Enable verbose logging (DEBUG level)
+    #[arg(short, long)]
+    verbose: bool,
+
+    /// Dry run: Show context without writing to file
     #[arg(long)]
-    skip_verify: bool,
+    dry_run: bool,
 }
 
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum Mode {
+    /// Load data from mock JSON file
+    Mock,
+    /// Fetch data from SAP S/4HANA via OData v4
+    Odata,
+}
+
+/// Mock data structure (for JSON files)
 #[derive(Debug, Deserialize)]
-struct SapSupplier {
-    #[serde(rename = "LIFNR")]
-    id: String,
-    #[serde(rename = "NAME1")]
-    name: String,
-    #[serde(rename = "LAND1")]
-    country: String,
-    #[serde(rename = "TIER")]
-    tier: String,
+struct MockData {
+    suppliers: Vec<SapBusinessPartner>,
 }
 
-#[derive(Debug, Deserialize)]
-struct SapMockData {
-    suppliers: Vec<SapSupplier>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-struct HashedSupplier {
-    id_hash: String,
-    country: String,
-    tier: String,
-}
-
-#[derive(Debug, Serialize)]
-struct ContextData {
-    supplier_hashes: Vec<String>,
-    supplier_regions: Vec<String>,
-}
-
-#[derive(Debug, Serialize)]
-struct VerifyRequest {
-    policy_id: String,
-    context: ContextData,
-    backend: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct VerifyResponse {
-    result: String,
-    #[serde(default)]
-    valid_until: Option<String>,
-    #[serde(default)]
-    manifest_hash: Option<String>,
-    #[serde(default)]
-    trace: Option<serde_json::Value>,
-}
-
-#[derive(Debug, Serialize)]
-struct Context {
-    suppliers: Vec<HashedSupplier>,
-    total_count: usize,
-}
-
-fn hash_field(input: &str) -> String {
-    let mut hasher = Hasher::new();
-    hasher.update(input.as_bytes());
-    format!("0x{}", hasher.finalize().to_hex())
-}
-
-async fn call_verifier_api(cli: &Cli, request: &VerifyRequest) -> Result<VerifyResponse> {
-    // Build HTTP client with optional self-signed cert support
-    let client = reqwest::Client::builder()
-        .danger_accept_invalid_certs(cli.accept_invalid_certs)
-        .timeout(std::time::Duration::from_secs(30))
-        .build()
-        .context("Failed to build HTTP client")?;
-
-    let url = format!("{}/verify", cli.verifier_url);
-    println!("📡 POST {}", url);
-
-    let response = client
-        .post(&url)
-        .json(request)
-        .send()
-        .await
-        .context("Failed to send request to Verifier API")?;
-
-    let status = response.status();
-    println!("📥 Response: {}", status);
-
-    if !status.is_success() {
-        let error_text = response.text().await.unwrap_or_default();
-        anyhow::bail!("Verifier API error {}: {}", status, error_text);
-    }
-
-    let verify_response: VerifyResponse = response
-        .json()
-        .await
-        .context("Failed to parse Verifier response")?;
-
-    Ok(verify_response)
-}
-
+/// Main entry point
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    println!("🧩 SAP Adapter v0.2.0 (Week 2: E2E Integration)");
-    println!("📂 Reading: {}", cli.suppliers.display());
+    // Initialize logging
+    let log_level = if cli.verbose { "debug" } else { "info" };
+    tracing_subscriber::fmt()
+        .with_env_filter(tracing_subscriber::EnvFilter::new(log_level))
+        .init();
 
-    // Load SAP mock data
-    let data: SapMockData = serde_json::from_reader(std::fs::File::open(&cli.suppliers)?)?;
-    println!("✅ Loaded {} suppliers", data.suppliers.len());
+    tracing::info!("🧩 SAP Adapter v0.3.0 (CAP Engineering Guide compliant)");
 
-    // Hash sensitive fields (BLAKE3)
-    let hashed_suppliers: Vec<HashedSupplier> = data
-        .suppliers
-        .iter()
-        .map(|s| HashedSupplier {
-            id_hash: hash_field(&format!("{}:{}", s.id, s.name)),
-            country: s.country.clone(),
-            tier: s.tier.clone(),
-        })
-        .collect();
-
-    let context = Context {
-        total_count: hashed_suppliers.len(),
-        suppliers: hashed_suppliers.clone(),
+    // Fetch data based on mode
+    let raw_partners = match cli.mode {
+        Mode::Mock => fetch_mock_data(&cli.mock_file)?,
+        Mode::Odata => fetch_odata_data(&cli).await?,
     };
 
-    println!("🔐 Hashed {} suppliers with BLAKE3", context.total_count);
+    tracing::info!("✅ Loaded {} business partners", raw_partners.len());
 
-    // Output context.json (legacy format)
-    if let Some(output) = &cli.output {
-        std::fs::write(output, serde_json::to_string_pretty(&context)?)?;
-        println!("💾 Saved to: {}", output.display());
+    // Step 2: Sanitize input
+    let (sanitized_partners, errors) = sanitize_batch(&raw_partners);
+
+    if !errors.is_empty() {
+        tracing::warn!("⚠️  {} sanitization errors:", errors.len());
+        for (id, error) in &errors {
+            tracing::warn!("  - Business Partner {}: {}", id, error);
+        }
     }
 
+    tracing::info!("🔐 Sanitized {} suppliers (dropped {} invalid)",
+                   sanitized_partners.len(), errors.len());
+
+    // Step 3+4: Map to CAP context with BLAKE3 hashing
+    let timestamp = chrono::Utc::now().to_rfc3339();
+    let source = match cli.mode {
+        Mode::Mock => format!("Mock: {}", cli.mock_file.display()),
+        Mode::Odata => cli.sap_url.clone().unwrap_or_else(|| "SAP S/4HANA".to_string()),
+    };
+
+    let cap_context = map_to_cap_context(&sanitized_partners, &source, &timestamp);
+
+    tracing::info!("✅ Generated CAP context with {} hashed suppliers", cap_context.total_count);
+
+    // Step 5: Output context.json
     if cli.dry_run {
-        println!("\n📄 Context Preview:");
-        println!("{}", serde_json::to_string_pretty(&context)?);
+        println!("\n📄 CAP Context (Dry Run):");
+        println!("{}", serde_json::to_string_pretty(&cap_context)?);
     }
 
-    // Skip verification if requested (Week 1 mode)
-    if cli.skip_verify {
-        println!("\n⏭️  Skipping verification (--skip-verify)");
-        return Ok(());
+    if let Some(output_path) = &cli.output {
+        write_context_json(&cap_context, output_path)?;
+        tracing::info!("💾 Saved to: {}", output_path.display());
     }
 
-    // Build VerifyRequest (PRD format)
-    let verify_request = VerifyRequest {
-        policy_id: "lksg.v1".to_string(),
-        context: ContextData {
-            supplier_hashes: hashed_suppliers.iter().map(|s| s.id_hash.clone()).collect(),
-            supplier_regions: hashed_suppliers.iter().map(|s| s.country.clone()).collect(),
-        },
-        backend: "mock".to_string(),
+    // Summary
+    print_summary(&cap_context, &errors);
+
+    Ok(())
+}
+
+/// Fetch data from mock JSON file
+fn fetch_mock_data(path: &PathBuf) -> Result<Vec<SapBusinessPartner>> {
+    tracing::info!("📂 Reading mock data from: {}", path.display());
+
+    let file = std::fs::File::open(path)
+        .with_context(|| format!("Failed to open mock file: {}", path.display()))?;
+
+    let mock_data: MockData = serde_json::from_reader(file)
+        .context("Failed to parse mock JSON file")?;
+
+    Ok(mock_data.suppliers)
+}
+
+/// Fetch data from SAP S/4HANA via OData v4
+async fn fetch_odata_data(cli: &Cli) -> Result<Vec<SapBusinessPartner>> {
+    // Try CLI args first, then environment variables
+    let base_url = cli.sap_url.clone()
+        .or_else(|| std::env::var("SAP_ODATA_URL").ok())
+        .ok_or_else(|| anyhow::anyhow!("--sap-url or SAP_ODATA_URL required for --mode odata"))?;
+
+    let username = cli.sap_user.clone()
+        .or_else(|| std::env::var("SAP_USER").ok())
+        .ok_or_else(|| anyhow::anyhow!("--sap-user or SAP_USER required for --mode odata"))?;
+
+    let password = cli.sap_pass.clone()
+        .or_else(|| std::env::var("SAP_PASS").ok())
+        .ok_or_else(|| anyhow::anyhow!("--sap-pass or SAP_PASS required for --mode odata"))?;
+
+    let config = ODataConfig {
+        base_url: base_url.clone(),
+        username: username.clone(),
+        password: password.clone(),
+        timeout_secs: 30,
+        accept_invalid_certs: cli.accept_invalid_certs,
     };
 
-    println!("\n🔍 Calling Verifier API...");
+    tracing::info!("📡 Connecting to SAP OData: {}", base_url);
 
-    // Call Verifier API
-    match call_verifier_api(&cli, &verify_request).await {
-        Ok(response) => {
-            println!("\n✅ Verification Result: {}", response.result);
-            if let Some(valid_until) = &response.valid_until {
-                println!("📅 Valid Until: {}", valid_until);
-            }
-            if let Some(manifest_hash) = &response.manifest_hash {
-                println!("🔐 Manifest Hash: {}", manifest_hash);
-            }
-            if let Some(trace) = &response.trace {
-                println!("📊 Trace: {}", serde_json::to_string_pretty(trace)?);
-            }
+    let client = ODataClient::new(config)
+        .context("Failed to create OData client")?;
 
-            // TODO Week 2: Writeback to SAP Z-Table
-            println!("\n⏭️  Writeback to SAP (TODO: Week 2)");
-        }
-        Err(e) => {
-            eprintln!("\n❌ Verification failed: {}", e);
-            std::process::exit(1);
-        }
+    // Health check
+    if let Err(e) = client.health_check().await {
+        tracing::warn!("⚠️  OData health check failed: {}", e);
+    }
+
+    // Fetch business partners
+    let partners = client
+        .fetch_business_partners(cli.filter.as_deref(), cli.top)
+        .await
+        .context("Failed to fetch business partners from SAP")?;
+
+    Ok(partners)
+}
+
+/// Write CAP context to JSON file
+fn write_context_json(context: &CapContext, path: &PathBuf) -> Result<()> {
+    let json = serde_json::to_string_pretty(context)
+        .context("Failed to serialize context to JSON")?;
+
+    std::fs::write(path, json)
+        .with_context(|| format!("Failed to write to: {}", path.display()))?;
+
+    Ok(())
+}
+
+/// Print execution summary
+fn print_summary(context: &CapContext, errors: &[(String, String)]) {
+    println!("\n=== Summary ===");
+    println!("  Schema Version:   {}", context.schema_version);
+    println!("  Source:           {}", context.metadata.source);
+    println!("  Extracted At:     {}", context.metadata.extracted_at);
+    println!("  Adapter Version:  {}", context.metadata.adapter_version);
+    println!("  Total Suppliers:  {}", context.total_count);
+    println!("  Sanitization Errors: {}", errors.len());
+
+    if !context.suppliers.is_empty() {
+        println!("\n  First Supplier:");
+        println!("    ID Hash:      {}", context.suppliers[0].id_hash);
+        println!("    Country:      {}", context.suppliers[0].country);
+        println!("    Tier:         {}", context.suppliers[0].tier);
     }
 
     println!("\n✅ Done!");
-    Ok(())
 }

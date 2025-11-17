@@ -1,6 +1,6 @@
 [package]
 name = "sap-adapter"
-version = "0.1.0"
+version = "0.3.0"
 edition = "2021"
 
 [dependencies]
@@ -21,7 +21,14 @@ serde_yaml = "0.9"
 
 # Error Handling
 anyhow = "1.0"
+thiserror = "2.0"
+
+# URL encoding for OData queries
+urlencoding = "2.1"
 
 # Logging
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Date/Time
+chrono = "0.4"
