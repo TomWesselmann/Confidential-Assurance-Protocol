@@ -20,6 +20,7 @@ The **Confidential Assurance Protocol (CAP)** is a cryptographic compliance proo
 ✅ **Cryptographic Commitments** - BLAKE3 Merkle roots + SHA3-256 audit trails
 ✅ **Policy Engine** - Flexible YAML-based compliance rules
 ✅ **REST API** - OAuth2-secured endpoints for system integration
+✅ **Web UI** - React-based interface for proof upload and verification (v0.11.0)
 ✅ **Production Monitoring** - Full observability stack (Prometheus, Grafana, Loki, Jaeger)
 ✅ **Audit Trail** - Immutable SHA3-256 hash chain for all operations
 ✅ **Key Management** - Ed25519 signing with key rotation and attestation
@@ -146,6 +147,36 @@ curl http://localhost:8080/healthz
 ---
 
 ## 💡 Usage Examples
+
+### Web UI: Upload & Verify Proof (Easiest)
+
+```bash
+# 1. Start Backend API
+cd agent
+cargo run --bin cap-verifier-api &
+
+# 2. Start WebUI
+cd webui
+npm install
+npm run dev
+
+# 3. Compile Policy
+curl -X POST http://localhost:8080/policy/v2/compile \
+  -H "Authorization: Bearer admin-tom" \
+  -H "Content-Type: application/json" \
+  -d @examples/policy_v2_request.json
+
+# 4. Open Browser
+open http://localhost:5173
+
+# 5. Upload proof package ZIP and click "Proof Verifizieren"
+```
+
+**Features:**
+- Drag & Drop proof package upload
+- Visual manifest display
+- One-click verification
+- Detailed results with status badges
 
 ### CLI: Generate Proof
 
@@ -328,6 +359,7 @@ docker compose up -d
 - Key Management with KID Rotation
 - Registry (JSON + SQLite)
 - BLOB Store (Content-Addressable Storage)
+- **Web UI** (React + TypeScript + Vite) - Upload & Verification ✨
 - Production Monitoring Stack (Prometheus, Grafana, Loki, Jaeger)
 - Docker & Kubernetes Deployment
 - Comprehensive Documentation
@@ -335,13 +367,13 @@ docker compose up -d
 ### 🔄 In Progress (Week 3-6)
 - **Week 3-4**: Halo2 ZK-Proofs Implementation
 - **Week 5**: SAP Adapter (OData v4)
-- **Week 6**: Web UI (React + TypeScript)
+- **Week 6**: Web UI Enhancements (CSV Import, Multi-Policy Support)
 - **Security Audit**: External mini-audit
 
 ### 📅 Planned (MVP v1.0 - Dec 31, 2025)
 - Halo2-based Zero-Knowledge Proofs
 - SAP Integration (automated data import)
-- Basic Web UI
+- Web UI Full Features (CSV Import, Multi-Policy, Signature Verification)
 - Security Audit completed
 - Production Deployment (Docker + K8s)
 

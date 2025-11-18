@@ -7,14 +7,15 @@ Diese Anleitung richtet sich an **Personen ohne Vorkenntnisse** in GitHub oder S
 ## 📋 Inhaltsverzeichnis
 
 1. [Was ist dieses Projekt?](#was-ist-dieses-projekt)
-2. [Voraussetzungen installieren](#voraussetzungen-installieren)
-3. [Projekt herunterladen (Clone)](#projekt-herunterladen-clone)
-4. [Projekt bauen (Build)](#projekt-bauen-build)
-5. [Tests ausführen](#tests-ausführen)
-6. [CLI verwenden](#cli-verwenden)
-7. [Änderungen vornehmen](#änderungen-vornehmen)
-8. [Probleme melden (Issues)](#probleme-melden-issues)
-9. [Häufige Fehler und Lösungen](#häufige-fehler-und-lösungen)
+2. [🚀 Schnellstart mit WebUI (Einfachster Einstieg!)](#schnellstart-mit-webui-einfachster-einstieg)
+3. [Voraussetzungen installieren](#voraussetzungen-installieren)
+4. [Projekt herunterladen (Clone)](#projekt-herunterladen-clone)
+5. [Projekt bauen (Build)](#projekt-bauen-build)
+6. [Tests ausführen](#tests-ausführen)
+7. [CLI verwenden](#cli-verwenden)
+8. [Änderungen vornehmen](#änderungen-vornehmen)
+9. [Probleme melden (Issues)](#probleme-melden-issues)
+10. [Häufige Fehler und Lösungen](#häufige-fehler-und-lösungen)
 
 ---
 
@@ -23,6 +24,214 @@ Diese Anleitung richtet sich an **Personen ohne Vorkenntnisse** in GitHub oder S
 **CAP Agent** (Confidential Assurance Protocol) ist ein Rust-basiertes Command-Line-Tool für die Erstellung und Verifikation von kryptographischen Nachweisen im Kontext des deutschen Lieferkettensorgfaltspflichtengesetzes (LkSG).
 
 **Einfach gesagt:** Es hilft Unternehmen, ihre Lieferketten nachweisbar zu dokumentieren und zu verifizieren.
+
+---
+
+## 🚀 Schnellstart mit WebUI (Einfachster Einstieg!)
+
+**Neu in v0.11.0:** Die grafische Benutzeroberfläche (WebUI) ist der einfachste Weg, um CAP ohne Kommandozeilen-Kenntnisse zu verwenden!
+
+### Was ist die WebUI?
+
+Die WebUI ist eine **browserbasierte Oberfläche**, mit der du:
+- ✅ Proof Packages per **Drag & Drop** hochladen kannst
+- ✅ Manifest-Daten **visuell** anzeigen lassen kannst
+- ✅ Proofs mit **einem Klick** verifizieren kannst
+- ✅ Verification Results mit **farbcodierten Status-Badges** siehst
+
+**Keine Terminal-Befehle nötig!**
+
+### Voraussetzungen (nur einmalig)
+
+**Du brauchst:**
+1. **Node.js** (für WebUI) - [Download hier](https://nodejs.org/)
+2. **Rust** (für Backend API) - [Installationsanleitung siehe unten](#schritt-1-rust-installieren)
+
+### Schritt-für-Schritt Anleitung
+
+#### 1. Projekt herunterladen
+
+```bash
+# Terminal öffnen (macOS: Cmd+Space → "Terminal")
+git clone https://github.com/TomWesselmann/Confidential-Assurance-Protocol.git
+cd Confidential-Assurance-Protocol
+```
+
+#### 2. Backend API starten
+
+```bash
+# Terminal 1: Backend API starten
+cd agent
+cargo run --bin cap-verifier-api
+
+# Warte bis du siehst:
+# 🚀 Starting CAP Verifier API v0.1.0
+# 🎧 Listening on http://127.0.0.1:8080
+```
+
+**Was passiert?**
+- Das Backend wird kompiliert (beim ersten Mal 3-5 Minuten)
+- Die REST API startet auf Port 8080
+- Die API ist bereit, Requests zu empfangen
+
+#### 3. WebUI starten
+
+```bash
+# Terminal 2: Neues Terminal-Fenster öffnen
+cd webui
+npm install  # Nur beim ersten Mal
+npm run dev
+
+# Warte bis du siehst:
+# ➜  Local:   http://localhost:5173/
+```
+
+**Was passiert?**
+- Node.js Dependencies werden installiert (nur beim ersten Mal)
+- Der Dev-Server startet
+- Die WebUI ist bereit unter http://localhost:5173
+
+#### 4. Policy vorbereiten
+
+```bash
+# Terminal 3: Neues Terminal-Fenster öffnen
+# Führe diesen Befehl aus, um die Demo-Policy zu kompilieren:
+
+TOKEN="admin-tom"
+curl -X POST http://localhost:8080/policy/v2/compile \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "policy": {
+      "id": "lksg.demo.v1",
+      "version": "1.0.0",
+      "legal_basis": [{"directive": "LkSG", "article": "§3"}],
+      "description": "Demo policy for WebUI testing",
+      "inputs": {
+        "ubo_count": {"type": "integer"},
+        "supplier_count": {"type": "integer"}
+      },
+      "rules": [
+        {"id": "rule_ubo_exists", "op": "range_min", "lhs": {"var": "ubo_count"}, "rhs": 1}
+      ]
+    },
+    "persist": true,
+    "lint_mode": "relaxed"
+  }'
+```
+
+**Erwartete Ausgabe:**
+```json
+{
+  "policy_id": "lksg.demo.v1",
+  "policy_hash": "0x...",
+  "stored": true
+}
+```
+
+**Was ist passiert?**
+- Eine Demo-Policy wurde im Backend gespeichert
+- Diese Policy prüft, ob mindestens 1 UBO (Ultimate Beneficial Owner) vorhanden ist
+
+#### 5. WebUI öffnen und verwenden
+
+1. **Browser öffnen:** http://localhost:5173
+
+2. **Proof Package hochladen:**
+   - Ziehe eine ZIP-Datei in das Upload-Feld
+   - Oder klicke auf "Datei auswählen"
+   - Das Manifest wird automatisch angezeigt
+
+3. **Manifest ansehen:**
+   - Company Commitment Root (kryptographischer Hash)
+   - Policy Name, Version, Hash
+   - Audit Event Count
+   - Erstellungsdatum
+
+4. **Proof verifizieren:**
+   - Klicke auf den blauen Button "Proof Verifizieren"
+   - Warte 1-2 Sekunden
+   - Sieh das Verification Result:
+     - ✅ **OK** = Proof ist gültig
+     - ⚠️ **WARN** = Warnung (Proof gültig, aber Hinweise)
+     - ❌ **FAIL** = Proof ungültig
+
+5. **Details ansehen:**
+   - Manifest Hash
+   - Proof Hash
+   - Signatur-Status
+   - Detaillierter Report
+
+### Beispiel-Screenshot (Beschreibung)
+
+**Upload Screen:**
+```
+┌─────────────────────────────────────────┐
+│  CAP Verifier WebUI                     │
+├─────────────────────────────────────────┤
+│                                         │
+│  ┌───────────────────────────────────┐ │
+│  │  Drag & Drop Proof Package hier  │ │
+│  │  oder klicke, um Datei zu wählen │ │
+│  └───────────────────────────────────┘ │
+│                                         │
+└─────────────────────────────────────────┘
+```
+
+**Verification Screen:**
+```
+┌─────────────────────────────────────────┐
+│  Manifest Viewer                        │
+├─────────────────────────────────────────┤
+│  Company Commitment: 0x1234...          │
+│  Policy: LkSG Demo v1.0                 │
+│  Status: Bereit zur Verifikation        │
+│                                         │
+│  [ Proof Verifizieren ]  [Reset]        │
+├─────────────────────────────────────────┤
+│  Verification Result: ✅ OK              │
+│  Manifest Hash: 0xd490...               │
+│  Proof Hash: 0x83a8...                  │
+│  Signature: ✓ Valid                     │
+└─────────────────────────────────────────┘
+```
+
+### Vorteile der WebUI
+
+| Feature | CLI (Terminal) | WebUI (Browser) |
+|---------|----------------|-----------------|
+| **Einstieg** | Rust & Terminal-Kenntnisse nötig | Browser genügt |
+| **Upload** | Manuelle Dateipfade | Drag & Drop |
+| **Visualisierung** | JSON in Terminal | Grafische Darstellung |
+| **Verifikation** | Mehrere Befehle | Ein Klick |
+| **Ergebnis** | Text-Output | Farbcodierte Badges |
+
+### Wichtige Hinweise für Einsteiger
+
+1. **"admin-tom" Token:**
+   - Dies ist ein **Entwicklungs-Token** (nur für lokales Testing!)
+   - In Production wird ein echter OAuth2 Token verwendet
+   - Du siehst diesen Token normalerweise nicht, er ist im Hintergrund aktiv
+
+2. **Demo Proof Packages:**
+   - Enthalten oft **keine echten UBO/Supplier-Daten**
+   - Verification kann **"FAIL"** anzeigen (das ist korrekt!)
+   - Für echte Verifikation benötigst du echte Proof Packages mit Daten
+
+3. **Backend muss laufen:**
+   - WebUI funktioniert **nur**, wenn Backend API läuft (Terminal 1)
+   - Wenn Backend stoppt, zeigt WebUI Fehler
+
+4. **Policy muss kompiliert sein:**
+   - Schritt 4 (Policy kompilieren) ist **wichtig**!
+   - Ohne Policy zeigt Verifikation "Policy not found" Fehler
+
+### Nächste Schritte
+
+- ✅ **CLI lernen:** Für fortgeschrittene Nutzer (siehe [CLI verwenden](#cli-verwenden))
+- ✅ **Eigene Proofs erstellen:** Mit CSV-Daten und Policy-Dateien
+- ✅ **Dokumentation lesen:** `agent/CLAUDE.md` für vollständige Doku
+- ✅ **Tests ausführen:** `cargo test` im agent-Verzeichnis
 
 ---
 
