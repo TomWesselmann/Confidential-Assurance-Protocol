@@ -8,20 +8,23 @@
 /// - GET /readyz - Readiness Check
 /// - GET /metrics - Prometheus metrics
 use axum::{
-    http::StatusCode,
+    http::{StatusCode, Method},
     middleware,
     response::Response,
     routing::{get, post},
     Json, Router,
 };
 use axum_server::tls_rustls::RustlsConfig;
+use tower_http::cors::{CorsLayer, Any};
 use cap_agent::api::auth::auth_middleware;
 use cap_agent::api::metrics_middleware::metrics_middleware;
-use cap_agent::api::policy::{handle_policy_compile, handle_policy_get};
+use cap_agent::api::policy::{handle_policy_compile, handle_policy_get, PolicyState};
 use cap_agent::api::policy_compiler::{handle_policy_v2_compile, handle_policy_v2_get};
 use cap_agent::api::tls::{TlsConfig, TlsMode};
+use cap_agent::api::upload::handle_upload;
 use cap_agent::api::verify::{handle_verify, VerifyRequest, VerifyResponse};
 use cap_agent::metrics::{get_metrics, init_metrics};
+use cap_agent::policy::{InMemoryPolicyStore, SqlitePolicyStore};
 use clap::Parser;
 use serde::Serialize;
 use std::net::SocketAddr;
@@ -149,7 +152,7 @@ async fn verify_endpoint(
 }
 
 /// Build the Axum router
-fn build_router(tls_enabled: bool) -> Router {
+fn build_router(tls_enabled: bool, policy_state: PolicyState) -> Router {
     // Closure to capture tls_enabled for health check
     let health_handler = move || health_check(tls_enabled);
 
@@ -162,14 +165,22 @@ fn build_router(tls_enabled: bool) -> Router {
     // Build protected routes (with OAuth2 auth + metrics)
     let protected_routes = Router::new()
         .route("/verify", post(verify_endpoint))
+        .route("/proof/upload", post(handle_upload))
         .route("/policy/compile", post(handle_policy_compile))
         .route("/policy/:id", get(handle_policy_get))
         .route("/policy/v2/compile", post(handle_policy_v2_compile))
         .route("/policy/v2/:id", get(handle_policy_v2_get))
         .layer(middleware::from_fn(auth_middleware))
-        .layer(middleware::from_fn(metrics_middleware));
+        .layer(middleware::from_fn(metrics_middleware))
+        .with_state(policy_state);
 
-    public_routes.merge(protected_routes)
+    // Add CORS layer for WebUI access
+    let cors = CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
+        .allow_headers(Any);
+
+    public_routes.merge(protected_routes).layer(cors)
 }
 
 #[tokio::main]
@@ -191,6 +202,29 @@ async fn main() {
     init_metrics();
     info!("📊 Prometheus metrics initialized");
 
+    // Initialize Policy Store based on environment variable
+    let policy_store_backend =
+        std::env::var("POLICY_STORE_BACKEND").unwrap_or_else(|_| "memory".to_string());
+    let policy_db_path =
+        std::env::var("POLICY_DB_PATH").unwrap_or_else(|_| "build/policies.sqlite".to_string());
+
+    let policy_state = match policy_store_backend.as_str() {
+        "sqlite" => {
+            info!("🗄️  Using SQLite Policy Store: {}", policy_db_path);
+            match SqlitePolicyStore::new(&policy_db_path) {
+                Ok(store) => PolicyState::new(store),
+                Err(e) => {
+                    error!("❌ Failed to initialize SQLite Policy Store: {}", e);
+                    std::process::exit(1);
+                }
+            }
+        }
+        "memory" | _ => {
+            info!("💾 Using In-Memory Policy Store");
+            PolicyState::new(InMemoryPolicyStore::new())
+        }
+    };
+
     // Parse bind address
     let addr: SocketAddr = args
         .bind
@@ -211,7 +245,7 @@ async fn main() {
     };
 
     // Build router
-    let app = build_router(tls_mode != TlsMode::Disabled);
+    let app = build_router(tls_mode != TlsMode::Disabled, policy_state);
 
     // Start server based on TLS mode
     match tls_mode {

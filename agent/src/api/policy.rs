@@ -1,25 +1,30 @@
-use crate::policy::{Policy, PolicyInfo};
-use anyhow::{anyhow, Result};
+use crate::policy::{Policy, PolicyStore, PolicyMetadata};
 /// Policy API - REST Endpoints for Policy Management
 ///
 /// Endpoints:
 /// - POST /policy/compile - Compiles and validates a policy
-/// - GET /policy/:id - Retrieves a policy by hash
-use axum::{extract::Path, http::StatusCode, Json};
+/// - GET /policy/:id - Retrieves a policy by hash or UUID
+use axum::{extract::{Path, State}, http::StatusCode, Json};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::Arc;
+use tokio::sync::RwLock;
 
 // ============================================================================
-// In-Memory Policy Store (Thread-Safe)
+// Application State
 // ============================================================================
 
-static POLICY_STORE: OnceLock<Arc<Mutex<HashMap<String, Policy>>>> = OnceLock::new();
+/// Shared application state containing the policy store
+#[derive(Clone)]
+pub struct PolicyState {
+    pub store: Arc<RwLock<Box<dyn PolicyStore + Send + Sync>>>,
+}
 
-fn get_store() -> Arc<Mutex<HashMap<String, Policy>>> {
-    POLICY_STORE
-        .get_or_init(|| Arc::new(Mutex::new(HashMap::new())))
-        .clone()
+impl PolicyState {
+    pub fn new<S: PolicyStore + Send + Sync + 'static>(store: S) -> Self {
+        Self {
+            store: Arc::new(RwLock::new(Box::new(store))),
+        }
+    }
 }
 
 // ============================================================================
@@ -36,10 +41,12 @@ pub struct PolicyCompileRequest {
 /// Response after policy compilation
 #[derive(Debug, Serialize)]
 pub struct PolicyCompileResponse {
+    /// Policy UUID
+    pub policy_id: String,
     /// Policy hash (SHA3-256)
     pub policy_hash: String,
-    /// Policy info
-    pub policy_info: PolicyInfo,
+    /// Policy metadata
+    pub metadata: PolicyMetadata,
     /// Status message
     pub status: String,
 }
@@ -47,49 +54,10 @@ pub struct PolicyCompileResponse {
 /// Response for policy retrieval
 #[derive(Debug, Serialize)]
 pub struct PolicyGetResponse {
-    /// Policy hash
-    pub policy_hash: String,
+    /// Policy metadata
+    pub metadata: PolicyMetadata,
     /// Full policy definition
     pub policy: Policy,
-}
-
-// ============================================================================
-// Helper Functions
-// ============================================================================
-
-/// Computes SHA3-256 hash of a policy
-fn compute_policy_hash(policy: &Policy) -> Result<String> {
-    use sha3::{Digest, Sha3_256};
-
-    let json =
-        serde_json::to_string(policy).map_err(|e| anyhow!("Failed to serialize policy: {}", e))?;
-
-    let mut hasher = Sha3_256::new();
-    hasher.update(json.as_bytes());
-    let result = hasher.finalize();
-
-    Ok(format!("0x{}", hex::encode(result)))
-}
-
-/// Stores a policy in the in-memory store
-fn store_policy(hash: String, policy: Policy) -> Result<()> {
-    let store = get_store();
-    let mut map = store
-        .lock()
-        .map_err(|e| anyhow!("Failed to lock policy store: {}", e))?;
-
-    map.insert(hash, policy);
-    Ok(())
-}
-
-/// Retrieves a policy from the in-memory store
-fn get_policy(hash: &str) -> Result<Option<Policy>> {
-    let store = get_store();
-    let map = store
-        .lock()
-        .map_err(|e| anyhow!("Failed to lock policy store: {}", e))?;
-
-    Ok(map.get(hash).cloned())
 }
 
 // ============================================================================
@@ -98,8 +66,9 @@ fn get_policy(hash: &str) -> Result<Option<Policy>> {
 
 /// Handles POST /policy/compile
 ///
-/// Validates and compiles a policy, returns policy hash
+/// Validates and compiles a policy, returns policy hash and metadata
 pub async fn handle_policy_compile(
+    State(state): State<PolicyState>,
     Json(request): Json<PolicyCompileRequest>,
 ) -> Result<Json<PolicyCompileResponse>, StatusCode> {
     // Validate policy
@@ -108,52 +77,53 @@ pub async fn handle_policy_compile(
         StatusCode::BAD_REQUEST
     })?;
 
-    // Compute policy hash
-    let policy_hash = compute_policy_hash(&request.policy).map_err(|e| {
-        tracing::error!("Failed to compute policy hash: {}", e);
+    // Save policy (this computes hash and creates metadata)
+    let store = state.store.write().await;
+    let metadata = store.save(request.policy.clone()).await.map_err(|e| {
+        tracing::error!("Failed to save policy: {}", e);
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
-    // Store policy
-    store_policy(policy_hash.clone(), request.policy.clone()).map_err(|e| {
-        tracing::error!("Failed to store policy: {}", e);
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
-
-    // Create policy info
-    let policy_info = PolicyInfo {
-        name: request.policy.name.clone(),
-        version: request.policy.version.clone(),
-        hash: policy_hash.clone(),
-    };
-
-    tracing::info!("Policy compiled successfully: {}", policy_hash);
+    tracing::info!("Policy compiled successfully: {} (hash: {})", metadata.id, metadata.hash);
 
     Ok(Json(PolicyCompileResponse {
-        policy_hash,
-        policy_info,
+        policy_id: metadata.id.to_string(),
+        policy_hash: metadata.hash.clone(),
+        metadata,
         status: "compiled".to_string(),
     }))
 }
 
 /// Handles GET /policy/:id
 ///
-/// Retrieves a policy by its hash
+/// Retrieves a policy by its UUID or hash
 pub async fn handle_policy_get(
+    State(state): State<PolicyState>,
     Path(policy_id): Path<String>,
 ) -> Result<Json<PolicyGetResponse>, StatusCode> {
-    // Retrieve policy
-    let policy = get_policy(&policy_id).map_err(|e| {
-        tracing::error!("Failed to retrieve policy: {}", e);
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
+    let store = state.store.read().await;
 
-    match policy {
-        Some(policy) => {
+    // Try to get by UUID first, then by hash
+    let compiled_policy = if policy_id.starts_with("0x") {
+        // Hash lookup
+        store.get_by_hash(&policy_id).await.map_err(|e| {
+            tracing::error!("Failed to retrieve policy by hash: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?
+    } else {
+        // UUID lookup
+        store.get(&policy_id).await.map_err(|e| {
+            tracing::error!("Failed to retrieve policy by ID: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?
+    };
+
+    match compiled_policy {
+        Some(compiled) => {
             tracing::info!("Policy retrieved successfully: {}", policy_id);
             Ok(Json(PolicyGetResponse {
-                policy_hash: policy_id,
-                policy,
+                metadata: compiled.metadata,
+                policy: compiled.policy,
             }))
         }
         None => {
@@ -170,10 +140,10 @@ pub async fn handle_policy_get(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::policy::PolicyConstraints;
+    use crate::policy::{PolicyConstraints, InMemoryPolicyStore};
 
-    #[test]
-    fn test_compute_policy_hash() {
+    #[tokio::test]
+    async fn test_policy_compile_and_get() {
         let policy = Policy {
             version: "lksg.v1".to_string(),
             name: "Test Policy".to_string(),
@@ -184,34 +154,60 @@ mod tests {
                 ubo_count_min: None,
                 require_statement_roots: None,
             },
-            notes: "".to_string(),
+            notes: "Test policy".to_string(),
         };
 
-        let hash = compute_policy_hash(&policy).unwrap();
-        assert!(hash.starts_with("0x"));
-        assert_eq!(hash.len(), 66); // 0x + 64 hex chars
+        // Create state with in-memory store
+        let state = PolicyState::new(InMemoryPolicyStore::new());
+
+        // Compile policy
+        let compile_req = PolicyCompileRequest {
+            policy: policy.clone(),
+        };
+        let compile_resp = handle_policy_compile(
+            State(state.clone()),
+            Json(compile_req),
+        )
+        .await
+        .expect("Compilation should succeed");
+
+        let resp_data = compile_resp.0;
+        assert_eq!(resp_data.status, "compiled");
+        assert!(resp_data.policy_hash.starts_with("0x"));
+        assert_eq!(resp_data.policy_hash.len(), 66); // 0x + 64 hex chars
+
+        // Retrieve by UUID
+        let get_resp = handle_policy_get(
+            State(state.clone()),
+            Path(resp_data.policy_id.clone()),
+        )
+        .await
+        .expect("Get by UUID should succeed");
+
+        assert_eq!(get_resp.0.policy.name, "Test Policy");
+
+        // Retrieve by hash
+        let get_resp_hash = handle_policy_get(
+            State(state.clone()),
+            Path(resp_data.policy_hash.clone()),
+        )
+        .await
+        .expect("Get by hash should succeed");
+
+        assert_eq!(get_resp_hash.0.policy.name, "Test Policy");
     }
 
-    #[test]
-    fn test_store_and_get_policy() {
-        let policy = Policy {
-            version: "lksg.v1".to_string(),
-            name: "Test Policy".to_string(),
-            created_at: "2025-11-06T10:00:00Z".to_string(),
-            constraints: PolicyConstraints {
-                require_at_least_one_ubo: true,
-                supplier_count_max: 10,
-                ubo_count_min: None,
-                require_statement_roots: None,
-            },
-            notes: "".to_string(),
-        };
+    #[tokio::test]
+    async fn test_policy_not_found() {
+        let state = PolicyState::new(InMemoryPolicyStore::new());
 
-        let hash = compute_policy_hash(&policy).unwrap();
-        store_policy(hash.clone(), policy.clone()).unwrap();
+        let result = handle_policy_get(
+            State(state),
+            Path("nonexistent-id".to_string()),
+        )
+        .await;
 
-        let retrieved = get_policy(&hash).unwrap();
-        assert!(retrieved.is_some());
-        assert_eq!(retrieved.unwrap().name, "Test Policy");
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), StatusCode::NOT_FOUND);
     }
 }

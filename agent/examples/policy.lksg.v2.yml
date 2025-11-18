@@ -1,0 +1,29 @@
+id: "lksg.demo.v1"
+version: "1.0"
+legal_basis:
+  - directive: "LkSG"
+    article: "§3 Abs. 1"
+description: "LkSG Demo Policy - Supply Chain Due Diligence Requirements"
+inputs:
+  supplier_hashes:
+    type: "array"
+    items: "string"
+  ubo_hashes:
+    type: "array"
+    items: "string"
+  company_commitment_root:
+    type: "string"
+  sanctions_root:
+    type: "string"
+rules:
+  - id: "ubo_not_sanctioned"
+    op: "non_membership"
+    lhs:
+      var: "ubo_hashes"
+    rhs:
+      var: "sanctions_root"
+  - id: "supplier_count_check"
+    op: "range_min"
+    lhs:
+      var: "supplier_hashes"
+    rhs: 1

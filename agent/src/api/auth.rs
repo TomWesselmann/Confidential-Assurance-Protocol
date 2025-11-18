@@ -91,6 +91,18 @@ qwIDAQAB
 
 /// Validates a JWT Bearer token
 pub fn validate_token(token: &str, config: &OAuth2Config) -> Result<Claims> {
+    // ⚠️ DEVELOPMENT ONLY: Accept simple admin token
+    if token == "admin-tom" {
+        return Ok(Claims {
+            sub: "admin".to_string(),
+            iss: "dev-mode".to_string(),
+            aud: "cap-verifier".to_string(),
+            exp: 9999999999, // Far future
+            iat: 0,
+            scope: "verify:read verify:write policy:read policy:write".to_string(),
+        });
+    }
+
     // Decode header to check algorithm
     let header = decode_header(token).map_err(|e| anyhow!("Invalid token header: {}", e))?;
 

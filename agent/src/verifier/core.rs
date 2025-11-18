@@ -166,13 +166,17 @@ pub fn extract_statement_from_manifest(
     })
 }
 
-/// Validates that a string is a valid 32-byte hex hash with 0x prefix
+/// Validates that a string is a valid 32-byte hex hash with 0x or sha3-256: prefix
 fn validate_hex32(hex_str: &str, field_name: &str) -> Result<()> {
-    if !hex_str.starts_with("0x") {
-        return Err(anyhow!("{}: must start with '0x'", field_name));
-    }
+    // Support both 0x and sha3-256: prefixes (for compatibility with PolicyV2)
+    let hex_part = if hex_str.starts_with("0x") {
+        &hex_str[2..]
+    } else if hex_str.starts_with("sha3-256:") {
+        &hex_str[9..]
+    } else {
+        return Err(anyhow!("{}: must start with '0x' or 'sha3-256:'", field_name));
+    };
 
-    let hex_part = &hex_str[2..];
     if hex_part.len() != 64 {
         return Err(anyhow!(
             "{}: expected 64 hex characters (32 bytes), got {}",

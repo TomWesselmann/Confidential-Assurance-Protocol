@@ -323,7 +323,12 @@ fn build_manifest_from_context(req: &VerifyRequest) -> Result<serde_json::Value>
 
 /// Computes company commitment root from supplier and UBO hashes
 fn compute_company_root(ctx: &VerifyContext) -> Result<String> {
-    // For mock: just hash the concatenated hashes
+    // If company_commitment_root is already provided (from manifest), use it
+    if let Some(root) = &ctx.company_commitment_root {
+        return Ok(root.clone());
+    }
+
+    // Otherwise compute from individual hashes (mock implementation)
     let mut combined = String::new();
     for h in &ctx.supplier_hashes {
         combined.push_str(h);
@@ -333,7 +338,7 @@ fn compute_company_root(ctx: &VerifyContext) -> Result<String> {
     }
 
     if combined.is_empty() {
-        return Err(anyhow!("No supplier or UBO hashes provided"));
+        return Err(anyhow!("No supplier or UBO hashes provided and no company_commitment_root"));
     }
 
     let hash = crypto::blake3_256(combined.as_bytes());

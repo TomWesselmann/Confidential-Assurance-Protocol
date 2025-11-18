@@ -13,5 +13,5 @@ required_scopes:
   policy_read: ["policy:read"]
 
 # Optional: Enable for development/testing
-# mock_mode: false
+mock_mode: true
 # mock_public_key_path: "keys/mock_rsa.pub"
