@@ -85,24 +85,16 @@ curl http://localhost:8080/healthz
 
 ## 📚 Documentation
 
-### For Non-Technical Users
-- **[01 - System Overview](docs/Projektübersicht/01-overview.md)** - What is CAP? (Business perspective)
-- **[07 - Status & Roadmap](docs/Projektübersicht/07-status-und-roadmap.md)** - Current status and future plans
+### Primary Documentation
+- **[CLAUDE.md](agent/CLAUDE.md)** - Complete technical documentation (all features, architecture, APIs, examples)
+- **[DOCKER_DEPLOYMENT.md](agent/DOCKER_DEPLOYMENT.md)** - Docker & WebUI deployment guide
+- **[GETTING_STARTED.md](agent/docs/GETTING_STARTED.md)** - Beginner-friendly Quick Start
+- **[WEBUI_BACKEND_STATUS.md](agent/WEBUI_BACKEND_STATUS.md)** - WebUI integration status
 
-### For Developers
-- **[CLAUDE.md](agent/CLAUDE.md)** - Complete technical documentation (200+ pages)
-- **[02 - Architecture](docs/Projektübersicht/02-architecture.md)** - System architecture
-- **[03 - Components](docs/Projektübersicht/03-components.md)** - Module overview
-- **[04 - API Reference](docs/Projektübersicht/04-api-reference.md)** - REST API documentation
-
-### For DevOps
-- **[05 - Deployment](docs/Projektübersicht/05-deployment.md)** - Installation & operations guide
-- **[DOCKER_DEPLOYMENT.md](agent/DOCKER_DEPLOYMENT.md)** - Docker deployment guide
-- **[Monitoring README](agent/monitoring/README.md)** - Observability stack guide
+### Deployment & Operations
+- **[Monitoring README](agent/monitoring/README.md)** - Observability stack guide (Prometheus, Grafana, Loki, Jaeger)
 - **[Kubernetes Deployment](agent/kubernetes/README.md)** - K8s deployment configs
-
-### For Troubleshooting
-- **[06 - Troubleshooting](docs/Projektübersicht/06-troubleshooting.md)** - Common issues and solutions
+- **[SLO README](agent/monitoring/slo/README.md)** - SLO/SLI monitoring and error budgets
 
 ---
 
@@ -384,7 +376,7 @@ docker compose up -d
 - Additional ERP Integrations (Oracle, Dynamics)
 - SOC 2 & ISO 27001 Certification
 
-**Full Roadmap:** [docs/Projektübersicht/07-status-und-roadmap.md](docs/Projektübersicht/07-status-und-roadmap.md)
+**Full Details:** See [CLAUDE.md](agent/CLAUDE.md) for complete roadmap and implementation timeline
 
 ---
 
@@ -434,7 +426,7 @@ For licensing inquiries, please contact: [contact information]
 
 ## 📞 Support & Contact
 
-- **Documentation**: [docs/Projektübersicht/](docs/Projektübersicht/)
+- **Documentation**: See [CLAUDE.md](agent/CLAUDE.md) and [DOCKER_DEPLOYMENT.md](agent/DOCKER_DEPLOYMENT.md)
 - **Issues**: [GitHub Issues](https://github.com/TomWesselmann/Confidential-Assurance-Protocol/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/TomWesselmann/Confidential-Assurance-Protocol/discussions)
 
@@ -442,5 +434,5 @@ For licensing inquiries, please contact: [contact information]
 
 **Project Status:** ✅ Production-Ready (Phase 1+2 completed)
 **Current Version:** v0.11.0
-**Last Updated:** November 17, 2025
+**Last Updated:** November 18, 2025
 **MVP Target:** December 31, 2025
