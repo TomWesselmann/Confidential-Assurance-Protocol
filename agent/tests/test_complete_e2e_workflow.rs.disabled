@@ -1,0 +1,417 @@
+/**
+ * Complete End-to-End Workflow Integration Test
+ *
+ * Tests the entire CAP Agent workflow from CSV data to verified proof:
+ * 1. CSV Data → Commitments (prepare)
+ * 2. Commitments → Manifest (manifest build)
+ * 3. Manifest + Policy → Proof (proof build)
+ * 4. Proof → Verification (verifier run)
+ * 5. Proof → Registry (registry add)
+ * 6. Proof → Export (proof export)
+ */
+
+use anyhow::Result;
+use std::fs;
+use std::path::PathBuf;
+use tempfile::TempDir;
+
+#[test]
+fn test_complete_workflow_csv_to_verified_proof() -> Result<()> {
+    // Setup test directory
+    let temp_dir = TempDir::new()?;
+    let test_dir = temp_dir.path();
+
+    // Step 1: Create test CSV files
+    create_test_csv_files(test_dir)?;
+
+    // Step 2: Run prepare command (CSV → Commitments)
+    let commitments_file = test_dir.join("commitments.json");
+    assert!(
+        run_prepare_command(test_dir, &commitments_file).is_ok(),
+        "Step 2: prepare command failed"
+    );
+    assert!(
+        commitments_file.exists(),
+        "Commitments file should exist after prepare"
+    );
+
+    // Step 3: Create test policy
+    let policy_file = create_test_policy(test_dir)?;
+
+    // Step 4: Run manifest build (Commitments → Manifest)
+    let manifest_file = test_dir.join("manifest.json");
+    assert!(
+        run_manifest_build(test_dir, &policy_file, &manifest_file).is_ok(),
+        "Step 4: manifest build failed"
+    );
+    assert!(
+        manifest_file.exists(),
+        "Manifest file should exist after manifest build"
+    );
+
+    // Step 5: Validate manifest structure
+    let manifest_json = fs::read_to_string(&manifest_file)?;
+    assert!(
+        manifest_json.contains("manifest.v1.0"),
+        "Manifest should have correct version"
+    );
+    assert!(
+        manifest_json.contains("company_commitment_root"),
+        "Manifest should contain company_commitment_root"
+    );
+
+    // Step 6: Run proof build (Manifest + Policy → Proof)
+    let proof_file = test_dir.join("proof.dat");
+    assert!(
+        run_proof_build(test_dir, &manifest_file, &policy_file, &proof_file).is_ok(),
+        "Step 6: proof build failed"
+    );
+    assert!(
+        proof_file.exists(),
+        "Proof file should exist after proof build"
+    );
+
+    // Step 7: Verify proof integrity
+    assert!(
+        run_proof_verify(&proof_file, &manifest_file).is_ok(),
+        "Step 7: proof verify failed"
+    );
+
+    // Step 8: Export proof package
+    let package_dir = test_dir.join("proof_package");
+    assert!(
+        run_proof_export(&manifest_file, &proof_file, &package_dir).is_ok(),
+        "Step 8: proof export failed"
+    );
+    assert!(
+        package_dir.exists(),
+        "Proof package directory should exist"
+    );
+    assert!(
+        package_dir.join("manifest.json").exists(),
+        "Package should contain manifest.json"
+    );
+    assert!(
+        package_dir.join("proof.dat").exists(),
+        "Package should contain proof.dat"
+    );
+    assert!(
+        package_dir.join("_meta.json").exists(),
+        "Package should contain _meta.json"
+    );
+
+    // Step 9: Verify proof package
+    assert!(
+        run_verifier_package(&package_dir).is_ok(),
+        "Step 9: verifier run failed on exported package"
+    );
+
+    println!("✅ Complete E2E Workflow Test PASSED");
+    println!("   - CSV → Commitments ✅");
+    println!("   - Commitments → Manifest ✅");
+    println!("   - Manifest + Policy → Proof ✅");
+    println!("   - Proof Verification ✅");
+    println!("   - Proof Export ✅");
+    println!("   - Package Verification ✅");
+
+    Ok(())
+}
+
+#[test]
+fn test_workflow_with_registry() -> Result<()> {
+    let temp_dir = TempDir::new()?;
+    let test_dir = temp_dir.path();
+
+    // Complete workflow up to proof
+    create_test_csv_files(test_dir)?;
+    let commitments_file = test_dir.join("commitments.json");
+    run_prepare_command(test_dir, &commitments_file)?;
+
+    let policy_file = create_test_policy(test_dir)?;
+    let manifest_file = test_dir.join("manifest.json");
+    run_manifest_build(test_dir, &policy_file, &manifest_file)?;
+
+    let proof_file = test_dir.join("proof.dat");
+    run_proof_build(test_dir, &manifest_file, &policy_file, &proof_file)?;
+
+    // Add to registry
+    let registry_file = test_dir.join("registry.json");
+    assert!(
+        run_registry_add(&manifest_file, &proof_file, &registry_file).is_ok(),
+        "Registry add failed"
+    );
+    assert!(registry_file.exists(), "Registry file should exist");
+
+    // Verify registry entry
+    let registry_json = fs::read_to_string(&registry_file)?;
+    assert!(
+        registry_json.contains("entries"),
+        "Registry should have entries"
+    );
+
+    println!("✅ Workflow with Registry Test PASSED");
+    Ok(())
+}
+
+#[test]
+fn test_workflow_failure_invalid_policy() -> Result<()> {
+    let temp_dir = TempDir::new()?;
+    let test_dir = temp_dir.path();
+
+    // Create CSV files
+    create_test_csv_files(test_dir)?;
+    let commitments_file = test_dir.join("commitments.json");
+    run_prepare_command(test_dir, &commitments_file)?;
+
+    // Create INVALID policy
+    let invalid_policy = test_dir.join("invalid_policy.yml");
+    fs::write(
+        &invalid_policy,
+        "version: invalid\nname: Bad Policy\nconstraints: {}\n",
+    )?;
+
+    // Manifest build should fail with invalid policy
+    let manifest_file = test_dir.join("manifest.json");
+    let result = run_manifest_build(test_dir, &invalid_policy, &manifest_file);
+
+    assert!(
+        result.is_err(),
+        "Manifest build should fail with invalid policy"
+    );
+
+    println!("✅ Invalid Policy Failure Test PASSED");
+    Ok(())
+}
+
+// Helper functions
+
+fn create_test_csv_files(test_dir: &std::path::Path) -> Result<()> {
+    // Create suppliers.csv
+    let suppliers_csv = test_dir.join("suppliers.csv");
+    fs::write(
+        &suppliers_csv,
+        "name,jurisdiction,tier\nAcme Corp,Germany,1\nGlobal Inc,USA,2\n",
+    )?;
+
+    // Create ubos.csv
+    let ubos_csv = test_dir.join("ubos.csv");
+    fs::write(
+        &ubos_csv,
+        "name,birthdate,citizenship\nJohn Doe,1980-01-01,USA\n",
+    )?;
+
+    Ok(())
+}
+
+fn create_test_policy(test_dir: &std::path::Path) -> Result<PathBuf> {
+    let policy_file = test_dir.join("test_policy.yml");
+    fs::write(
+        &policy_file,
+        r#"
+version: "lksg.v1"
+name: "Test Policy"
+created_at: "2025-11-20T10:00:00Z"
+constraints:
+  require_at_least_one_ubo: true
+  supplier_count_max: 10
+notes: "E2E Test Policy"
+"#,
+    )?;
+    Ok(policy_file)
+}
+
+fn run_prepare_command(
+    test_dir: &std::path::Path,
+    _commitments_file: &std::path::Path,
+) -> Result<()> {
+    use cap_agent::commitment;
+    use cap_agent::io::{read_suppliers_csv, read_ubos_csv};
+
+    let suppliers = read_suppliers_csv(&test_dir.join("suppliers.csv"))?;
+    let ubos = read_ubos_csv(&test_dir.join("ubos.csv"))?;
+
+    let supplier_root = commitment::compute_supplier_root(&suppliers);
+    let ubo_root = commitment::compute_ubo_root(&ubos);
+    let company_root = commitment::compute_company_commitment_root(&supplier_root, &ubo_root);
+
+    let commitments = serde_json::json!({
+        "supplier_root": format!("0x{}", hex::encode(supplier_root)),
+        "ubo_root": format!("0x{}", hex::encode(ubo_root)),
+        "company_commitment_root": format!("0x{}", hex::encode(company_root)),
+        "supplier_count": suppliers.len(),
+        "ubo_count": ubos.len(),
+    });
+
+    fs::write(
+        test_dir.join("commitments.json"),
+        serde_json::to_string_pretty(&commitments)?,
+    )?;
+
+    Ok(())
+}
+
+fn run_manifest_build(
+    test_dir: &std::path::Path,
+    policy_file: &std::path::Path,
+    manifest_file: &std::path::Path,
+) -> Result<()> {
+    use cap_agent::manifest::Manifest;
+    use cap_agent::policy::Policy;
+
+    let commitments_json = fs::read_to_string(test_dir.join("commitments.json"))?;
+    let commitments: serde_json::Value = serde_json::from_str(&commitments_json)?;
+
+    let policy_yaml = fs::read_to_string(policy_file)?;
+    let policy: Policy = serde_yaml::from_str(&policy_yaml)?;
+
+    let manifest = Manifest::build(&commitments, &policy)?;
+
+    fs::write(
+        manifest_file,
+        serde_json::to_string_pretty(&manifest)?,
+    )?;
+
+    Ok(())
+}
+
+fn run_proof_build(
+    _test_dir: &std::path::Path,
+    manifest_file: &std::path::Path,
+    policy_file: &std::path::Path,
+    proof_file: &std::path::Path,
+) -> Result<()> {
+    use cap_agent::manifest::Manifest;
+    use cap_agent::policy::Policy;
+    use cap_agent::proof_engine::Proof;
+
+    let manifest_json = fs::read_to_string(manifest_file)?;
+    let manifest: Manifest = serde_json::from_str(&manifest_json)?;
+
+    let policy_yaml = fs::read_to_string(policy_file)?;
+    let policy: Policy = serde_yaml::from_str(&policy_yaml)?;
+
+    let proof = Proof::build(&policy, &manifest, &serde_json::json!({}))?;
+
+    // Save as base64-encoded dat file
+    let proof_json = serde_json::to_string(&proof)?;
+    let proof_base64 = base64::encode(proof_json);
+    fs::write(proof_file, proof_base64)?;
+
+    Ok(())
+}
+
+fn run_proof_verify(proof_file: &std::path::Path, manifest_file: &std::path::Path) -> Result<()> {
+    use cap_agent::manifest::Manifest;
+    use cap_agent::proof_engine::Proof;
+
+    let proof_base64 = fs::read_to_string(proof_file)?;
+    let proof_json = base64::decode(proof_base64)?;
+    let proof: Proof = serde_json::from_slice(&proof_json)?;
+
+    let manifest_json = fs::read_to_string(manifest_file)?;
+    let manifest: Manifest = serde_json::from_str(&manifest_json)?;
+
+    proof.verify(&manifest)?;
+
+    Ok(())
+}
+
+fn run_proof_export(
+    manifest_file: &std::path::Path,
+    proof_file: &std::path::Path,
+    package_dir: &std::path::Path,
+) -> Result<()> {
+    use cap_agent::proof_engine;
+
+    fs::create_dir_all(package_dir)?;
+
+    // Copy manifest
+    fs::copy(manifest_file, package_dir.join("manifest.json"))?;
+
+    // Copy proof
+    fs::copy(proof_file, package_dir.join("proof.dat"))?;
+
+    // Create _meta.json
+    let meta = serde_json::json!({
+        "version": "cap-proof.v1.0",
+        "created_at": chrono::Utc::now().to_rfc3339(),
+        "files": {
+            "manifest": "manifest.json",
+            "proof": "proof.dat",
+        }
+    });
+    fs::write(
+        package_dir.join("_meta.json"),
+        serde_json::to_string_pretty(&meta)?,
+    )?;
+
+    // Create README
+    fs::write(
+        package_dir.join("README.txt"),
+        "CAP Proof Package v1.0\n\nContains:\n- manifest.json\n- proof.dat\n- _meta.json\n",
+    )?;
+
+    Ok(())
+}
+
+fn run_verifier_package(package_dir: &std::path::Path) -> Result<()> {
+    // Verify package integrity
+    assert!(
+        package_dir.join("manifest.json").exists(),
+        "Package missing manifest.json"
+    );
+    assert!(
+        package_dir.join("proof.dat").exists(),
+        "Package missing proof.dat"
+    );
+    assert!(
+        package_dir.join("_meta.json").exists(),
+        "Package missing _meta.json"
+    );
+
+    // Verify proof against manifest
+    run_proof_verify(
+        &package_dir.join("proof.dat"),
+        &package_dir.join("manifest.json"),
+    )?;
+
+    Ok(())
+}
+
+fn run_registry_add(
+    manifest_file: &std::path::Path,
+    proof_file: &std::path::Path,
+    registry_file: &std::path::Path,
+) -> Result<()> {
+    use cap_agent::registry::api::{open_registry, save_registry};
+    use cap_agent::registry::schema::RegistryEntryBuilder;
+
+    // Load or create registry
+    let mut registry = if registry_file.exists() {
+        open_registry(registry_file)?
+    } else {
+        cap_agent::registry::schema::Registry::new()
+    };
+
+    // Compute hashes
+    use cap_agent::crypto;
+    let manifest_bytes = fs::read(manifest_file)?;
+    let proof_bytes = fs::read(proof_file)?;
+
+    let manifest_hash = hex::encode(crypto::sha3_256(&manifest_bytes));
+    let proof_hash = hex::encode(crypto::sha3_256(&proof_bytes));
+
+    // Create entry
+    let entry = RegistryEntryBuilder::new()
+        .id(format!("entry_{}", uuid::Uuid::new_v4()))
+        .manifest_hash(format!("0x{}", manifest_hash))
+        .proof_hash(format!("0x{}", proof_hash))
+        .build();
+
+    registry.add_entry(entry);
+
+    // Save registry
+    save_registry(&registry, registry_file)?;
+
+    Ok(())
+}

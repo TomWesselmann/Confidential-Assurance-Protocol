@@ -1257,12 +1257,13 @@ fn run_proof_build(policy_path: &str, manifest_path: &str) -> Result<(), Box<dyn
     let policy = policy::Policy::load(policy_path)?;
     let manifest = manifest::Manifest::load(manifest_path)?;
 
-    // Lade Original-Daten für Count
-    let suppliers = io::read_suppliers_csv("../examples/suppliers.csv").unwrap_or_default();
-    let ubos = io::read_ubos_csv("../examples/ubos.csv").unwrap_or_default();
+    // Lade Commitments für Count-Daten
+    let commitments = commitment::load_commitments("build/commitments.json")?;
+    let supplier_count = commitments.supplier_count.unwrap_or(0);
+    let ubo_count = commitments.ubo_count.unwrap_or(0);
 
     // Generiere Proof
-    let proof = proof_engine::Proof::build(&policy, &manifest, suppliers.len(), ubos.len())?;
+    let proof = proof_engine::Proof::build(&policy, &manifest, supplier_count, ubo_count)?;
 
     // Speichere als .dat und .json
     let output_path_dat = "build/proof.dat";

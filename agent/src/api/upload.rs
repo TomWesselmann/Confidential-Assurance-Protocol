@@ -164,8 +164,8 @@ mod tests {
         // Create empty ZIP
         let cursor = std::io::Cursor::new(Vec::new());
         let mut zip = zip::ZipWriter::new(cursor);
-        zip.finish().unwrap();
-        let empty_zip = zip.into_inner().into_inner();
+        let cursor = zip.finish().unwrap();
+        let empty_zip = cursor.into_inner();
 
         // Should fail with missing files
         let result = parse_proof_package(&empty_zip);
