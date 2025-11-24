@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use async_trait::async_trait;
 use anyhow::Result;
 use crate::policy::Policy;
@@ -39,5 +40,5 @@ pub fn compute_policy_hash(policy: &Policy) -> Result<String> {
 
 /// Generate ISO 8601 timestamp
 pub fn now_iso8601() -> String {
-    chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true)
+    chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true)
 }

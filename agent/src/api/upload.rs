@@ -158,17 +158,111 @@ fn parse_proof_package(zip_bytes: &[u8]) -> Result<(serde_json::Value, String, P
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Write;
+
+    /// Helper: Create a test ZIP with manifest.json and proof.dat
+    fn create_test_zip(include_manifest: bool, include_proof: bool, valid_manifest: bool) -> Vec<u8> {
+        let cursor = std::io::Cursor::new(Vec::new());
+        let mut zip = zip::ZipWriter::new(cursor);
+
+        // Add manifest.json if requested
+        if include_manifest {
+            zip.start_file("manifest.json", zip::write::SimpleFileOptions::default()).unwrap();
+            if valid_manifest {
+                let manifest = r#"{
+                    "version": "manifest.v1.0",
+                    "company_commitment_root": "0x1234567890abcdef",
+                    "supplier_root": "0xabcd",
+                    "ubo_root": "0xef01"
+                }"#;
+                zip.write_all(manifest.as_bytes()).unwrap();
+            } else {
+                // Invalid JSON
+                zip.write_all(b"{ invalid json }").unwrap();
+            }
+        }
+
+        // Add proof.dat if requested
+        if include_proof {
+            zip.start_file("proof.dat", zip::write::SimpleFileOptions::default()).unwrap();
+            zip.write_all(b"proof_data_here").unwrap();
+        }
+
+        let cursor = zip.finish().unwrap();
+        cursor.into_inner()
+    }
 
     #[test]
     fn test_parse_proof_package_missing_files() {
         // Create empty ZIP
         let cursor = std::io::Cursor::new(Vec::new());
-        let mut zip = zip::ZipWriter::new(cursor);
+        let zip = zip::ZipWriter::new(cursor);
         let cursor = zip.finish().unwrap();
         let empty_zip = cursor.into_inner();
 
         // Should fail with missing files
         let result = parse_proof_package(&empty_zip);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_proof_package_success() {
+        // Create valid ZIP with both files
+        let zip_bytes = create_test_zip(true, true, true);
+
+        // Should succeed
+        let result = parse_proof_package(&zip_bytes);
+        assert!(result.is_ok());
+
+        let (manifest, proof_base64, package_info) = result.unwrap();
+
+        // Verify manifest fields
+        assert!(manifest.get("company_commitment_root").is_some());
+        assert_eq!(
+            manifest["company_commitment_root"].as_str().unwrap(),
+            "0x1234567890abcdef"
+        );
+
+        // Verify proof is base64 encoded
+        assert!(!proof_base64.is_empty());
+
+        // Verify package info
+        assert_eq!(package_info.file_count, 2);
+        assert_eq!(package_info.files.len(), 2);
+        assert!(package_info.files.contains(&"manifest.json".to_string()));
+        assert!(package_info.files.contains(&"proof.dat".to_string()));
+    }
+
+    #[test]
+    fn test_parse_proof_package_missing_manifest() {
+        // Create ZIP with only proof.dat
+        let zip_bytes = create_test_zip(false, true, false);
+
+        // Should fail
+        let result = parse_proof_package(&zip_bytes);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("manifest.json not found"));
+    }
+
+    #[test]
+    fn test_parse_proof_package_missing_proof() {
+        // Create ZIP with only manifest.json
+        let zip_bytes = create_test_zip(true, false, true);
+
+        // Should fail
+        let result = parse_proof_package(&zip_bytes);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("proof.dat not found"));
+    }
+
+    #[test]
+    fn test_parse_proof_package_invalid_manifest_json() {
+        // Create ZIP with invalid JSON in manifest
+        let zip_bytes = create_test_zip(true, true, false);
+
+        // Should fail
+        let result = parse_proof_package(&zip_bytes);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Invalid manifest.json"));
     }
 }

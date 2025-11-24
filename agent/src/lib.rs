@@ -6,6 +6,7 @@ pub mod api;
 pub mod audit;
 pub mod auth;
 pub mod blob_store;
+pub mod bundle;
 pub mod crypto;
 pub mod http;
 pub mod keys;
@@ -19,3 +20,11 @@ pub mod registry;
 pub mod tls;
 pub mod verifier;
 pub mod wasm;
+
+// Binary-only modules exported for integration testing
+// These modules are primarily used by the CLI binary (main.rs)
+// but are exported here to enable integration tests and Tarpaulin coverage
+pub mod commitment;
+pub mod io;
+pub mod manifest;
+pub mod sign;

@@ -8,9 +8,9 @@
 /// - GET /readyz - Readiness Check
 /// - GET /metrics - Prometheus metrics
 use axum::{
-    http::{StatusCode, Method},
+    http::{StatusCode, Method, header},
     middleware,
-    response::Response,
+    response::{Response, IntoResponse},
     routing::{get, post},
     Json, Router,
 };
@@ -20,6 +20,7 @@ use cap_agent::api::auth::auth_middleware;
 use cap_agent::api::metrics_middleware::metrics_middleware;
 use cap_agent::api::policy::{handle_policy_compile, handle_policy_get, PolicyState};
 use cap_agent::api::policy_compiler::{handle_policy_v2_compile, handle_policy_v2_get};
+use cap_agent::api::rate_limit::{rate_limiter_layer, RateLimitConfig};
 use cap_agent::api::tls::{TlsConfig, TlsMode};
 use cap_agent::api::upload::handle_upload;
 use cap_agent::api::verify::{handle_verify, VerifyRequest, VerifyResponse};
@@ -58,6 +59,14 @@ struct Args {
     /// Path to CA certificate for mTLS client verification
     #[arg(long, required_if_eq("mtls", "true"))]
     tls_ca: Option<String>,
+
+    /// Rate limit: requests per minute (default: 100)
+    #[arg(long, default_value = "100")]
+    rate_limit: u32,
+
+    /// Rate limit: burst size (default: 120)
+    #[arg(long, default_value = "120")]
+    rate_limit_burst: u32,
 }
 
 /// Health Check Response
@@ -129,6 +138,17 @@ async fn metrics_endpoint() -> Response {
         .unwrap()
 }
 
+/// OpenAPI Spec Endpoint (serves the YAML file)
+async fn openapi_spec() -> impl IntoResponse {
+    let openapi_yaml = include_str!("../../openapi.yaml");
+
+    (
+        StatusCode::OK,
+        [(header::CONTENT_TYPE, "application/x-yaml")],
+        openapi_yaml
+    )
+}
+
 /// Verify Endpoint
 async fn verify_endpoint(
     Json(payload): Json<VerifyRequest>,
@@ -152,17 +172,18 @@ async fn verify_endpoint(
 }
 
 /// Build the Axum router
-fn build_router(tls_enabled: bool, policy_state: PolicyState) -> Router {
+fn build_router(tls_enabled: bool, policy_state: PolicyState, rate_limit_config: RateLimitConfig) -> Router {
     // Closure to capture tls_enabled for health check
     let health_handler = move || health_check(tls_enabled);
 
-    // Build public routes (no auth)
+    // Build public routes (no auth, no rate limiting for health checks)
     let public_routes = Router::new()
         .route("/healthz", get(health_handler))
         .route("/readyz", get(readiness_check))
-        .route("/metrics", get(metrics_endpoint));
+        .route("/metrics", get(metrics_endpoint))
+        .route("/openapi.yaml", get(openapi_spec));
 
-    // Build protected routes (with OAuth2 auth + metrics)
+    // Build protected routes (with OAuth2 auth + metrics + rate limiting)
     let protected_routes = Router::new()
         .route("/verify", post(verify_endpoint))
         .route("/proof/upload", post(handle_upload))
@@ -172,6 +193,7 @@ fn build_router(tls_enabled: bool, policy_state: PolicyState) -> Router {
         .route("/policy/v2/:id", get(handle_policy_v2_get))
         .layer(middleware::from_fn(auth_middleware))
         .layer(middleware::from_fn(metrics_middleware))
+        .layer(rate_limiter_layer(rate_limit_config))
         .with_state(policy_state);
 
     // Add CORS layer for WebUI access
@@ -219,7 +241,8 @@ async fn main() {
                 }
             }
         }
-        "memory" | _ => {
+        _ => {
+            // Default: In-Memory Policy Store (also covers "memory" explicitly)
             info!("💾 Using In-Memory Policy Store");
             PolicyState::new(InMemoryPolicyStore::new())
         }
@@ -244,8 +267,18 @@ async fn main() {
         TlsMode::Disabled
     };
 
+    // Configure rate limiting
+    let rate_limit_config = RateLimitConfig {
+        requests_per_minute: args.rate_limit,
+        burst_size: args.rate_limit_burst,
+    };
+    info!(
+        "⏱️  Rate limiting: {} req/min, burst {}",
+        rate_limit_config.requests_per_minute, rate_limit_config.burst_size
+    );
+
     // Build router
-    let app = build_router(tls_mode != TlsMode::Disabled, policy_state);
+    let app = build_router(tls_mode != TlsMode::Disabled, policy_state, rate_limit_config);
 
     // Start server based on TLS mode
     match tls_mode {
@@ -253,6 +286,8 @@ async fn main() {
             info!("🎧 Listening on http://{}", addr);
             info!("⚠️  TLS disabled - HTTP only (not recommended for production!)");
             info!("🔒 OAuth2 authentication enabled for /verify");
+            info!("📚 OpenAPI spec available at http://{}/openapi.yaml", addr);
+            info!("💡 View in Swagger Editor: https://editor.swagger.io/?url=http://{}/openapi.yaml", addr);
 
             let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
             axum::serve(listener, app).await.unwrap();
@@ -276,6 +311,7 @@ async fn main() {
 
             info!("🎧 Listening on https://{}", addr);
             info!("🔒 OAuth2 authentication enabled for /verify");
+            info!("📚 Swagger UI available at https://{}/swagger-ui/", addr);
 
             // Use axum-server for TLS
             axum_server::bind_rustls(addr, rustls_config)
@@ -310,6 +346,7 @@ async fn main() {
 
             info!("🎧 Listening on https://{} (mTLS)", addr);
             info!("🔒 OAuth2 authentication + client certificate verification enabled");
+            info!("📚 Swagger UI available at https://{}/swagger-ui/", addr);
 
             // Use axum-server for TLS
             axum_server::bind_rustls(addr, rustls_config)

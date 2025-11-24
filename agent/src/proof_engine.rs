@@ -397,4 +397,267 @@ mod tests {
 
         std::fs::remove_file(temp_path).ok();
     }
+
+    // ====================================================================================
+    // Neue Tests für Coverage-Erweiterung (49% -> 65%+)
+    // ====================================================================================
+
+    // --- build() Edge Cases ---
+
+    #[test]
+    fn test_proof_build_failed_status() {
+        let policy = Policy {
+            version: "lksg.v1".to_string(),
+            name: "Test".to_string(),
+            created_at: "2025-10-25T09:00:00Z".to_string(),
+            constraints: PolicyConstraints {
+                require_at_least_one_ubo: true,
+                supplier_count_max: 5,
+                ubo_count_min: None,
+                require_statement_roots: None,
+            },
+            notes: "".to_string(),
+        };
+
+        let manifest = create_test_manifest();
+
+        // supplier_count = 10 > supplier_count_max = 5 → failed
+        let proof = Proof::build(&policy, &manifest, 10, 2).unwrap();
+
+        assert_eq!(proof.status, "failed");
+        assert_eq!(proof.proof_data.checked_constraints.len(), 2);
+
+        // Check 1: UBO check should pass (ubo_count=2 >= 1)
+        assert!(proof.proof_data.checked_constraints[0].ok);
+
+        // Check 2: Supplier check should fail (10 > 5)
+        assert!(!proof.proof_data.checked_constraints[1].ok);
+    }
+
+    #[test]
+    fn test_proof_build_ubo_check_disabled() {
+        let policy = Policy {
+            version: "lksg.v1".to_string(),
+            name: "Test".to_string(),
+            created_at: "2025-10-25T09:00:00Z".to_string(),
+            constraints: PolicyConstraints {
+                require_at_least_one_ubo: false, // Disabled
+                supplier_count_max: 10,
+                ubo_count_min: None,
+                require_statement_roots: None,
+            },
+            notes: "".to_string(),
+        };
+
+        let manifest = create_test_manifest();
+
+        // ubo_count = 0 but check is disabled
+        let proof = Proof::build(&policy, &manifest, 5, 0).unwrap();
+
+        assert_eq!(proof.status, "ok");
+        // Only supplier check should exist
+        assert_eq!(proof.proof_data.checked_constraints.len(), 1);
+        assert_eq!(
+            proof.proof_data.checked_constraints[0].name,
+            "supplier_count_max_10"
+        );
+    }
+
+    #[test]
+    fn test_proof_build_ubo_check_failed() {
+        let policy = Policy {
+            version: "lksg.v1".to_string(),
+            name: "Test".to_string(),
+            created_at: "2025-10-25T09:00:00Z".to_string(),
+            constraints: PolicyConstraints {
+                require_at_least_one_ubo: true,
+                supplier_count_max: 10,
+                ubo_count_min: None,
+                require_statement_roots: None,
+            },
+            notes: "".to_string(),
+        };
+
+        let manifest = create_test_manifest();
+
+        // ubo_count = 0 < 1 → failed
+        let proof = Proof::build(&policy, &manifest, 5, 0).unwrap();
+
+        assert_eq!(proof.status, "failed");
+        assert!(!proof.proof_data.checked_constraints[0].ok);
+        assert_eq!(
+            proof.proof_data.checked_constraints[0].name,
+            "require_at_least_one_ubo"
+        );
+    }
+
+    // --- verify() Error Cases ---
+
+    #[test]
+    fn test_verify_manifest_hash_mismatch() {
+        let manifest = create_test_manifest();
+
+        let proof = Proof {
+            version: "proof.v0".to_string(),
+            proof_type: "mock".to_string(),
+            statement: "policy:lksg.v1".to_string(),
+            manifest_hash: "0xWRONG".to_string(), // Wrong hash
+            policy_hash: "0xpolicy".to_string(),
+            proof_data: ProofData {
+                checked_constraints: vec![],
+            },
+            status: "ok".to_string(),
+        };
+
+        let result = proof.verify(&manifest);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Manifest-Hash"));
+    }
+
+    #[test]
+    fn test_verify_policy_hash_mismatch() {
+        let manifest = create_test_manifest();
+        let manifest_hash = Proof::compute_manifest_hash(&manifest).unwrap();
+
+        let proof = Proof {
+            version: "proof.v0".to_string(),
+            proof_type: "mock".to_string(),
+            statement: "policy:lksg.v1".to_string(),
+            manifest_hash,
+            policy_hash: "0xWRONG".to_string(), // Wrong hash
+            proof_data: ProofData {
+                checked_constraints: vec![],
+            },
+            status: "ok".to_string(),
+        };
+
+        let result = proof.verify(&manifest);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Policy-Hash"));
+    }
+
+    #[test]
+    fn test_verify_status_not_ok() {
+        let manifest = create_test_manifest();
+        let manifest_hash = Proof::compute_manifest_hash(&manifest).unwrap();
+
+        let proof = Proof {
+            version: "proof.v0".to_string(),
+            proof_type: "mock".to_string(),
+            statement: "policy:lksg.v1".to_string(),
+            manifest_hash,
+            policy_hash: "0xpolicy".to_string(),
+            proof_data: ProofData {
+                checked_constraints: vec![],
+            },
+            status: "failed".to_string(), // Not OK
+        };
+
+        let result = proof.verify(&manifest);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Status ist nicht OK"));
+    }
+
+    #[test]
+    fn test_verify_constraint_failed() {
+        let manifest = create_test_manifest();
+        let manifest_hash = Proof::compute_manifest_hash(&manifest).unwrap();
+
+        let proof = Proof {
+            version: "proof.v0".to_string(),
+            proof_type: "mock".to_string(),
+            statement: "policy:lksg.v1".to_string(),
+            manifest_hash,
+            policy_hash: "0xpolicy".to_string(),
+            proof_data: ProofData {
+                checked_constraints: vec![ConstraintCheck {
+                    name: "test_check".to_string(),
+                    ok: false, // Failed constraint
+                }],
+            },
+            status: "ok".to_string(),
+        };
+
+        let result = proof.verify(&manifest);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("fehlgeschlagen"));
+    }
+
+    // --- save() / load() Roundtrip ---
+
+    #[test]
+    fn test_proof_json_save_load_roundtrip() {
+        let proof = Proof {
+            version: "proof.v0".to_string(),
+            proof_type: "mock".to_string(),
+            statement: "policy:lksg.v1".to_string(),
+            manifest_hash: "0xabc123".to_string(),
+            policy_hash: "0xdef456".to_string(),
+            proof_data: ProofData {
+                checked_constraints: vec![ConstraintCheck {
+                    name: "test".to_string(),
+                    ok: true,
+                }],
+            },
+            status: "ok".to_string(),
+        };
+
+        let temp_path = "/tmp/test_proof.json";
+        proof.save(temp_path).unwrap();
+
+        let loaded = Proof::load(temp_path).unwrap();
+        assert_eq!(proof.version, loaded.version);
+        assert_eq!(proof.manifest_hash, loaded.manifest_hash);
+        assert_eq!(proof.policy_hash, loaded.policy_hash);
+        assert_eq!(proof.status, loaded.status);
+
+        std::fs::remove_file(temp_path).ok();
+    }
+
+    #[test]
+    fn test_load_nonexistent_file() {
+        let result = Proof::load("/tmp/nonexistent_proof.json");
+        assert!(result.is_err());
+    }
+
+    // --- compute_manifest_hash() ---
+
+    #[test]
+    fn test_compute_manifest_hash_deterministic() {
+        let manifest = create_test_manifest();
+
+        let hash1 = Proof::compute_manifest_hash(&manifest).unwrap();
+        let hash2 = Proof::compute_manifest_hash(&manifest).unwrap();
+
+        assert_eq!(hash1, hash2);
+        assert!(hash1.starts_with("0x"));
+        assert_eq!(hash1.len(), 66); // "0x" + 64 hex chars
+    }
+
+    // --- Helper ---
+
+    fn create_test_manifest() -> Manifest {
+        Manifest {
+            version: "manifest.v1.0".to_string(),
+            created_at: "2025-10-25T10:00:00Z".to_string(),
+            supplier_root: "0xabc".to_string(),
+            ubo_root: "0xdef".to_string(),
+            company_commitment_root: "0x123".to_string(),
+            policy: PolicyInfo {
+                name: "Test".to_string(),
+                version: "lksg.v1".to_string(),
+                hash: "0xpolicy".to_string(),
+            },
+            audit: AuditInfo {
+                tail_digest: "0xtail".to_string(),
+                events_count: 5,
+            },
+            proof: ProofInfo {
+                proof_type: "none".to_string(),
+                status: "none".to_string(),
+            },
+            signatures: Vec::new(),
+            time_anchor: None,
+        }
+    }
 }

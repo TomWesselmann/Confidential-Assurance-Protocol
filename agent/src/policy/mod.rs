@@ -10,10 +10,18 @@ pub mod sqlite;       // SqlitePolicyStore
 // pub mod filesystem;   // FileSystemPolicyStore (planned)
 
 // Re-export core types for backward compatibility
-pub use types::{Policy, PolicyConstraints, PolicyInfo};
+pub use types::{Policy, PolicyInfo};
 
-// Re-export new types
+// Allow unused imports for types that may be used in different build targets
+#[allow(unused_imports)]
+pub use types::PolicyConstraints;
+
+// Policy Store types (currently unused, but kept for backward compatibility)
+#[allow(unused_imports)]
 pub use metadata::{CompiledPolicy, PolicyMetadata, PolicyStatus};
+#[allow(unused_imports)]
 pub use store::{compute_policy_hash, now_iso8601, PolicyStore};
+#[allow(unused_imports)]
 pub use in_memory::InMemoryPolicyStore;
+#[allow(unused_imports)]
 pub use sqlite::SqlitePolicyStore;

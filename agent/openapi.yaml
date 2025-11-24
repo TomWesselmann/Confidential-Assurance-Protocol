@@ -1,0 +1,510 @@
+openapi: 3.0.3
+info:
+  title: CAP Verifier API
+  description: |
+    REST API for verifying Content Authenticity Protocol (CAP) proofs.
+
+    ## Features
+    - **Deterministic Verification**: Cryptographic proof validation
+    - **Policy-based**: Flexible policy constraints (YAML/IR)
+    - **Offline-capable**: No external dependencies required
+    - **Production-ready**: TLS/mTLS, OAuth2, Prometheus metrics
+
+    ## Authentication
+    All protected endpoints require OAuth2 Bearer token authentication.
+    Include the token in the Authorization header:
+    ```
+    Authorization: Bearer <your-jwt-token>
+    ```
+  version: 0.1.0
+  contact:
+    name: CAP Agent Team
+    url: https://github.com/your-org/cap-agent
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+
+servers:
+  - url: http://localhost:8080
+    description: Local development (HTTP)
+  - url: https://localhost:8443
+    description: Local development (HTTPS)
+
+tags:
+  - name: verification
+    description: Proof verification operations
+  - name: upload
+    description: Proof package upload operations
+  - name: policy
+    description: Policy management (v1 - YAML)
+  - name: policy-v2
+    description: Policy management (v2 - IR compilation)
+  - name: health
+    description: Health and readiness checks
+  - name: metrics
+    description: Prometheus metrics
+
+paths:
+  /verify:
+    post:
+      tags:
+        - verification
+      summary: Verify a CAP proof
+      description: |
+        Verifies a Content Authenticity Protocol proof against a policy.
+
+        Supports two modes:
+        - **Policy ID mode**: Reference a pre-compiled policy by UUID or hash
+        - **Embedded IR mode**: Include the policy IR directly in the request
+      operationId: verifyProof
+      security:
+        - oauth2: [verify:read]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyRequest'
+            examples:
+              policyId:
+                summary: Verify with policy ID
+                value:
+                  context:
+                    proof_base64: "dmVyaWZ5LXRlc3QtZGF0YQ=="
+                    company_commitment_root: "0x1234567890abcdef"
+                  policy_id: "550e8400-e29b-41d4-a716-446655440000"
+              embeddedIr:
+                summary: Verify with embedded IR
+                value:
+                  context:
+                    proof_base64: "dmVyaWZ5LXRlc3QtZGF0YQ=="
+                    company_commitment_root: "0x1234567890abcdef"
+                  ir: "0x0a1b2c3d..."
+      responses:
+        '200':
+          description: Verification successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerifyResponse'
+              example:
+                status: valid
+                policy_hash: "0xabc123..."
+                verified_at: "2025-11-22T10:30:00Z"
+                constraints_met: true
+        '400':
+          description: Invalid request or verification failed
+        '401':
+          description: Unauthorized - missing or invalid token
+
+  /proof/upload:
+    post:
+      tags:
+        - upload
+      summary: Upload a proof package (ZIP)
+      description: |
+        Uploads a proof package ZIP file and extracts manifest.json and proof.dat.
+        Returns parsed data ready for verification.
+      operationId: uploadProof
+      security:
+        - oauth2: [verify:read]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: ZIP file containing manifest.json and proof.dat
+      responses:
+        '200':
+          description: Upload successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadResponse'
+        '400':
+          description: Invalid ZIP file or missing required files
+        '401':
+          description: Unauthorized
+
+  /policy/compile:
+    post:
+      tags:
+        - policy
+      summary: Compile and store a policy (v1 - YAML)
+      description: |
+        Validates and compiles a policy definition (YAML format).
+        Returns policy UUID and SHA3-256 hash for reference.
+      operationId: compilePolicy
+      security:
+        - oauth2: [verify:read]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PolicyCompileRequest'
+      responses:
+        '200':
+          description: Policy compiled successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PolicyCompileResponse'
+        '400':
+          description: Invalid policy definition
+        '401':
+          description: Unauthorized
+
+  /policy/{id}:
+    get:
+      tags:
+        - policy
+      summary: Retrieve a policy by UUID or hash
+      operationId: getPolicy
+      security:
+        - oauth2: [verify:read]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Policy UUID or hash (0x-prefixed)
+          schema:
+            type: string
+          examples:
+            uuid:
+              value: "550e8400-e29b-41d4-a716-446655440000"
+            hash:
+              value: "0xabc123..."
+      responses:
+        '200':
+          description: Policy found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PolicyGetResponse'
+        '404':
+          description: Policy not found
+        '401':
+          description: Unauthorized
+
+  /policy/v2/compile:
+    post:
+      tags:
+        - policy-v2
+      summary: Compile policy to IR (v2)
+      description: |
+        Compiles a PolicyV2 definition to Intermediate Representation (IR).
+        The IR can be used directly in verification requests.
+      operationId: compilePolicyV2
+      security:
+        - oauth2: [verify:read]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                policy:
+                  type: object
+                  description: PolicyV2 definition with rules and anchors
+      responses:
+        '200':
+          description: Policy compiled to IR
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  policy_id:
+                    type: string
+                  ir_hex:
+                    type: string
+                  metadata:
+                    type: object
+        '400':
+          description: Invalid policy
+        '401':
+          description: Unauthorized
+
+  /policy/v2/{id}:
+    get:
+      tags:
+        - policy-v2
+      summary: Retrieve a PolicyV2 by UUID or hash
+      operationId: getPolicyV2
+      security:
+        - oauth2: [verify:read]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Policy found
+        '404':
+          description: Policy not found
+        '401':
+          description: Unauthorized
+
+  /healthz:
+    get:
+      tags:
+        - health
+      summary: Health check
+      description: Returns server health status
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Server is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /readyz:
+    get:
+      tags:
+        - health
+      summary: Readiness check
+      description: Returns server readiness status (all subsystems operational)
+      operationId: readinessCheck
+      responses:
+        '200':
+          description: Server is ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessResponse'
+
+  /metrics:
+    get:
+      tags:
+        - metrics
+      summary: Prometheus metrics
+      description: Returns metrics in Prometheus text format
+      operationId: getMetrics
+      responses:
+        '200':
+          description: Metrics data
+          content:
+            text/plain:
+              schema:
+                type: string
+
+components:
+  securitySchemes:
+    oauth2:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: OAuth2 JWT token authentication
+
+  schemas:
+    VerifyRequest:
+      type: object
+      required:
+        - context
+      properties:
+        context:
+          $ref: '#/components/schemas/VerifyContext'
+        policy_id:
+          type: string
+          description: UUID or hash of pre-compiled policy (mutually exclusive with ir)
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        ir:
+          type: string
+          description: Hex-encoded policy IR (mutually exclusive with policy_id)
+          example: "0x0a1b2c3d..."
+        options:
+          $ref: '#/components/schemas/VerifyRequestOptions'
+
+    VerifyContext:
+      type: object
+      required:
+        - proof_base64
+        - company_commitment_root
+      properties:
+        proof_base64:
+          type: string
+          format: byte
+          description: Base64-encoded proof data
+        company_commitment_root:
+          type: string
+          description: Hex-encoded company commitment root
+          example: "0x1234567890abcdef"
+
+    VerifyRequestOptions:
+      type: object
+      properties:
+        strict_mode:
+          type: boolean
+          default: false
+        skip_signature_check:
+          type: boolean
+          default: false
+
+    VerifyResponse:
+      type: object
+      required:
+        - status
+        - policy_hash
+      properties:
+        status:
+          type: string
+          enum: [valid, invalid]
+        policy_hash:
+          type: string
+          description: SHA3-256 hash of the policy used
+        verified_at:
+          type: string
+          format: date-time
+        constraints_met:
+          type: boolean
+        errors:
+          type: array
+          items:
+            type: string
+
+    UploadResponse:
+      type: object
+      required:
+        - manifest
+        - proof_base64
+        - company_commitment_root
+        - package_info
+      properties:
+        manifest:
+          type: object
+          description: Parsed manifest.json
+        proof_base64:
+          type: string
+          format: byte
+          description: Base64-encoded proof.dat
+        company_commitment_root:
+          type: string
+          description: Extracted from manifest
+        package_info:
+          $ref: '#/components/schemas/PackageInfo'
+
+    PackageInfo:
+      type: object
+      properties:
+        size_bytes:
+          type: integer
+        file_count:
+          type: integer
+        files:
+          type: array
+          items:
+            type: string
+
+    PolicyCompileRequest:
+      type: object
+      required:
+        - policy
+      properties:
+        policy:
+          $ref: '#/components/schemas/Policy'
+
+    Policy:
+      type: object
+      required:
+        - version
+        - name
+        - created_at
+        - constraints
+      properties:
+        version:
+          type: string
+          example: "lksg.v1"
+        name:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        constraints:
+          $ref: '#/components/schemas/PolicyConstraints'
+        notes:
+          type: string
+
+    PolicyConstraints:
+      type: object
+      properties:
+        require_at_least_one_ubo:
+          type: boolean
+        supplier_count_max:
+          type: integer
+        ubo_count_min:
+          type: integer
+        require_statement_roots:
+          type: array
+          items:
+            type: string
+
+    PolicyCompileResponse:
+      type: object
+      required:
+        - policy_id
+        - policy_hash
+        - status
+      properties:
+        policy_id:
+          type: string
+          format: uuid
+        policy_hash:
+          type: string
+          description: SHA3-256 hash (0x-prefixed)
+        metadata:
+          type: object
+        status:
+          type: string
+          example: "compiled"
+
+    PolicyGetResponse:
+      type: object
+      properties:
+        metadata:
+          type: object
+        policy:
+          $ref: '#/components/schemas/Policy'
+
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: "OK"
+        version:
+          type: string
+        build_hash:
+          type: string
+          nullable: true
+        tls_enabled:
+          type: boolean
+
+    ReadinessResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: "OK"
+        checks:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReadinessCheck'
+
+    ReadinessCheck:
+      type: object
+      properties:
+        name:
+          type: string
+        status:
+          type: string

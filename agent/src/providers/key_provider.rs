@@ -391,4 +391,204 @@ software:
         assert_eq!(sw_config.keys_dir, "/path/to/keys");
         assert_eq!(sw_config.default_key.unwrap(), "my-key");
     }
+
+    #[test]
+    fn test_all_key_error_display_variants() {
+        // Test all KeyError variants have proper Display messages
+        let errors = vec![
+            KeyError::NotFound("test-key".to_string()),
+            KeyError::InvalidKid("invalid-kid".to_string()),
+            KeyError::SignatureError("sig-error".to_string()),
+            KeyError::ProviderError("provider-error".to_string()),
+            KeyError::IoError("io-error".to_string()),
+            KeyError::AuthenticationFailed("auth-failed".to_string()),
+            KeyError::TokenLocked("token-locked".to_string()),
+            KeyError::Timeout("timeout".to_string()),
+            KeyError::ConfigError("config-error".to_string()),
+        ];
+
+        for err in errors {
+            let msg = err.to_string();
+            assert!(!msg.is_empty(), "Error message should not be empty");
+        }
+    }
+
+    #[test]
+    fn test_key_error_std_error_trait() {
+        // Test that KeyError implements std::error::Error
+        let err: Box<dyn std::error::Error> = Box::new(KeyError::NotFound("test".to_string()));
+        assert!(err.to_string().contains("Key not found"));
+    }
+
+    #[test]
+    fn test_provider_type_case_insensitive() {
+        // Test case-insensitive parsing
+        assert_eq!(
+            ProviderType::from_str("SOFTWARE").unwrap(),
+            ProviderType::Software
+        );
+        assert_eq!(
+            ProviderType::from_str("PKCS11").unwrap(),
+            ProviderType::Pkcs11
+        );
+        assert_eq!(
+            ProviderType::from_str("CloudKMS").unwrap(),
+            ProviderType::CloudKms
+        );
+    }
+
+    #[test]
+    fn test_provider_type_error_message() {
+        // Test error message contains helpful info
+        let result = ProviderType::from_str("invalid");
+        assert!(result.is_err());
+
+        if let Err(KeyError::ConfigError(msg)) = result {
+            assert!(msg.contains("Unknown provider type"));
+            assert!(msg.contains("software"));
+            assert!(msg.contains("pkcs11"));
+            assert!(msg.contains("cloudkms"));
+        } else {
+            panic!("Expected ConfigError");
+        }
+    }
+
+    #[test]
+    fn test_pkcs11_config_deserialization() {
+        let yaml = r#"
+provider: pkcs11
+pkcs11:
+  module: /usr/lib/softhsm/libsofthsm2.so
+  slot: 0
+  pin_env: PKCS11_PIN
+  key_label: test-key
+"#;
+
+        let config: ProviderConfig = serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(config.provider, "pkcs11");
+        assert!(config.pkcs11.is_some());
+
+        let p11_config = config.pkcs11.unwrap();
+        assert_eq!(p11_config.module, "/usr/lib/softhsm/libsofthsm2.so");
+        assert_eq!(p11_config.slot, 0);
+        assert_eq!(p11_config.pin_env, "PKCS11_PIN");
+        assert_eq!(p11_config.key_label, "test-key");
+    }
+
+    #[test]
+    fn test_cloudkms_config_deserialization() {
+        let yaml = r#"
+provider: cloudkms
+cloudkms:
+  cloud: gcp
+  project: my-project
+  location: europe-west1
+  keyring: my-keyring
+  key: my-key
+  version: "1"
+"#;
+
+        let config: ProviderConfig = serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(config.provider, "cloudkms");
+        assert!(config.cloudkms.is_some());
+
+        let kms_config = config.cloudkms.unwrap();
+        assert_eq!(kms_config.cloud, "gcp");
+        assert_eq!(kms_config.project, "my-project");
+        assert_eq!(kms_config.location, Some("europe-west1".to_string()));
+        assert_eq!(kms_config.keyring, Some("my-keyring".to_string()));
+        assert_eq!(kms_config.key, "my-key");
+        assert_eq!(kms_config.version, "1");
+    }
+
+    #[test]
+    fn test_cloudkms_config_default_version() {
+        let yaml = r#"
+provider: cloudkms
+cloudkms:
+  cloud: gcp
+  project: my-project
+  key: my-key
+"#;
+
+        let config: ProviderConfig = serde_yaml::from_str(yaml).unwrap();
+        let kms_config = config.cloudkms.unwrap();
+
+        // Should use default version "latest"
+        assert_eq!(kms_config.version, "latest");
+    }
+
+    #[test]
+    fn test_config_serialization_roundtrip() {
+        let config = ProviderConfig {
+            provider: "software".to_string(),
+            software: Some(SoftwareConfig {
+                keys_dir: "/test/keys".to_string(),
+                default_key: Some("default".to_string()),
+            }),
+            pkcs11: None,
+            cloudkms: None,
+        };
+
+        let yaml = serde_yaml::to_string(&config).unwrap();
+        let roundtrip: ProviderConfig = serde_yaml::from_str(&yaml).unwrap();
+
+        assert_eq!(roundtrip.provider, config.provider);
+        assert!(roundtrip.software.is_some());
+    }
+
+    #[test]
+    fn test_load_config_missing_file() {
+        let result = load_config("/nonexistent/path/config.yml");
+        assert!(result.is_err());
+
+        if let Err(KeyError::IoError(msg)) = result {
+            assert!(msg.contains("Failed to read config file"));
+        } else {
+            panic!("Expected IoError");
+        }
+    }
+
+    #[test]
+    fn test_load_config_invalid_yaml() {
+        use std::io::Write;
+
+        // Create a temporary file with invalid YAML
+        let temp_path = std::env::temp_dir().join("invalid_config.yml");
+        let mut file = std::fs::File::create(&temp_path).unwrap();
+        writeln!(file, "invalid: yaml: content: [").unwrap();
+
+        let result = load_config(&temp_path);
+        assert!(result.is_err());
+
+        if let Err(KeyError::ConfigError(msg)) = result {
+            assert!(msg.contains("Failed to parse YAML"));
+        } else {
+            panic!("Expected ConfigError");
+        }
+
+        // Cleanup
+        std::fs::remove_file(temp_path).ok();
+    }
+
+    #[test]
+    fn test_load_config_valid_yaml() {
+        use std::io::Write;
+
+        // Create a temporary file with valid YAML
+        let temp_path = std::env::temp_dir().join("valid_config.yml");
+        let mut file = std::fs::File::create(&temp_path).unwrap();
+        writeln!(file, "provider: software").unwrap();
+        writeln!(file, "software:").unwrap();
+        writeln!(file, "  keys_dir: /test/keys").unwrap();
+
+        let result = load_config(&temp_path);
+        assert!(result.is_ok());
+
+        let config = result.unwrap();
+        assert_eq!(config.provider, "software");
+
+        // Cleanup
+        std::fs::remove_file(temp_path).ok();
+    }
 }

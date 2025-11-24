@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 /// Policy Status Lifecycle
+#[allow(dead_code)]
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum PolicyStatus {
@@ -14,6 +15,7 @@ pub enum PolicyStatus {
 }
 
 /// Policy Metadata (stored in Registry)
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PolicyMetadata {
     /// Unique Policy ID (UUID v4)
@@ -44,6 +46,7 @@ pub struct PolicyMetadata {
 }
 
 /// Compiled Policy (Policy + Metadata + Compiled Bytes)
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CompiledPolicy {
     /// Metadata

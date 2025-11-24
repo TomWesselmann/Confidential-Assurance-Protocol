@@ -15,8 +15,14 @@ pub struct MetricsRegistry {
     cache_hits: AtomicU64,
     cache_misses: AtomicU64,
 
+    // Gauges
+    active_connections: AtomicU64,
+    database_pool_connections: AtomicU64,
+
     // Histograms (simplified - stores individual durations)
     request_durations: Arc<Mutex<Vec<f64>>>,
+    policy_compilation_durations: Arc<Mutex<Vec<f64>>>,
+    proof_verification_durations: Arc<Mutex<Vec<f64>>>,
 }
 
 impl MetricsRegistry {
@@ -28,7 +34,11 @@ impl MetricsRegistry {
             auth_failures_total: AtomicU64::new(0),
             cache_hits: AtomicU64::new(0),
             cache_misses: AtomicU64::new(0),
+            active_connections: AtomicU64::new(0),
+            database_pool_connections: AtomicU64::new(0),
             request_durations: Arc::new(Mutex::new(Vec::new())),
+            policy_compilation_durations: Arc::new(Mutex::new(Vec::new())),
+            proof_verification_durations: Arc::new(Mutex::new(Vec::new())),
         }
     }
 
@@ -79,6 +89,75 @@ impl MetricsRegistry {
         }
 
         hits as f64 / total as f64
+    }
+
+    /// Record policy compilation duration (in seconds)
+    pub fn record_policy_compilation_duration(&self, duration_secs: f64) {
+        let mut durations = self.policy_compilation_durations.lock().unwrap();
+        durations.push(duration_secs);
+
+        // Keep only last 10000 samples to prevent unbounded growth
+        if durations.len() > 10000 {
+            durations.drain(0..5000);
+        }
+    }
+
+    /// Record proof verification duration (in seconds)
+    pub fn record_proof_verification_duration(&self, duration_secs: f64) {
+        let mut durations = self.proof_verification_durations.lock().unwrap();
+        durations.push(duration_secs);
+
+        // Keep only last 10000 samples to prevent unbounded growth
+        if durations.len() > 10000 {
+            durations.drain(0..5000);
+        }
+    }
+
+    /// Set active connections count
+    pub fn set_active_connections(&self, count: u64) {
+        self.active_connections.store(count, Ordering::Relaxed);
+    }
+
+    /// Increment active connections
+    pub fn inc_active_connections(&self) {
+        self.active_connections.fetch_add(1, Ordering::Relaxed);
+    }
+
+    /// Decrement active connections
+    pub fn dec_active_connections(&self) {
+        self.active_connections.fetch_sub(1, Ordering::Relaxed);
+    }
+
+    /// Set database pool connections count
+    pub fn set_database_pool_connections(&self, count: u64) {
+        self.database_pool_connections.store(count, Ordering::Relaxed);
+    }
+
+    // Getter methods for testing
+    /// Get total OK requests count
+    pub fn get_requests_total_ok(&self) -> u64 {
+        self.requests_total_ok.load(Ordering::Relaxed)
+    }
+
+    /// Get total WARN requests count
+    pub fn get_requests_total_warn(&self) -> u64 {
+        self.requests_total_warn.load(Ordering::Relaxed)
+    }
+
+    /// Get total FAIL requests count
+    pub fn get_requests_total_fail(&self) -> u64 {
+        self.requests_total_fail.load(Ordering::Relaxed)
+    }
+
+    /// Get total auth failures count
+    pub fn get_auth_failures_total(&self) -> u64 {
+        self.auth_failures_total.load(Ordering::Relaxed)
+    }
+
+    /// Get request durations count
+    pub fn get_request_durations_count(&self) -> usize {
+        let durations = self.request_durations.lock().unwrap();
+        durations.len()
     }
 
     /// Export metrics in Prometheus text format
@@ -165,6 +244,114 @@ impl MetricsRegistry {
                 durations.len()
             ));
         }
+
+        // cap_policy_compilation_duration_seconds (histogram)
+        let policy_durations = self.policy_compilation_durations.lock().unwrap();
+        if !policy_durations.is_empty() {
+            output.push_str(
+                "# HELP cap_policy_compilation_duration_seconds Policy compilation duration in seconds\n",
+            );
+            output.push_str("# TYPE cap_policy_compilation_duration_seconds histogram\n");
+
+            // Calculate histogram buckets
+            let buckets = [0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0];
+            let mut counts = vec![0u64; buckets.len()];
+            let mut sum = 0.0;
+
+            for &duration in policy_durations.iter() {
+                sum += duration;
+                for (i, &bucket) in buckets.iter().enumerate() {
+                    if duration <= bucket {
+                        counts[i] += 1;
+                    }
+                }
+            }
+
+            // Cumulative counts for histogram
+            let mut cumulative = 0;
+            for (bucket, count) in buckets.iter().zip(counts.iter()) {
+                cumulative += count;
+                output.push_str(&format!(
+                    "cap_policy_compilation_duration_seconds_bucket{{le=\"{}\"}} {}\n",
+                    bucket, cumulative
+                ));
+            }
+
+            output.push_str(&format!(
+                "cap_policy_compilation_duration_seconds_bucket{{le=\"+Inf\"}} {}\n",
+                policy_durations.len()
+            ));
+            output.push_str(&format!(
+                "cap_policy_compilation_duration_seconds_sum {:.6}\n",
+                sum
+            ));
+            output.push_str(&format!(
+                "cap_policy_compilation_duration_seconds_count {}\n",
+                policy_durations.len()
+            ));
+        }
+
+        // cap_proof_verification_duration_seconds (histogram)
+        let proof_durations = self.proof_verification_durations.lock().unwrap();
+        if !proof_durations.is_empty() {
+            output.push_str(
+                "# HELP cap_proof_verification_duration_seconds Proof verification duration in seconds\n",
+            );
+            output.push_str("# TYPE cap_proof_verification_duration_seconds histogram\n");
+
+            // Calculate histogram buckets
+            let buckets = [0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0];
+            let mut counts = vec![0u64; buckets.len()];
+            let mut sum = 0.0;
+
+            for &duration in proof_durations.iter() {
+                sum += duration;
+                for (i, &bucket) in buckets.iter().enumerate() {
+                    if duration <= bucket {
+                        counts[i] += 1;
+                    }
+                }
+            }
+
+            // Cumulative counts for histogram
+            let mut cumulative = 0;
+            for (bucket, count) in buckets.iter().zip(counts.iter()) {
+                cumulative += count;
+                output.push_str(&format!(
+                    "cap_proof_verification_duration_seconds_bucket{{le=\"{}\"}} {}\n",
+                    bucket, cumulative
+                ));
+            }
+
+            output.push_str(&format!(
+                "cap_proof_verification_duration_seconds_bucket{{le=\"+Inf\"}} {}\n",
+                proof_durations.len()
+            ));
+            output.push_str(&format!(
+                "cap_proof_verification_duration_seconds_sum {:.6}\n",
+                sum
+            ));
+            output.push_str(&format!(
+                "cap_proof_verification_duration_seconds_count {}\n",
+                proof_durations.len()
+            ));
+        }
+
+        // cap_active_connections (gauge)
+        output.push_str("# HELP cap_active_connections Number of active HTTP connections\n");
+        output.push_str("# TYPE cap_active_connections gauge\n");
+        output.push_str(&format!(
+            "cap_active_connections {}\n",
+            self.active_connections.load(Ordering::Relaxed)
+        ));
+
+        // cap_database_pool_connections (gauge)
+        output.push_str("# HELP cap_database_pool_connections Number of database pool connections\n");
+        output.push_str("# TYPE cap_database_pool_connections gauge\n");
+        output.push_str(&format!(
+            "cap_database_pool_connections {}\n",
+            self.database_pool_connections.load(Ordering::Relaxed)
+        ));
 
         output
     }
@@ -266,11 +453,16 @@ mod tests {
     #[test]
     fn test_request_timer() {
         init_metrics();
+        let metrics = get_metrics();
+
+        // Get initial value (may not be 0 due to parallel test execution)
+        let initial_ok = metrics.requests_total_ok.load(Ordering::Relaxed);
+
         let timer = RequestTimer::start();
         std::thread::sleep(std::time::Duration::from_millis(10));
         timer.finish("ok");
 
-        let metrics = get_metrics();
-        assert_eq!(metrics.requests_total_ok.load(Ordering::Relaxed), 1);
+        // Assert that counter was incremented by exactly 1
+        assert_eq!(metrics.requests_total_ok.load(Ordering::Relaxed), initial_ok + 1);
     }
 }

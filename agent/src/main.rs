@@ -15,16 +15,21 @@ mod zk_system;
 
 use audit::AuditLog;
 use blob_store::{BlobStore, SqliteBlobStore};
+use chrono::Utc;
 use clap::{Parser, Subcommand};
 use commitment::{compute_company_root, compute_supplier_root, compute_ubo_root, Commitments};
+use manifest::Manifest;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::error::Error;
 use std::fs;
 use std::io::{stdin, stdout, Read, Write};
+use std::path::Path;
+use uuid::Uuid;
 use zk_system::ProofSystem;
 
 // Import portable verifier core from library
+use cap_agent::bundle::meta::{BundleMeta, BundleFileMeta, ProofUnitMeta, BUNDLE_SCHEMA_V1};
 use cap_agent::crypto;
 use cap_agent::orchestrator;
 use cap_agent::verifier;
@@ -917,39 +922,7 @@ struct VerificationReport {
     pub status: String,
 }
 
-/// Package Meta für proof export Kommando (CAP-Proof v1.0)
-#[derive(Debug, Serialize, Deserialize)]
-struct PackageMeta {
-    pub version: String,
-    pub created_at: String,
-    pub files: PackageFiles,
-    pub hashes: PackageHashes,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct PackageFiles {
-    pub manifest: String,
-    pub proof: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub timestamp: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub registry: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub report: Option<String>,
-    pub readme: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, Default)]
-struct PackageHashes {
-    pub manifest_sha3: String,
-    pub proof_sha3: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub timestamp_sha3: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub registry_sha3: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub report_sha3: Option<String>,
-}
+// BundleMeta and BundleFileMeta are now imported from bundle::meta module (see imports at top of file)
 
 /// Hauptfunktion: Führt das prepare-Kommando aus
 ///
@@ -1339,10 +1312,7 @@ fn run_proof_export(
     output: Option<String>,
     force: bool,
 ) -> Result<(), Box<dyn Error>> {
-    use chrono::Utc;
-    use sha3::{Digest, Sha3_256};
-
-    println!("📦 Exportiere standardisiertes CAP Proof-Paket (v1.0)...");
+    println!("📦 Exportiere CAP Bundle (cap-bundle.v1)...");
 
     // 1. Output-Verzeichnis vorbereiten
     let output_dir = output.unwrap_or_else(|| "build/cap-proof".to_string());
@@ -1361,10 +1331,13 @@ fn run_proof_export(
     // 2. Dateien kopieren
     println!("   📁 Kopiere Dateien...");
 
-    // Manifest
+    // Manifest (load it to extract policy info)
     let manifest_dst = out_path.join("manifest.json");
     fs::copy(manifest_path, &manifest_dst)?;
     println!("      ✓ manifest.json");
+
+    // Load manifest to extract policy info
+    let manifest = Manifest::load(&manifest_dst)?;
 
     // Proof
     let proof_dst = out_path.join("proof.dat");
@@ -1411,10 +1384,10 @@ fn run_proof_export(
     println!("   📝 Erstelle README.txt...");
     let readme_dst = out_path.join("README.txt");
     let readme = format!(
-        r#"CAP Proof Package (v1.0)
-========================
+        r#"CAP Bundle Package (cap-bundle.v1)
+===================================
 
-This package contains a complete, offline-verifiable proof package
+This package contains a complete, offline-verifiable proof bundle
 following the Confidential Assurance Protocol (CAP) standard.
 
 Files:
@@ -1425,21 +1398,34 @@ Files:
 - registry.json              : Local proof registry (optional)
 - verification.report.json   : Pre-verification report
 - README.txt                 : This file
-- _meta.json                 : Package metadata with SHA3-256 hashes
+- _meta.json                 : Bundle metadata (cap-bundle.v1 format)
 
 Verification:
 -------------
-To verify this package offline, use:
+To verify this bundle offline, use:
 
-  cap manifest verify \
+  cap-agent verifier run --package <this-directory>
+
+Or manually:
+
+  cap-agent manifest verify \
     --manifest manifest.json \
     --proof proof.dat \
     --registry registry.json \
     --timestamp timestamp.tsr \
     --out verification.report.json
 
+Bundle Format:
+--------------
+This bundle uses the cap-bundle.v1 format with structured metadata.
+The _meta.json file contains:
+- schema: "cap-bundle.v1"
+- bundle_id: Unique bundle identifier
+- files: Map of filename -> BundleFileMeta (role, hash, size, content_type, optional)
+- proof_units: Array of proof unit metadata
+
 Package created: {}
-Package version: cap-proof.v1.0
+Package schema: cap-bundle.v1
 
 For more information, see: https://cap.protocol/
 "#,
@@ -1447,35 +1433,118 @@ For more information, see: https://cap.protocol/
     );
     fs::write(&readme_dst, readme)?;
 
-    // 4. _meta.json erstellen (mit Hashes)
+    // 4. _meta.json erstellen (cap-bundle.v1 format)
     println!("   🔐 Berechne Hashes und erstelle _meta.json...");
 
-    // Helper-Funktion für SHA3-256
+    // Helper-Funktion für SHA3-256 (using centralized crypto API)
     let compute_sha3 = |path: &std::path::Path| -> Result<String, Box<dyn Error>> {
         let bytes = fs::read(path)?;
-        Ok(format!("0x{:x}", Sha3_256::digest(&bytes)))
+        let hash = cap_agent::crypto::sha3_256(&bytes);
+        Ok(cap_agent::crypto::hex_lower_prefixed32(hash))
     };
 
-    let hashes = PackageHashes {
-        manifest_sha3: compute_sha3(&manifest_dst)?,
-        proof_sha3: compute_sha3(&proof_dst)?,
-        timestamp_sha3: ts_dst.as_ref().and_then(|p| compute_sha3(p).ok()),
-        registry_sha3: reg_dst.as_ref().and_then(|p| compute_sha3(p).ok()),
-        report_sha3: Some(compute_sha3(&rep_dst)?),
+    // Helper-Funktion für Dateigröße
+    let get_size = |path: &std::path::Path| -> Result<u64, Box<dyn Error>> {
+        Ok(fs::metadata(path)?.len())
     };
 
-    let meta = PackageMeta {
-        version: "cap-proof.v1.0".to_string(),
-        created_at: Utc::now().to_rfc3339(),
-        files: PackageFiles {
-            manifest: "manifest.json".to_string(),
-            proof: "proof.dat".to_string(),
-            timestamp: ts_dst.as_ref().map(|_| "timestamp.tsr".to_string()),
-            registry: reg_dst.as_ref().map(|_| "registry.json".to_string()),
-            report: Some("verification.report.json".to_string()),
-            readme: "README.txt".to_string(),
+    // Create files map with BundleFileMeta objects
+    let mut files = std::collections::HashMap::new();
+
+    // Manifest file
+    files.insert(
+        "manifest.json".to_string(),
+        BundleFileMeta {
+            role: "manifest".to_string(),
+            hash: compute_sha3(&manifest_dst)?,
+            size: Some(get_size(&manifest_dst)?),
+            content_type: Some("application/json".to_string()),
+            optional: false,
         },
-        hashes,
+    );
+
+    // Proof file
+    files.insert(
+        "proof.dat".to_string(),
+        BundleFileMeta {
+            role: "proof".to_string(),
+            hash: compute_sha3(&proof_dst)?,
+            size: Some(get_size(&proof_dst)?),
+            content_type: Some("application/octet-stream".to_string()),
+            optional: false,
+        },
+    );
+
+    // Timestamp (optional)
+    if let Some(ts) = ts_dst.as_ref() {
+        files.insert(
+            "timestamp.tsr".to_string(),
+            BundleFileMeta {
+                role: "timestamp".to_string(),
+                hash: compute_sha3(ts)?,
+                size: Some(get_size(ts)?),
+                content_type: None,
+                optional: true,
+            },
+        );
+    }
+
+    // Registry (optional)
+    if let Some(reg) = reg_dst.as_ref() {
+        files.insert(
+            "registry.json".to_string(),
+            BundleFileMeta {
+                role: "registry".to_string(),
+                hash: compute_sha3(reg)?,
+                size: Some(get_size(reg)?),
+                content_type: Some("application/json".to_string()),
+                optional: true,
+            },
+        );
+    }
+
+    // Report
+    files.insert(
+        "verification.report.json".to_string(),
+        BundleFileMeta {
+            role: "report".to_string(),
+            hash: compute_sha3(&rep_dst)?,
+            size: Some(get_size(&rep_dst)?),
+            content_type: Some("application/json".to_string()),
+            optional: false,
+        },
+    );
+
+    // README
+    files.insert(
+        "README.txt".to_string(),
+        BundleFileMeta {
+            role: "documentation".to_string(),
+            hash: compute_sha3(&readme_dst)?,
+            size: Some(get_size(&readme_dst)?),
+            content_type: Some("text/plain".to_string()),
+            optional: false,
+        },
+    );
+
+    // Create proof_units array (single unit for simple export)
+    let proof_units = vec![ProofUnitMeta {
+        id: "main".to_string(),
+        manifest_file: "manifest.json".to_string(),
+        proof_file: "proof.dat".to_string(),
+        policy_id: manifest.policy.hash.clone(), // Use hash as policy ID
+        policy_hash: manifest.policy.hash.clone(),
+        backend: "mock".to_string(),
+        depends_on: vec![],
+    }];
+
+    // Create bundle metadata
+    let meta = BundleMeta {
+        schema: BUNDLE_SCHEMA_V1.to_string(),
+        bundle_id: Uuid::new_v4().to_string(),
+        created_at: Utc::now().to_rfc3339(),
+        files,
+        proof_units,
     };
 
     let meta_dst = out_path.join("_meta.json");
@@ -1485,10 +1554,11 @@ For more information, see: https://cap.protocol/
     // 5. Audit-Log-Eintrag
     let mut audit = AuditLog::new("build/agent.audit.jsonl")?;
     audit.log_event(
-        "proof_package_exported",
+        "bundle_exported",
         json!({
             "output": &output_dir,
-            "version": "cap-proof.v1.0",
+            "schema": "cap-bundle.v1",
+            "bundle_id": &meta.bundle_id,
             "has_timestamp": timestamp_path.is_some(),
             "has_registry": registry_path.is_some(),
             "has_report": report_path.is_some()
@@ -1497,8 +1567,9 @@ For more information, see: https://cap.protocol/
 
     // 6. Erfolg
     println!();
-    println!("✅ CAP Proof-Paket erfolgreich exportiert!");
+    println!("✅ CAP Bundle erfolgreich exportiert (cap-bundle.v1)!");
     println!("   Verzeichnis: {}", output_dir);
+    println!("   Bundle ID: {}", meta.bundle_id);
     println!(
         "   Dateien: {}",
         if ts_dst.is_some() && reg_dst.is_some() {
@@ -1911,31 +1982,71 @@ fn run_verifier_run(package_path: &str) -> Result<(), Box<dyn Error>> {
     println!("🔍 Verifiziere Proof-Paket...");
 
     let mut audit = AuditLog::new("build/agent.audit.jsonl")?;
+    let package_dir = Path::new(package_path);
 
-    let verifier = package_verifier::Verifier::new(package_path);
+    // Prüfe ob _meta.json existiert (cap-bundle.v1 Format)
+    let meta_path = package_dir.join("_meta.json");
 
-    // Prüfe Integrität
-    let integrity = verifier.check_package_integrity()?;
-    println!("📋 {}", integrity);
+    if meta_path.exists() {
+        // Verwende BundleVerifier für cap-bundle.v1
+        println!("📦 Erkanntes Format: cap-bundle.v1");
 
-    // Verifiziere
-    let result = verifier.verify()?;
+        let bundle_verifier = package_verifier::BundleVerifier::new(package_dir);
+        let result = bundle_verifier.verify_bundle()?;
 
-    audit.log_event(
-        "verifier_run",
-        json!({
-            "package": package_path,
-            "success": result.success,
-            "checks_passed": result.checks_passed,
-            "checks_total": result.checks_total
-        }),
-    )?;
+        // Log Audit-Event
+        audit.log_event(
+            "bundle_verifier_run",
+            json!({
+                "bundle_id": result.bundle_id,
+                "schema": result.schema,
+                "status": format!("{:?}", result.status),
+                "unit_count": result.unit_results.len()
+            }),
+        )?;
 
-    println!("\n✅ Verifikation erfolgreich!");
-    println!("  Manifest Hash: {}", result.manifest_hash);
-    println!("  Policy Hash: {}", result.policy_hash);
-    println!("  Proof Status: {}", result.proof_status);
-    println!("  Checks: {}/{}", result.checks_passed, result.checks_total);
+        // Zeige Ergebnisse
+        println!("\n✅ Bundle-Verifikation abgeschlossen!");
+        println!("  Bundle ID: {}", result.bundle_id);
+        println!("  Schema: {}", result.schema);
+        println!("  Status: {:?}", result.status);
+        println!("  Proof Units: {}", result.unit_results.len());
+
+        // Zeige einzelne Unit-Ergebnisse
+        for (unit_id, unit_result) in &result.unit_results {
+            println!("\n  📋 Unit '{}': {:?}", unit_id, unit_result.status);
+            println!("     Manifest Hash: {}", unit_result.manifest_hash);
+            println!("     Proof Hash: {}", unit_result.proof_hash);
+        }
+    } else {
+        // Fallback zu Legacy Verifier (Backward-Compatibility)
+        println!("📦 Erkanntes Format: Legacy (pre-bundle.v1)");
+
+        let verifier = package_verifier::Verifier::new(package_path);
+
+        // Prüfe Integrität
+        let integrity = verifier.check_package_integrity()?;
+        println!("📋 {}", integrity);
+
+        // Verifiziere
+        let result = verifier.verify()?;
+
+        audit.log_event(
+            "verifier_run",
+            json!({
+                "package": package_path,
+                "success": result.success,
+                "checks_passed": result.checks_passed,
+                "checks_total": result.checks_total
+            }),
+        )?;
+
+        println!("\n✅ Verifikation erfolgreich!");
+        println!("  Manifest Hash: {}", result.manifest_hash);
+        println!("  Policy Hash: {}", result.policy_hash);
+        println!("  Proof Status: {}", result.proof_status);
+        println!("  Checks: {}/{}", result.checks_passed, result.checks_total);
+    }
 
     Ok(())
 }

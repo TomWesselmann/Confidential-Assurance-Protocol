@@ -11,8 +11,12 @@
 ///
 /// For I/O-based package verification, see the `verifier` module in main.rs.
 pub mod core;
+pub mod core_verify;
 
 // Re-export main types for convenience
 pub use core::{
     extract_statement_from_manifest, verify, ProofStatement, VerifyOptions, VerifyReport,
+};
+pub use core_verify::{
+    verify_core, CheckResult, CoreVerifyInput, CoreVerifyOptions, CoreVerifyResult, VerifyStatus,
 };

@@ -108,4 +108,81 @@ mod tests {
         assert_eq!(AuthError::InsufficientScope.status_code(), 403);
         assert_eq!(AuthError::JwksFetchFailed.status_code(), 500);
     }
+
+    #[test]
+    fn test_all_error_display_messages() {
+        // Test all error variants have proper Display messages
+        assert_eq!(AuthError::MissingAuthHeader.to_string(), "Missing Authorization header");
+        assert_eq!(AuthError::InvalidAuthFormat.to_string(), "Invalid Authorization header format");
+        assert_eq!(AuthError::InvalidToken.to_string(), "Invalid token");
+        assert_eq!(AuthError::InvalidSignature.to_string(), "Invalid token signature");
+        assert_eq!(AuthError::TokenExpired.to_string(), "Token expired");
+        assert_eq!(AuthError::TokenNotYetValid.to_string(), "Token not yet valid");
+        assert_eq!(AuthError::IssuerMismatch.to_string(), "Token issuer mismatch");
+        assert_eq!(AuthError::AudienceMismatch.to_string(), "Token audience mismatch");
+        assert_eq!(AuthError::InsufficientScope.to_string(), "Insufficient scope");
+        assert_eq!(AuthError::JwksFetchFailed.to_string(), "Failed to fetch JWKS");
+        assert_eq!(AuthError::KeyIdNotFound.to_string(), "Key ID not found");
+        assert_eq!(AuthError::JwkParseError.to_string(), "Failed to parse JWK");
+        assert_eq!(AuthError::InternalError.to_string(), "Internal authentication error");
+    }
+
+    #[test]
+    fn test_all_status_codes_401() {
+        // All authentication failures return 401 Unauthorized
+        assert_eq!(AuthError::MissingAuthHeader.status_code(), 401);
+        assert_eq!(AuthError::InvalidAuthFormat.status_code(), 401);
+        assert_eq!(AuthError::InvalidToken.status_code(), 401);
+        assert_eq!(AuthError::InvalidSignature.status_code(), 401);
+        assert_eq!(AuthError::TokenExpired.status_code(), 401);
+        assert_eq!(AuthError::TokenNotYetValid.status_code(), 401);
+        assert_eq!(AuthError::IssuerMismatch.status_code(), 401);
+        assert_eq!(AuthError::AudienceMismatch.status_code(), 401);
+        assert_eq!(AuthError::KeyIdNotFound.status_code(), 401);
+        assert_eq!(AuthError::JwkParseError.status_code(), 401);
+    }
+
+    #[test]
+    fn test_status_code_403_forbidden() {
+        // Insufficient scope returns 403 Forbidden
+        assert_eq!(AuthError::InsufficientScope.status_code(), 403);
+    }
+
+    #[test]
+    fn test_status_codes_500_internal_error() {
+        // Server errors return 500 Internal Server Error
+        assert_eq!(AuthError::JwksFetchFailed.status_code(), 500);
+        assert_eq!(AuthError::InternalError.status_code(), 500);
+    }
+
+    #[test]
+    fn test_error_debug_format() {
+        // Test Debug formatting works
+        let err = AuthError::InvalidToken;
+        let debug_str = format!("{:?}", err);
+        assert!(debug_str.contains("InvalidToken"));
+    }
+
+    #[test]
+    fn test_error_clone() {
+        // Test Clone trait
+        let err1 = AuthError::TokenExpired;
+        let err2 = err1.clone();
+        assert_eq!(err1, err2);
+    }
+
+    #[test]
+    fn test_error_partial_eq() {
+        // Test PartialEq trait
+        assert_eq!(AuthError::InvalidToken, AuthError::InvalidToken);
+        assert_ne!(AuthError::InvalidToken, AuthError::TokenExpired);
+        assert_ne!(AuthError::MissingAuthHeader, AuthError::InvalidAuthFormat);
+    }
+
+    #[test]
+    fn test_error_trait_implementation() {
+        // Test std::error::Error trait
+        let err: Box<dyn std::error::Error> = Box::new(AuthError::InvalidToken);
+        assert_eq!(err.to_string(), "Invalid token");
+    }
 }

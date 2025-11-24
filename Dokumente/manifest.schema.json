@@ -1,0 +1,160 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cap.protocol/schemas/manifest.v1.0.json",
+  "title": "CAP Manifest Schema",
+  "description": "JSON Schema for Confidential Assurance Protocol (CAP) Manifest v1.0",
+  "type": "object",
+  "required": [
+    "version",
+    "created_at",
+    "supplier_root",
+    "ubo_root",
+    "company_commitment_root",
+    "policy",
+    "audit",
+    "proof",
+    "signatures"
+  ],
+  "properties": {
+    "version": {
+      "type": "string",
+      "const": "manifest.v1.0",
+      "description": "Manifest schema version"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 / RFC3339 timestamp"
+    },
+    "supplier_root": {
+      "type": "string",
+      "pattern": "^0x[0-9a-fA-F]{64}$",
+      "description": "BLAKE3 Merkle root of supplier hashes"
+    },
+    "ubo_root": {
+      "type": "string",
+      "pattern": "^0x[0-9a-fA-F]{64}$",
+      "description": "BLAKE3 Merkle root of UBO hashes"
+    },
+    "company_commitment_root": {
+      "type": "string",
+      "pattern": "^0x[0-9a-fA-F]{64}$",
+      "description": "BLAKE3 combined root (supplier + UBO)"
+    },
+    "policy": {
+      "type": "object",
+      "required": ["name", "version", "hash"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Policy name"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^[a-z0-9\\.]+$",
+          "description": "Policy version (e.g., lksg.v1)"
+        },
+        "hash": {
+          "type": "string",
+          "pattern": "^0x[0-9a-fA-F]{64}$",
+          "description": "SHA3-256 hash of policy file"
+        }
+      },
+      "additionalProperties": false
+    },
+    "audit": {
+      "type": "object",
+      "required": ["tail_digest", "events_count"],
+      "properties": {
+        "tail_digest": {
+          "type": "string",
+          "pattern": "^0x[0-9a-fA-F]{64}$",
+          "description": "SHA3-256 digest of last audit log entry"
+        },
+        "events_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of events in audit log"
+        }
+      },
+      "additionalProperties": false
+    },
+    "proof": {
+      "type": "object",
+      "required": ["type", "status"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["none", "mock", "zk", "halo2", "spartan", "risc0"],
+          "description": "Proof system type"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["none", "ok", "failed"],
+          "description": "Proof generation status"
+        }
+      },
+      "additionalProperties": false
+    },
+    "signatures": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["alg", "signer", "pubkey_hex", "sig_hex"],
+        "properties": {
+          "alg": {
+            "type": "string",
+            "enum": ["ed25519"],
+            "description": "Signature algorithm"
+          },
+          "signer": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Signer identifier"
+          },
+          "pubkey_hex": {
+            "type": "string",
+            "pattern": "^0x[0-9a-fA-F]+$",
+            "description": "Public key (hex)"
+          },
+          "sig_hex": {
+            "type": "string",
+            "pattern": "^0x[0-9a-fA-F]+$",
+            "description": "Signature (hex)"
+          }
+        },
+        "additionalProperties": false
+      },
+      "description": "List of digital signatures"
+    },
+    "time_anchor": {
+      "type": "object",
+      "required": ["kind", "reference", "audit_tip_hex", "created_at"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["tsa", "blockchain", "file"],
+          "description": "Type of time anchor"
+        },
+        "reference": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Path, TxID, or URI reference"
+        },
+        "audit_tip_hex": {
+          "type": "string",
+          "pattern": "^0x[0-9a-fA-F]{64}$",
+          "description": "Audit chain tip at anchor time"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "RFC3339 timestamp"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

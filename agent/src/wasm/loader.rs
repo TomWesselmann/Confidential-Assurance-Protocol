@@ -166,7 +166,7 @@ mod tests {
     use super::*;
 
     // Note: Full WASM tests require actual WASM binaries
-    // These tests verify the loader API structure
+    // These tests verify the loader API structure and error handling
 
     #[test]
     fn test_limits_default() {
@@ -184,6 +184,76 @@ mod tests {
             max_fuel: Some(1_000_000),
         };
         assert_eq!(limits.max_memory_mb, 64);
+        assert_eq!(limits.timeout_ms, 1000);
+        assert_eq!(limits.max_fuel, Some(1_000_000));
+    }
+
+    #[test]
+    fn test_limits_no_fuel() {
+        let limits = WasmLimits {
+            max_memory_mb: 256,
+            timeout_ms: 5000,
+            max_fuel: None,
+        };
+        assert_eq!(limits.max_fuel, None);
+    }
+
+    #[test]
+    fn test_new_with_empty_bytes() {
+        let limits = WasmLimits::default();
+        let result = WasmVerifier::new(&[], limits);
+
+        // Empty bytes should fail to parse as WASM module
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_new_with_invalid_wasm() {
+        let limits = WasmLimits::default();
+        let invalid_wasm = b"not a valid wasm module";
+        let result = WasmVerifier::new(invalid_wasm, limits);
+
+        // Invalid WASM should fail to compile
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_new_with_truncated_wasm_header() {
+        let limits = WasmLimits::default();
+        // WASM magic number is 0x00 0x61 0x73 0x6D (\\0asm), but truncated
+        let truncated = b"\x00\x61\x73";
+        let result = WasmVerifier::new(truncated, limits);
+
+        // Truncated WASM should fail
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_from_file_nonexistent() {
+        let limits = WasmLimits::default();
+        let result = WasmVerifier::from_file("/nonexistent/path/to/wasm.wasm", limits);
+
+        // Non-existent file should return IO error
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_limits_serialization_roundtrip() {
+        let limits = WasmLimits {
+            max_memory_mb: 256,
+            timeout_ms: 10000,
+            max_fuel: Some(10_000_000),
+        };
+
+        // Serialize to JSON
+        let json = serde_json::to_string(&limits).unwrap();
+
+        // Deserialize back
+        let deserialized: WasmLimits = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(deserialized.max_memory_mb, 256);
+        assert_eq!(deserialized.timeout_ms, 10000);
+        assert_eq!(deserialized.max_fuel, Some(10_000_000));
     }
 
     // Additional tests would require:

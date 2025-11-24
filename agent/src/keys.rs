@@ -398,6 +398,7 @@ pub fn verify_chain(attestation_paths: &[&str], key_store: &KeyStore) -> Result<
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ed25519_dalek::Signer;
 
     #[test]
     fn test_derive_kid() {
@@ -556,5 +557,357 @@ mod tests {
                 "Metadata KID should match derived KID"
             );
         }
+    }
+
+    #[test]
+    fn test_key_metadata_revoke() {
+        let pubkey_bytes = vec![1, 2, 3, 4, 5];
+        let mut metadata = KeyMetadata::new(&pubkey_bytes, "company", "ed25519", 730).unwrap();
+
+        assert_eq!(metadata.status, "active");
+        metadata.revoke();
+        assert_eq!(metadata.status, "revoked");
+    }
+
+    #[test]
+    fn test_key_metadata_public_key_bytes() {
+        let pubkey_bytes = vec![1, 2, 3, 4, 5];
+        let metadata = KeyMetadata::new(&pubkey_bytes, "company", "ed25519", 730).unwrap();
+
+        let decoded = metadata.public_key_bytes().unwrap();
+        assert_eq!(decoded, pubkey_bytes);
+    }
+
+    #[test]
+    fn test_key_metadata_with_comment() {
+        let pubkey_bytes = vec![1, 2, 3, 4, 5];
+        let mut metadata = KeyMetadata::new(&pubkey_bytes, "company", "ed25519", 730).unwrap();
+
+        assert!(metadata.comment.is_none());
+        metadata.comment = Some("Test key for development".to_string());
+        assert_eq!(metadata.comment.unwrap(), "Test key for development");
+    }
+
+    #[test]
+    fn test_compute_fingerprint_deterministic() {
+        let pubkey_bytes = vec![1, 2, 3, 4, 5];
+        let fp1 = compute_fingerprint(&pubkey_bytes);
+        let fp2 = compute_fingerprint(&pubkey_bytes);
+
+        assert_eq!(fp1, fp2);
+        assert!(fp1.starts_with("sha256:"));
+        assert_eq!(fp1.len(), 7 + 32); // "sha256:" + 32 hex chars (16 bytes)
+    }
+
+    #[test]
+    fn test_key_store_find_by_kid_not_found() {
+        let temp_dir = std::env::temp_dir().join("cap_test_find_kid");
+        let _ = fs::remove_dir_all(&temp_dir);
+
+        let store = KeyStore::new(&temp_dir).unwrap();
+
+        let result = store.find_by_kid("nonexistent_kid").unwrap();
+        assert!(result.is_none());
+
+        fs::remove_dir_all(&temp_dir).ok();
+    }
+
+    #[test]
+    fn test_key_store_find_by_kid_success() {
+        let temp_dir = std::env::temp_dir().join("cap_test_find_kid_success");
+        let _ = fs::remove_dir_all(&temp_dir);
+
+        let store = KeyStore::new(&temp_dir).unwrap();
+
+        // Create and save a key
+        let pubkey_bytes = vec![1, 2, 3, 4, 5];
+        let metadata = KeyMetadata::new(&pubkey_bytes, "company", "ed25519", 730).unwrap();
+        let kid = metadata.kid.clone();
+        let key_file = temp_dir.join("test_key.json");
+        metadata.save(&key_file).unwrap();
+
+        // Find by KID
+        let found = store.find_by_kid(&kid).unwrap();
+        assert!(found.is_some());
+        assert_eq!(found.unwrap().kid, kid);
+
+        fs::remove_dir_all(&temp_dir).ok();
+    }
+
+    #[test]
+    fn test_key_store_archive() {
+        let temp_dir = std::env::temp_dir().join("cap_test_archive");
+        let _ = fs::remove_dir_all(&temp_dir);
+
+        let store = KeyStore::new(&temp_dir).unwrap();
+
+        // Create and save a key
+        let pubkey_bytes = vec![1, 2, 3, 4, 5];
+        let metadata = KeyMetadata::new(&pubkey_bytes, "company", "ed25519", 730).unwrap();
+        let kid = metadata.kid.clone();
+        let key_file = temp_dir.join("test_key.json");
+        metadata.save(&key_file).unwrap();
+
+        // Archive the key
+        store.archive(&kid).unwrap();
+
+        // Key should no longer be in base directory
+        assert!(!key_file.exists());
+
+        // Key should be in archive with "retired" status
+        let archived_key = temp_dir.join("archive").join("test_key.json");
+        assert!(archived_key.exists());
+
+        let loaded = KeyMetadata::load(&archived_key).unwrap();
+        assert_eq!(loaded.status, "retired");
+
+        fs::remove_dir_all(&temp_dir).ok();
+    }
+
+    #[test]
+    fn test_key_store_archive_not_found() {
+        let temp_dir = std::env::temp_dir().join("cap_test_archive_not_found");
+        let _ = fs::remove_dir_all(&temp_dir);
+
+        let store = KeyStore::new(&temp_dir).unwrap();
+
+        let result = store.archive("nonexistent_kid");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Key not found"));
+
+        fs::remove_dir_all(&temp_dir).ok();
+    }
+
+    #[test]
+    fn test_key_store_get_active() {
+        let temp_dir = std::env::temp_dir().join("cap_test_get_active");
+        let _ = fs::remove_dir_all(&temp_dir);
+
+        let store = KeyStore::new(&temp_dir).unwrap();
+
+        // Create and save two keys for same owner
+        let pubkey1 = vec![1, 2, 3];
+        let metadata1 = KeyMetadata::new(&pubkey1, "company", "ed25519", 730).unwrap();
+        metadata1.save(temp_dir.join("key1.json")).unwrap();
+
+        let pubkey2 = vec![4, 5, 6];
+        let mut metadata2 = KeyMetadata::new(&pubkey2, "company", "ed25519", 730).unwrap();
+        metadata2.retire(); // Retire this one
+        metadata2.save(temp_dir.join("key2.json")).unwrap();
+
+        // Get active should return the active one
+        let active = store.get_active("company").unwrap();
+        assert!(active.is_some());
+        assert_eq!(active.unwrap().status, "active");
+
+        // Get active for different owner should return None
+        let other = store.get_active("other_company").unwrap();
+        assert!(other.is_none());
+
+        fs::remove_dir_all(&temp_dir).ok();
+    }
+
+    #[test]
+    fn test_key_store_list_includes_archive() {
+        let temp_dir = std::env::temp_dir().join("cap_test_list_archive");
+        let _ = fs::remove_dir_all(&temp_dir);
+
+        let store = KeyStore::new(&temp_dir).unwrap();
+
+        // Create keys in base and archive
+        let pubkey1 = vec![1, 2, 3];
+        let metadata1 = KeyMetadata::new(&pubkey1, "company1", "ed25519", 730).unwrap();
+        metadata1.save(temp_dir.join("key1.json")).unwrap();
+
+        let pubkey2 = vec![4, 5, 6];
+        let metadata2 = KeyMetadata::new(&pubkey2, "company2", "ed25519", 730).unwrap();
+        metadata2.save(temp_dir.join("archive").join("key2.json")).unwrap();
+
+        // List should include both
+        let keys = store.list().unwrap();
+        assert_eq!(keys.len(), 2);
+
+        fs::remove_dir_all(&temp_dir).ok();
+    }
+
+    #[test]
+    fn test_signed_attestation_verify_success() {
+        use ed25519_dalek::SigningKey;
+
+        // Generate signer key
+        let signer_sk = SigningKey::generate(&mut rand::rngs::OsRng);
+        let signer_vk = signer_sk.verifying_key();
+        let signer_pubkey_b64 = BASE64.encode(signer_vk.to_bytes());
+
+        // Generate subject key
+        let subject_sk = SigningKey::generate(&mut rand::rngs::OsRng);
+        let subject_vk = subject_sk.verifying_key();
+        let subject_pubkey_b64 = BASE64.encode(subject_vk.to_bytes());
+
+        // Create attestation
+        let attestation = Attestation {
+            schema: "cap-attestation.v1".to_string(),
+            signer_kid: derive_kid(&signer_pubkey_b64).unwrap(),
+            signer_owner: "Company".to_string(),
+            subject_kid: derive_kid(&subject_pubkey_b64).unwrap(),
+            subject_owner: "Company".to_string(),
+            subject_public_key: subject_pubkey_b64.clone(),
+            attested_at: Utc::now().to_rfc3339(),
+        };
+
+        // Sign attestation
+        let attestation_bytes = serde_json::to_vec(&attestation).unwrap();
+        let signature = signer_sk.sign(&attestation_bytes);
+
+        let signed_attestation = SignedAttestation {
+            attestation,
+            signature: BASE64.encode(signature.to_bytes()),
+            signer_public_key: signer_pubkey_b64,
+        };
+
+        // Verify should succeed
+        let result = signed_attestation.verify();
+        assert!(result.is_ok(), "Verification failed: {:?}", result);
+    }
+
+    #[test]
+    fn test_signed_attestation_verify_invalid_signature() {
+        use ed25519_dalek::SigningKey;
+
+        // Generate keys
+        let signer_sk = SigningKey::generate(&mut rand::rngs::OsRng);
+        let signer_vk = signer_sk.verifying_key();
+        let signer_pubkey_b64 = BASE64.encode(signer_vk.to_bytes());
+
+        let subject_sk = SigningKey::generate(&mut rand::rngs::OsRng);
+        let subject_vk = subject_sk.verifying_key();
+        let subject_pubkey_b64 = BASE64.encode(subject_vk.to_bytes());
+
+        // Create attestation
+        let attestation = Attestation {
+            schema: "cap-attestation.v1".to_string(),
+            signer_kid: derive_kid(&signer_pubkey_b64).unwrap(),
+            signer_owner: "Company".to_string(),
+            subject_kid: derive_kid(&subject_pubkey_b64).unwrap(),
+            subject_owner: "Company".to_string(),
+            subject_public_key: subject_pubkey_b64.clone(),
+            attested_at: Utc::now().to_rfc3339(),
+        };
+
+        // Create INVALID signature (all zeros)
+        let invalid_signature = BASE64.encode([0u8; 64]);
+
+        let signed_attestation = SignedAttestation {
+            attestation,
+            signature: invalid_signature,
+            signer_public_key: signer_pubkey_b64,
+        };
+
+        // Verify should fail
+        let result = signed_attestation.verify();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("verification failed"));
+    }
+
+    #[test]
+    fn test_signed_attestation_verify_kid_mismatch() {
+        use ed25519_dalek::SigningKey;
+
+        // Generate keys
+        let signer_sk = SigningKey::generate(&mut rand::rngs::OsRng);
+        let signer_vk = signer_sk.verifying_key();
+        let signer_pubkey_b64 = BASE64.encode(signer_vk.to_bytes());
+
+        let subject_sk = SigningKey::generate(&mut rand::rngs::OsRng);
+        let subject_vk = subject_sk.verifying_key();
+        let subject_pubkey_b64 = BASE64.encode(subject_vk.to_bytes());
+
+        // Create attestation with WRONG signer_kid
+        let attestation = Attestation {
+            schema: "cap-attestation.v1".to_string(),
+            signer_kid: "wrong_kid_0123456789abcdef0123".to_string(),
+            signer_owner: "Company".to_string(),
+            subject_kid: derive_kid(&subject_pubkey_b64).unwrap(),
+            subject_owner: "Company".to_string(),
+            subject_public_key: subject_pubkey_b64.clone(),
+            attested_at: Utc::now().to_rfc3339(),
+        };
+
+        // Sign attestation (signature will be valid, but KID won't match)
+        let attestation_bytes = serde_json::to_vec(&attestation).unwrap();
+        let signature = signer_sk.sign(&attestation_bytes);
+
+        let signed_attestation = SignedAttestation {
+            attestation,
+            signature: BASE64.encode(signature.to_bytes()),
+            signer_public_key: signer_pubkey_b64,
+        };
+
+        // Verify should fail due to KID mismatch
+        let result = signed_attestation.verify();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Signer KID mismatch"));
+    }
+
+    #[test]
+    fn test_verify_chain_empty() {
+        let temp_dir = std::env::temp_dir().join("cap_test_chain_empty");
+        let _ = fs::remove_dir_all(&temp_dir);
+        let store = KeyStore::new(&temp_dir).unwrap();
+
+        let result = verify_chain(&[], &store);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("No attestations"));
+
+        fs::remove_dir_all(&temp_dir).ok();
+    }
+
+    #[test]
+    fn test_verify_chain_signer_key_not_found() {
+        use ed25519_dalek::SigningKey;
+
+        let temp_dir = std::env::temp_dir().join("cap_test_chain_not_found");
+        let _ = fs::remove_dir_all(&temp_dir);
+        let store = KeyStore::new(&temp_dir).unwrap();
+
+        // Create attestation
+        let signer_sk = SigningKey::generate(&mut rand::rngs::OsRng);
+        let signer_vk = signer_sk.verifying_key();
+        let signer_pubkey_b64 = BASE64.encode(signer_vk.to_bytes());
+
+        let subject_sk = SigningKey::generate(&mut rand::rngs::OsRng);
+        let subject_vk = subject_sk.verifying_key();
+        let subject_pubkey_b64 = BASE64.encode(subject_vk.to_bytes());
+
+        let attestation = Attestation {
+            schema: "cap-attestation.v1".to_string(),
+            signer_kid: derive_kid(&signer_pubkey_b64).unwrap(),
+            signer_owner: "Company".to_string(),
+            subject_kid: derive_kid(&subject_pubkey_b64).unwrap(),
+            subject_owner: "Company".to_string(),
+            subject_public_key: subject_pubkey_b64.clone(),
+            attested_at: Utc::now().to_rfc3339(),
+        };
+
+        let attestation_bytes = serde_json::to_vec(&attestation).unwrap();
+        let signature = signer_sk.sign(&attestation_bytes);
+
+        let signed_att = SignedAttestation {
+            attestation,
+            signature: BASE64.encode(signature.to_bytes()),
+            signer_public_key: signer_pubkey_b64,
+        };
+
+        // Save attestation
+        let att_file = temp_dir.join("att1.json");
+        let json = serde_json::to_string_pretty(&signed_att).unwrap();
+        fs::write(&att_file, json).unwrap();
+
+        // Verify chain should fail because signer key is not in store
+        let result = verify_chain(&[att_file.to_str().unwrap()], &store);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Signer key not found"));
+
+        fs::remove_dir_all(&temp_dir).ok();
     }
 }

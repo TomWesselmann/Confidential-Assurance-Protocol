@@ -298,4 +298,131 @@ required_scopes:
         );
         assert_eq!(cache.ttl, Duration::from_secs(600));
     }
+
+    #[test]
+    fn test_cached_jwks_not_expired() {
+        let jwks = Jwks {
+            keys: vec![],
+        };
+        let cached = CachedJwks {
+            jwks: jwks.clone(),
+            fetched_at: Instant::now(),
+            ttl: Duration::from_secs(600),
+        };
+
+        assert!(!cached.is_expired(), "Freshly cached JWKS should not be expired");
+    }
+
+    #[test]
+    fn test_cached_jwks_expired() {
+        let jwks = Jwks {
+            keys: vec![],
+        };
+        let cached = CachedJwks {
+            jwks: jwks.clone(),
+            fetched_at: Instant::now() - Duration::from_secs(601), // 601 seconds ago
+            ttl: Duration::from_secs(600), // TTL is 600 seconds
+        };
+
+        assert!(cached.is_expired(), "JWKS older than TTL should be expired");
+    }
+
+    #[test]
+    fn test_validate_scopes_empty_required() {
+        let claims = Claims {
+            sub: "client-123".to_string(),
+            iss: "https://idp.example.com".to_string(),
+            aud: "cap-verifier".to_string(),
+            exp: 9999999999,
+            iat: 1234567890,
+            nbf: None,
+            scope: None, // No scopes in token
+        };
+
+        // Empty required scopes should always pass
+        let result = validate_scopes(&claims, &[]);
+        assert!(result.is_ok(), "Empty required scopes should always pass");
+    }
+
+    #[test]
+    fn test_validate_scopes_multiple_required() {
+        let claims = Claims {
+            sub: "client-123".to_string(),
+            iss: "https://idp.example.com".to_string(),
+            aud: "cap-verifier".to_string(),
+            exp: 9999999999,
+            iat: 1234567890,
+            nbf: None,
+            scope: Some("verify:run policy:read policy:write".to_string()),
+        };
+
+        // All required scopes present
+        let result = validate_scopes(
+            &claims,
+            &["verify:run".to_string(), "policy:read".to_string()],
+        );
+        assert!(result.is_ok(), "All required scopes are present");
+
+        // One required scope missing
+        let result = validate_scopes(
+            &claims,
+            &["verify:run".to_string(), "missing:scope".to_string()],
+        );
+        assert!(matches!(result, Err(AuthError::InsufficientScope)));
+    }
+
+    #[test]
+    fn test_load_auth_config_success() {
+        // Create temporary config file
+        let temp_dir = std::env::temp_dir();
+        let config_path = temp_dir.join("test_auth_config.yml");
+
+        let config_yaml = r#"
+issuer: "https://auth.test.com"
+audience: "test-api"
+jwks_url: "https://auth.test.com/.well-known/jwks.json"
+jwks_cache_ttl_sec: 300
+required_scopes:
+  verify: ["verify:run"]
+  policy_compile: ["policy:compile"]
+"#;
+
+        std::fs::write(&config_path, config_yaml).expect("Failed to write test config");
+
+        // Load config
+        let result = load_auth_config(config_path.to_str().unwrap());
+        assert!(result.is_ok(), "Config loading should succeed");
+
+        let config = result.unwrap();
+        assert_eq!(config.issuer, "https://auth.test.com");
+        assert_eq!(config.audience, "test-api");
+        assert_eq!(config.jwks_cache_ttl_sec, 300);
+
+        // Cleanup
+        std::fs::remove_file(&config_path).ok();
+    }
+
+    #[test]
+    fn test_load_auth_config_file_not_found() {
+        let result = load_auth_config("/nonexistent/path/config.yml");
+        assert!(result.is_err(), "Loading nonexistent file should fail");
+    }
+
+    #[test]
+    fn test_load_auth_config_invalid_yaml() {
+        // Create temporary config file with invalid YAML
+        let temp_dir = std::env::temp_dir();
+        let config_path = temp_dir.join("test_invalid_config.yml");
+
+        let invalid_yaml = "this is not valid yaml: [unclosed bracket";
+
+        std::fs::write(&config_path, invalid_yaml).expect("Failed to write test config");
+
+        // Load config
+        let result = load_auth_config(config_path.to_str().unwrap());
+        assert!(result.is_err(), "Loading invalid YAML should fail");
+
+        // Cleanup
+        std::fs::remove_file(&config_path).ok();
+    }
 }

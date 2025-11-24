@@ -169,10 +169,10 @@ pub fn extract_statement_from_manifest(
 /// Validates that a string is a valid 32-byte hex hash with 0x or sha3-256: prefix
 fn validate_hex32(hex_str: &str, field_name: &str) -> Result<()> {
     // Support both 0x and sha3-256: prefixes (for compatibility with PolicyV2)
-    let hex_part = if hex_str.starts_with("0x") {
-        &hex_str[2..]
-    } else if hex_str.starts_with("sha3-256:") {
-        &hex_str[9..]
+    let hex_part = if let Some(stripped) = hex_str.strip_prefix("0x") {
+        stripped
+    } else if let Some(stripped) = hex_str.strip_prefix("sha3-256:") {
+        stripped
     } else {
         return Err(anyhow!("{}: must start with '0x' or 'sha3-256:'", field_name));
     };
@@ -656,5 +656,288 @@ mod tests {
         let details = report.details.as_object().unwrap();
         assert_eq!(details.get("timestamp_check").unwrap(), "disabled");
         assert_eq!(details.get("registry_check").unwrap(), "disabled");
+    }
+
+    #[test]
+    fn test_validate_hex32_with_sha3_prefix() {
+        let valid_hash = "sha3-256:0000000000000000000000000000000000000000000000000000000000000000";
+        let result = validate_hex32(valid_hash, "test_field");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_validate_hex32_invalid_prefix() {
+        let invalid_hash = "invalid:0000000000000000000000000000000000000000000000000000000000000000";
+        let result = validate_hex32(invalid_hash, "test_field");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("must start with"));
+    }
+
+    #[test]
+    fn test_validate_hex32_wrong_length() {
+        let short_hash = "0x00001234"; // Too short
+        let result = validate_hex32(short_hash, "test_field");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("expected 64 hex characters"));
+    }
+
+    #[test]
+    fn test_validate_hex32_non_hex_characters() {
+        let invalid_chars = "0x000000000000000000000000000000000000000000000000000000000000gggg";
+        let result = validate_hex32(invalid_chars, "test_field");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("invalid hex characters"));
+    }
+
+    #[test]
+    fn test_extract_statement_with_sanctions_root() {
+        let mut manifest = mock_manifest();
+        manifest["sanctions_root"] = json!("0x1111111111111111111111111111111111111111111111111111111111111111");
+
+        let stmt = extract_statement_from_manifest(&manifest).unwrap();
+        assert!(stmt.sanctions_root.is_some());
+        assert_eq!(
+            stmt.sanctions_root.unwrap(),
+            "0x1111111111111111111111111111111111111111111111111111111111111111"
+        );
+    }
+
+    #[test]
+    fn test_extract_statement_with_jurisdiction_root() {
+        let mut manifest = mock_manifest();
+        manifest["jurisdiction_root"] = json!("0x2222222222222222222222222222222222222222222222222222222222222222");
+
+        let stmt = extract_statement_from_manifest(&manifest).unwrap();
+        assert!(stmt.jurisdiction_root.is_some());
+        assert_eq!(
+            stmt.jurisdiction_root.unwrap(),
+            "0x2222222222222222222222222222222222222222222222222222222222222222"
+        );
+    }
+
+    #[test]
+    fn test_extract_statement_with_extensions() {
+        let mut manifest = mock_manifest();
+        manifest["extensions"] = json!({"custom_field": "value"});
+
+        let stmt = extract_statement_from_manifest(&manifest).unwrap();
+        assert!(stmt.extensions.is_some());
+        let ext = stmt.extensions.unwrap();
+        assert_eq!(ext.get("custom_field").unwrap(), "value");
+    }
+
+    #[test]
+    fn test_extract_statement_invalid_sanctions_root() {
+        let mut manifest = mock_manifest();
+        manifest["sanctions_root"] = json!("invalid_hex");
+
+        let result = extract_statement_from_manifest(&manifest);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_extract_statement_invalid_jurisdiction_root() {
+        let mut manifest = mock_manifest();
+        manifest["jurisdiction_root"] = json!("0x123"); // Too short
+
+        let result = extract_statement_from_manifest(&manifest);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_verify_with_time_anchor() {
+        let mut manifest = mock_manifest();
+        manifest["signatures"] = json!([{"alg": "Ed25519"}]);
+        manifest["time_anchor"] = json!({
+            "kind": "tsa",
+            "reference": "./test.tsr",
+            "audit_tip_hex": "0x3333333333333333333333333333333333333333333333333333333333333333",
+            "created_at": "2025-11-01T12:00:00Z"
+        });
+
+        let proof_bytes = b"proof";
+        let stmt = extract_statement_from_manifest(&manifest).unwrap();
+        let opts = VerifyOptions {
+            check_timestamp: true,
+            check_registry: false,
+        };
+
+        let report = verify(&manifest, proof_bytes, &stmt, &opts).unwrap();
+        assert!(report.timestamp_valid.is_some());
+        assert_eq!(report.timestamp_valid.unwrap(), true);
+    }
+
+    #[test]
+    fn test_verify_with_dual_anchor_private() {
+        let mut manifest = mock_manifest();
+        manifest["signatures"] = json!([{"alg": "Ed25519"}]);
+        manifest["time_anchor"] = json!({
+            "kind": "tsa",
+            "audit_tip_hex": "0x4444444444444444444444444444444444444444444444444444444444444444",
+            "private": {
+                "audit_tip_hex": "0x4444444444444444444444444444444444444444444444444444444444444444",
+                "created_at": "2025-11-01T12:00:00Z"
+            }
+        });
+
+        let proof_bytes = b"proof";
+        let stmt = extract_statement_from_manifest(&manifest).unwrap();
+        let opts = VerifyOptions {
+            check_timestamp: true,
+            check_registry: false,
+        };
+
+        let report = verify(&manifest, proof_bytes, &stmt, &opts).unwrap();
+        assert_eq!(report.timestamp_valid.unwrap(), true);
+
+        let details = report.details.as_object().unwrap();
+        assert_eq!(details.get("dual_anchor_private").unwrap(), true);
+    }
+
+    #[test]
+    fn test_verify_dual_anchor_mismatch() {
+        let mut manifest = mock_manifest();
+        manifest["signatures"] = json!([{"alg": "Ed25519"}]);
+        manifest["time_anchor"] = json!({
+            "audit_tip_hex": "0x5555555555555555555555555555555555555555555555555555555555555555",
+            "private": {
+                "audit_tip_hex": "0x6666666666666666666666666666666666666666666666666666666666666666", // Mismatch!
+                "created_at": "2025-11-01T12:00:00Z"
+            }
+        });
+
+        let proof_bytes = b"proof";
+        let stmt = extract_statement_from_manifest(&manifest).unwrap();
+        let opts = VerifyOptions {
+            check_timestamp: true,
+            check_registry: false,
+        };
+
+        let report = verify(&manifest, proof_bytes, &stmt, &opts).unwrap();
+        assert_eq!(report.timestamp_valid.unwrap(), false);
+
+        let details = report.details.as_object().unwrap();
+        assert!(details.get("dual_anchor_error").is_some());
+    }
+
+    #[test]
+    fn test_verify_public_anchor_invalid_digest() {
+        let mut manifest = mock_manifest();
+        manifest["signatures"] = json!([{"alg": "Ed25519"}]);
+        manifest["time_anchor"] = json!({
+            "audit_tip_hex": "0x7777777777777777777777777777777777777777777777777777777777777777",
+            "public": {
+                "chain": "ethereum",
+                "txid": "0xabc123",
+                "digest": "invalid_digest", // Invalid format
+                "created_at": "2025-11-01T12:00:00Z"
+            }
+        });
+
+        let proof_bytes = b"proof";
+        let stmt = extract_statement_from_manifest(&manifest).unwrap();
+        let opts = VerifyOptions {
+            check_timestamp: true,
+            check_registry: false,
+        };
+
+        let report = verify(&manifest, proof_bytes, &stmt, &opts).unwrap();
+        assert_eq!(report.timestamp_valid.unwrap(), false);
+
+        let details = report.details.as_object().unwrap();
+        assert!(details.get("dual_anchor_error").is_some());
+    }
+
+    #[test]
+    fn test_verify_public_anchor_empty_txid() {
+        let mut manifest = mock_manifest();
+        manifest["signatures"] = json!([{"alg": "Ed25519"}]);
+        manifest["time_anchor"] = json!({
+            "audit_tip_hex": "0x8888888888888888888888888888888888888888888888888888888888888888",
+            "public": {
+                "chain": "ethereum",
+                "txid": "", // Empty txid
+                "digest": "0x9999999999999999999999999999999999999999999999999999999999999999",
+                "created_at": "2025-11-01T12:00:00Z"
+            }
+        });
+
+        let proof_bytes = b"proof";
+        let stmt = extract_statement_from_manifest(&manifest).unwrap();
+        let opts = VerifyOptions {
+            check_timestamp: true,
+            check_registry: false,
+        };
+
+        let report = verify(&manifest, proof_bytes, &stmt, &opts).unwrap();
+        assert_eq!(report.timestamp_valid.unwrap(), false);
+
+        let details = report.details.as_object().unwrap();
+        assert!(details.get("dual_anchor_error").is_some());
+    }
+
+    #[test]
+    fn test_verify_fail_company_commitment_mismatch() {
+        let manifest = mock_manifest();
+        let proof_bytes = b"proof";
+
+        // Create statement with different company_commitment_root
+        let mut stmt = extract_statement_from_manifest(&manifest).unwrap();
+        stmt.company_commitment_root = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string();
+
+        let opts = VerifyOptions {
+            check_timestamp: false,
+            check_registry: false,
+        };
+
+        let report = verify(&manifest, proof_bytes, &stmt, &opts).unwrap();
+        assert_eq!(report.status, "fail");
+
+        let details = report.details.as_object().unwrap();
+        let validation = details.get("statement_validation").unwrap().as_array().unwrap();
+        let company_check = &validation[1];
+        assert_eq!(company_check["status"], "mismatch");
+    }
+
+    #[test]
+    fn test_check_signature_presence_with_count() {
+        let mut manifest = mock_manifest();
+        manifest["signatures"] = json!([
+            {"alg": "Ed25519", "pubkey_hex": "0xaaa"},
+            {"alg": "Ed25519", "pubkey_hex": "0xbbb"},
+            {"alg": "Ed25519", "pubkey_hex": "0xccc"}
+        ]);
+
+        let mut details = serde_json::Map::new();
+        let has_sig = check_signature_presence(&manifest, &mut details);
+
+        assert!(has_sig);
+        assert_eq!(details.get("signature_count").unwrap(), 3);
+    }
+
+    #[test]
+    fn test_verify_options_enable_timestamp_check() {
+        let mut manifest = mock_manifest();
+        manifest["signatures"] = json!([{"alg": "Ed25519"}]);
+
+        let proof_bytes = b"proof";
+        let stmt = extract_statement_from_manifest(&manifest).unwrap();
+        let opts = VerifyOptions {
+            check_timestamp: true,
+            check_registry: false,
+        };
+
+        let report = verify(&manifest, proof_bytes, &stmt, &opts).unwrap();
+        assert!(report.timestamp_valid.is_some());
+    }
+
+    #[test]
+    fn test_verify_missing_company_commitment_root() {
+        let mut manifest = mock_manifest();
+        manifest.as_object_mut().unwrap().remove("company_commitment_root");
+
+        let result = extract_statement_from_manifest(&manifest);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Missing company_commitment_root"));
     }
 }

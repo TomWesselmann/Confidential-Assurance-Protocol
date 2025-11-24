@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use async_trait::async_trait;
 use anyhow::{anyhow, Result};
 use rusqlite::{Connection, params, OptionalExtension};

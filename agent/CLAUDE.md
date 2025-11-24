@@ -680,6 +680,45 @@ Das Policy Store System ist ein pluggable Persistence-Layer für Policy-Manageme
 - **Integration Tests:** 6 Tests in tests/test_policy_store.rs (API Layer)
 - **Output:** JSON Response mit policy_id, policy_hash, metadata, policy
 
+#### `api/rate_limit.rs` – Rate Limiting Middleware (✅ Production Ready)
+- **Funktion:** IP-basierte Rate Limiting mit Token Bucket Algorithm (GCRA)
+- **Features:**
+  - IP-basierte Rate Limiting (via X-Forwarded-For oder Socket Address)
+  - Konfigurierbare Burst und Replenishment Rate
+  - Standard Rate Limit Headers (X-RateLimit-Limit, X-RateLimit-Remaining, Retry-After)
+  - Per-Endpoint Rate Limits
+- **Default Limits:**
+  - Global: 100 Requests pro Minute (burst: 120)
+  - Verify Endpoint: 20 Requests pro Minute (burst: 25)
+  - Policy Compile: 10 Requests pro Minute (burst: 15)
+- **RateLimitConfig Struktur:**
+  ```rust
+  pub struct RateLimitConfig {
+      pub requests_per_minute: u32,
+      pub burst_size: u32,
+  }
+  ```
+- **Vorkonfigurierte Presets:**
+  - `default_global()` – 100 req/min, burst 120 (allgemeine API-Nutzung)
+  - `strict()` – 10 req/min, burst 15 (teure Operationen wie Policy Compilation)
+  - `moderate()` – 20 req/min, burst 25 (normale Operationen wie Verification)
+- **Funktionen:**
+  - `rate_limiter_layer()` – Erstellt Tower Layer mit IP-Extraktion
+  - `handle_rate_limit_error()` – HTTP 429 Too Many Requests Handler mit Retry-After Header
+- **Middleware-Integration:**
+  - Verwendet tower_governor 0.4 + governor 0.6
+  - SmartIpKeyExtractor für automatische IP-Erkennung
+  - StateInformationMiddleware für Header-Support
+- **CLI Flags (verifier_api.rs):**
+  - `--rate-limit <number>` – Requests pro Minute (default: 100)
+  - `--rate-limit-burst <number>` – Burst Size (default: 120)
+- **HTTP Response Headers:**
+  - `X-RateLimit-Limit` – Maximale Requests pro Zeitfenster
+  - `X-RateLimit-Remaining` – Verbleibende Requests
+  - `Retry-After` – Sekunden bis nächster Request (bei 429)
+- **Tests:** 4 Unit-Tests (config presets, layer creation)
+- **Output:** 429 Too Many Requests (bei Überschreitung), normale Response (sonst)
+
 #### `bin/verifier_api.rs` – REST API Server Binary
 - **Funktion:** Axum/Tokio-basierter REST API Server
 - **Framework:** Axum 0.7 + Tokio (async runtime)
@@ -3640,10 +3679,46 @@ cap_auth_token_validation_failures_total
 cap_cache_hit_ratio
 ```
 
-**Planned Metrics (Future):**
-- `cap_verifier_request_duration_seconds` - Histogram
-- `cap_verifier_proof_generation_duration_seconds` - Histogram
-- `cap_verifier_policy_compilation_duration_seconds` - Histogram
+**Histogram Metrics (Duration Tracking):**
+```promql
+# Request Duration Distribution (in seconds)
+cap_verifier_request_duration_seconds_bucket{le="0.001|0.005|0.01|0.05|0.1|0.5|1.0|5.0|+Inf"}
+cap_verifier_request_duration_seconds_sum
+cap_verifier_request_duration_seconds_count
+
+# Policy Compilation Duration (in seconds)
+cap_policy_compilation_duration_seconds_bucket{le="0.001|0.005|0.01|0.05|0.1|0.5|1.0|5.0|+Inf"}
+cap_policy_compilation_duration_seconds_sum
+cap_policy_compilation_duration_seconds_count
+
+# Proof Verification Duration (in seconds)
+cap_proof_verification_duration_seconds_bucket{le="0.001|0.005|0.01|0.05|0.1|0.5|1.0|5.0|+Inf"}
+cap_proof_verification_duration_seconds_sum
+cap_proof_verification_duration_seconds_count
+```
+
+**Gauge Metrics (Current State):**
+```promql
+# Active HTTP connections
+cap_active_connections
+
+# Database connection pool size
+cap_database_pool_connections
+```
+
+**Example Prometheus Queries:**
+```promql
+# 95th percentile request latency
+histogram_quantile(0.95, sum(rate(cap_verifier_request_duration_seconds_bucket[5m])) by (le))
+
+# Average policy compilation time
+rate(cap_policy_compilation_duration_seconds_sum[5m]) / rate(cap_policy_compilation_duration_seconds_count[5m])
+
+# Connection utilization
+cap_active_connections / cap_database_pool_connections
+```
+
+**Note:** Histogram metrics only appear in `/metrics` endpoint after recording samples (expected Prometheus behavior).
 
 ### Production Readiness
 
@@ -3695,7 +3770,7 @@ Prometheus Operator und Service Monitors werden für Production empfohlen.
 ## Nächste Schritte (v0.11.0+)
 
 1. **REST API Additional Features:**
-   - Rate Limiting & Request Throttling
+   - ✅ Rate Limiting & Request Throttling (completed - see api/rate_limit.rs)
    - OpenAPI/Swagger Spezifikation
    - API Key Management (alternative zu OAuth2)
    - Request Logging & Metrics (Prometheus/Grafana)
