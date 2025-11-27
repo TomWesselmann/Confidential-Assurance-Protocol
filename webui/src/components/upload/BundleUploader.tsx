@@ -1,75 +1,64 @@
 /**
- * CAP Bundle Uploader Component
+ * CAP Bundle Uploader Component (Tauri Version)
  *
- * @description Drag-and-drop file uploader for proof bundles
+ * @description File selector for proof bundles using Tauri dialog API
  * @architecture Imperative Shell (React UI Component)
+ * @offline Completely offline - no network requests
  */
 
-import { useCallback } from 'react';
-import { useDropzone } from 'react-dropzone';
+import { useState } from 'react';
+import { selectBundleFile, verifyBundle } from '../../lib/tauri';
 import { useVerificationStore } from '../../store/verificationStore';
-import { useBundleUploader } from '../../hooks/useBundleUploader';
 
 export const BundleUploader: React.FC = () => {
-  const {
-    setUploadedFile,
-    setUploadError,
-    setManifest,
-    setPolicyHash,
-    setProofBundle,
-  } = useVerificationStore();
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const { uploadBundle, isUploading, error: uploadError } = useBundleUploader();
+  const { setVerificationResult, setVerificationError, setIsVerifying } =
+    useVerificationStore();
 
-  const onDrop = useCallback(
-    async (acceptedFiles: File[]) => {
-      if (acceptedFiles.length === 0) return;
+  const handleSelectBundle = async () => {
+    try {
+      setIsLoading(true);
+      setIsVerifying(true);
+      setError(null);
+      setVerificationError(null);
 
-      const file = acceptedFiles[0];
-      setUploadedFile(file);
-      setUploadError(null);
+      // Open Tauri file dialog
+      const bundlePath = await selectBundleFile();
 
-      try {
-        const result = await uploadBundle(file);
-
-        setManifest(result.manifest);
-        setPolicyHash(result.policyHash);
-        setProofBundle(result.proofBundle);
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-        setUploadError(errorMessage);
+      if (!bundlePath) {
+        // User cancelled
+        setIsLoading(false);
+        setIsVerifying(false);
+        return;
       }
-    },
-    [uploadBundle, setUploadedFile, setUploadError, setManifest, setPolicyHash, setProofBundle]
-  );
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    accept: {
-      'application/zip': ['.zip'],
-    },
-    maxFiles: 1,
-    disabled: isUploading,
-  });
+      // Verify bundle immediately (offline)
+      const result = await verifyBundle({
+        bundlePath,
+        options: {
+          checkTimestamp: false, // Offline mode
+          checkRegistry: false, // Offline mode
+        },
+      });
+
+      // Store verification result in global state
+      setVerificationResult(result);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      setError(errorMessage);
+      setVerificationError(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="w-full max-w-2xl mx-auto p-6">
-      <div
-        {...getRootProps()}
-        className={`
-          border-2 border-dashed rounded-lg p-12 text-center cursor-pointer
-          transition-colors duration-200
-          ${
-            isDragActive
-              ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-              : 'border-gray-300 dark:border-gray-600 hover:border-blue-400'
-          }
-          ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}
-        `}
-      >
-        <input {...getInputProps()} />
-
+      <div className="border-2 border-dashed rounded-lg p-12 text-center border-gray-300 dark:border-gray-600 hover:border-blue-400 transition-colors duration-200">
         <div className="space-y-4">
+          {/* Icon */}
           <div className="text-6xl text-gray-400">
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -87,41 +76,53 @@ export const BundleUploader: React.FC = () => {
             </svg>
           </div>
 
-          {isUploading ? (
+          {/* Loading State */}
+          {isLoading ? (
             <div className="space-y-2">
               <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">
-                Lade Bundle hoch...
+                Verifiziere Bundle...
               </p>
               <div className="w-48 h-2 mx-auto bg-gray-200 rounded-full overflow-hidden">
-                <div className="h-full bg-blue-500 animate-pulse" style={{ width: '60%' }} />
+                <div
+                  className="h-full bg-blue-500 animate-pulse"
+                  style={{ width: '60%' }}
+                />
               </div>
             </div>
-          ) : isDragActive ? (
-            <p className="text-lg font-semibold text-blue-600 dark:text-blue-400">
-              Bundle hier ablegen...
-            </p>
           ) : (
-            <div className="space-y-2">
-              <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">
-                CAP Proof Bundle hochladen
-              </p>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                Ziehen Sie eine .zip-Datei hierher oder klicken Sie zum Auswählen
-              </p>
-              <p className="text-xs text-gray-400 dark:text-gray-500">
-                Das Bundle wird automatisch auf dem Server extrahiert
-              </p>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">
+                  CAP Proof Bundle verifizieren
+                </p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Wählen Sie eine Bundle-ZIP-Datei zur Offline-Verifikation
+                </p>
+                <p className="text-xs text-gray-400 dark:text-gray-500">
+                  🔒 Komplett offline • Keine Netzwerk-Anfragen
+                </p>
+              </div>
+
+              {/* Select Button */}
+              <button
+                onClick={handleSelectBundle}
+                disabled={isLoading}
+                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors font-semibold"
+              >
+                Bundle auswählen
+              </button>
             </div>
           )}
         </div>
       </div>
 
-      {uploadError && (
+      {/* Error Display */}
+      {error && (
         <div className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
           <p className="text-sm font-semibold text-red-800 dark:text-red-300">
-            Fehler beim Upload
+            Fehler bei der Verifikation
           </p>
-          <p className="text-xs text-red-600 dark:text-red-400 mt-1">{uploadError}</p>
+          <p className="text-xs text-red-600 dark:text-red-400 mt-1">{error}</p>
         </div>
       )}
     </div>

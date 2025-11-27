@@ -22,19 +22,26 @@ Nachdem Sie nun wissen, **was** das System macht, **wie** es aufgebaut ist, **we
 
 ## 👔 Für Management: Welche Installations-Methode?
 
-Das System kann auf **4 verschiedene Arten** installiert werden. Hier eine Entscheidungshilfe:
+Das System kann auf **5 verschiedene Arten** installiert werden. Hier eine Entscheidungshilfe:
 
 | Methode | Für wen? | Kosten | Komplexität | Skalierbarkeit |
 |---------|----------|--------|-------------|----------------|
-| **1. Binary** | Kleine Firmen, Tests | € | ⭐ Einfach | ⭐ Limitiert |
-| **2. Docker** | Mittlere Firmen | €€ | ⭐⭐ Mittel | ⭐⭐ Gut |
-| **3. Kubernetes** | Konzerne, Cloud | €€€€ | ⭐⭐⭐⭐ Komplex | ⭐⭐⭐⭐ Exzellent |
-| **4. Systemd** | Linux-Server | € | ⭐⭐ Mittel | ⭐⭐ Gut |
+| **1. Desktop App** | Einzelnutzer, Offline | € | ⭐ Sehr Einfach | ⭐ Single User |
+| **2. Binary** | Kleine Firmen, Tests | € | ⭐ Einfach | ⭐ Limitiert |
+| **3. Docker** | Mittlere Firmen | €€ | ⭐⭐ Mittel | ⭐⭐ Gut |
+| **4. Kubernetes** | Konzerne, Cloud | €€€€ | ⭐⭐⭐⭐ Komplex | ⭐⭐⭐⭐ Exzellent |
+| **5. Systemd** | Linux-Server | € | ⭐⭐ Mittel | ⭐⭐ Gut |
 
 ### Empfehlungen nach Unternehmensgröße:
 
+**Einzelperson / Freelancer:**
+- ✅ **Desktop App** (Tauri)
+- Keine Installation nötig, komplett offline
+- Alle Daten bleiben lokal
+- *Analogie:* Wie ein Textverarbeitungsprogramm - einfach starten und nutzen
+
 **Kleine Unternehmen (< 50 Mitarbeiter):**
-- ✅ **Binary** oder **Systemd** auf einem Linux-Server
+- ✅ **Desktop App** oder **Binary/Systemd** auf einem Linux-Server
 - Einfach, kostengünstig, ausreichend
 - *Analogie:* Wie ein Desktop-PC statt Server-Rack
 
@@ -66,14 +73,170 @@ Das System kann auf **4 verschiedene Arten** installiert werden. Hier eine Entsc
 
 Der LsKG-Agent kann auf verschiedene Arten deployed werden:
 
-1. **Binary Deployment** - Direktes Ausführen des Rust-Binaries (einfachste Methode)
-2. **Docker Container** - Containerisierte Anwendung (empfohlen für Produktion)
-3. **Kubernetes** - Orchestrierte Container in einem Cluster (für Enterprise)
-4. **Systemd Service** - Systemd-managed Service auf Linux (klassischer Ansatz)
+1. **Desktop App (Tauri)** - Native App für Windows/macOS/Linux (offline, v0.12.0)
+2. **Binary Deployment** - Direktes Ausführen des Rust-Binaries (einfachste Methode)
+3. **Docker Container** - Containerisierte Anwendung (empfohlen für Produktion)
+4. **Kubernetes** - Orchestrierte Container in einem Cluster (für Enterprise)
+5. **Systemd Service** - Systemd-managed Service auf Linux (klassischer Ansatz)
 
 ---
 
-## 1. Binary Deployment
+## 1. Desktop App Deployment (Tauri 2.0) - NEU in v0.12.0
+
+> ⭐ **NEU in v0.12.0:** Native Desktop-Anwendung für komplett offline Compliance-Workflow
+
+Die Desktop App ist die einfachste Deployment-Option und erfordert keine Server-Infrastruktur.
+
+### Voraussetzungen
+
+**Für Endbenutzer:**
+- Windows 10/11, macOS 10.15+, oder Linux (Ubuntu 20.04+)
+- 4 GB RAM minimum
+- 100 MB Festplatte für die App
+- Keine Internetverbindung erforderlich
+
+**Für Build (Entwickler):**
+- Rust 1.75+
+- Node.js 18+
+- Tauri CLI (`cargo install tauri-cli`)
+
+### Installation (Endbenutzer)
+
+**macOS:**
+```bash
+# Download der .dmg Datei
+# Doppelklick auf .dmg
+# App in Applications-Ordner ziehen
+# Starten via Launchpad oder Spotlight
+```
+
+**Windows:**
+```bash
+# Download der .msi oder .exe Installer
+# Doppelklick zum Installieren
+# Starten via Startmenü
+```
+
+**Linux:**
+```bash
+# Download der .AppImage oder .deb
+# AppImage: chmod +x ./desktop-proofer.AppImage && ./desktop-proofer.AppImage
+# Debian: sudo dpkg -i ./desktop-proofer.deb
+```
+
+### Build from Source
+
+```bash
+# Repository klonen
+git clone https://github.com/your-org/LsKG-Agent.git
+cd LsKG-Agent
+
+# Frontend Dependencies installieren
+cd webui
+npm install
+
+# Tauri App bauen
+cd ../src-tauri
+cargo build --release
+
+# Binary ist verfügbar unter:
+# macOS: target/release/desktop-proofer
+# Windows: target/release/desktop-proofer.exe
+# Linux: target/release/desktop-proofer
+```
+
+### App Distribution erstellen
+
+```bash
+# Für alle Plattformen (auf jeweiliger Plattform ausführen)
+cd src-tauri
+cargo tauri build
+
+# Output:
+# macOS: src-tauri/target/release/bundle/dmg/
+# Windows: src-tauri/target/release/bundle/msi/
+# Linux: src-tauri/target/release/bundle/appimage/
+```
+
+### Konfiguration
+
+Die Desktop App ist **zero-config** - keine Konfigurationsdateien nötig.
+
+**Daten werden gespeichert in:**
+- Workspace: Vom Benutzer gewählter Ordner (z.B. `~/cap-workspace/`)
+- Pro Projekt: `{workspace}/{project-name}/`
+  - `input/` - CSV-Dateien, Policy
+  - `build/` - Commitments, Manifest, Proof, Audit Log
+  - `export/` - Exportierte Bundles
+
+### Projekt-Struktur (automatisch erstellt)
+
+```
+~/cap-workspace/
+└── cap-proof-2025-11-27-xyz123/
+    ├── input/
+    │   ├── suppliers.csv
+    │   ├── ubos.csv
+    │   └── policy.yml
+    ├── build/
+    │   ├── commitments.json
+    │   ├── manifest.json
+    │   ├── proof.capz
+    │   └── audit.jsonl         # V1.0 Audit Trail
+    └── export/
+        └── cap-bundle-2025-11-27_120000.zip
+```
+
+### Audit Trail
+
+Jedes Projekt enthält einen manipulationssicheren Audit Trail in `build/audit.jsonl`:
+
+```json
+{"seq":1,"ts":"2025-11-27T10:00:00Z","event":"project_created","details":{"project_name":"cap-proof-xyz"},"prev_digest":"0x0","digest":"0x1a2b3c..."}
+{"seq":2,"ts":"2025-11-27T10:01:00Z","event":"csv_imported","details":{"file_type":"suppliers","row_count":150},"prev_digest":"0x1a2b3c...","digest":"0x4d5e6f..."}
+```
+
+**Hash-Chain:** Jeder Eintrag referenziert den Hash des vorherigen Eintrags → Manipulationen sofort erkennbar.
+
+### Desktop App vs. Server Deployment
+
+| Aspekt | Desktop App | Server (API) |
+|--------|-------------|--------------|
+| **Installation** | App Download | Server Setup |
+| **Netzwerk** | Offline | Netzwerk erforderlich |
+| **Daten** | Lokal auf Rechner | Server-seitig |
+| **Multi-User** | Single User | Multi-Tenant |
+| **Audit Trail** | Lokal (audit.jsonl) | Zentral |
+| **Updates** | Manuell/Auto-Update | Rolling Deployment |
+| **Kosten** | 0€ (kein Server) | Server + Wartung |
+
+### Troubleshooting Desktop App
+
+**Problem: App startet nicht auf macOS**
+```
+"desktop-proofer" kann nicht geöffnet werden, da es von einem nicht verifizierten Entwickler stammt
+```
+**Lösung:**
+```bash
+# Rechtsklick auf App → Öffnen → Bestätigen
+# Oder in Systemeinstellungen → Sicherheit → "Trotzdem öffnen"
+```
+
+**Problem: CSV-Import schlägt fehl**
+```
+Fehler beim Importieren: Invalid UTF-8
+```
+**Lösung:** CSV-Datei in UTF-8 kodieren (nicht ANSI/Windows-1252)
+
+**Problem: Audit Trail zeigt Hash-Chain-Fehler**
+```
+Error: Hash chain broken at seq 3
+```
+**Lösung:** audit.jsonl wurde manuell bearbeitet → Neues Projekt erstellen
+
+---
+
+## 2. Binary Deployment
 
 ### Voraussetzungen
 
@@ -2022,10 +2185,18 @@ readinessProbe:
 ## Zusammenfassung
 
 Der LsKG-Agent kann flexibel deployed werden:
+- ✅ **Desktop App** für Offline-Nutzung ohne Server (NEU in v0.12.0)
 - ✅ Binary + Systemd für einfache Deployments
 - ✅ Docker für Container-basierte Deployments
 - ✅ Kubernetes für Enterprise-Skalierung
+- ✅ WebUI für Browser-basierte Verifikation
 - ✅ Monitoring mit Prometheus + Grafana
 - ✅ Automated Backups
 - ✅ Security Hardening
 - ✅ Performance Tuning
+
+**Empfehlung nach Anwendungsfall:**
+- **Einzelperson/Offline:** Desktop App (Tauri)
+- **Kleine Teams:** Binary + Systemd
+- **Mittlere Unternehmen:** Docker Compose
+- **Enterprise:** Kubernetes mit HPA

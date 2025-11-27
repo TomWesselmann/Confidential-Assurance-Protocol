@@ -60,10 +60,14 @@ Der LsKG-Agent folgt einer **mehrschichtigen Architektur** (engl. "Layered Archi
 ┌─────────────────────────────────────────────────────────────┐
 │                    Presentation Layer                       │
 │  ┌──────────────┐  ┌──────────────┐  ┌─────────────────┐   │
-│  │  CLI Binary  │  │  REST API    │  │  Web UI         │   │
-│  │  (main.rs)   │  │  (Axum)      │  │  (React/TS)     │   │
-│  │              │  │  + OAuth2    │  │  v0.11.0 ✅     │   │
+│  │  CLI Binary  │  │  REST API    │  │  Desktop App    │   │
+│  │  (main.rs)   │  │  (Axum)      │  │  (Tauri 2.0)    │   │
+│  │              │  │  + OAuth2    │  │  v0.12.0 ✅     │   │
 │  └──────────────┘  └──────────────┘  └─────────────────┘   │
+│                                       ┌─────────────────┐   │
+│                                       │  Web UI         │   │
+│                                       │  (React/TS)     │   │
+│                                       └─────────────────┘   │
 └─────────────────────────────────────────────────────────────┘
                            ↓
 ┌─────────────────────────────────────────────────────────────┐
@@ -621,6 +625,313 @@ Communication:
   ├─ Bearer Token        (Authentication)
   ├─ Multipart Form      (File Upload)
   └─ CORS Preflight      (OPTIONS Requests)
+```
+
+## Desktop App Architektur (Tauri 2.0) - NEU in v0.12.0
+
+**Für Management:** Die Desktop App ist wie eine eigenständige Softwareanwendung (wie Word oder Excel), die komplett offline funktioniert. Alle Daten bleiben auf dem lokalen Rechner - keine Cloud, keine Server, keine Internetverbindung nötig.
+
+### Systemübersicht
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                    CAP Desktop Proofer                            │
+│                    (Tauri 2.0 Application)                        │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                   │
+│  ┌─────────────────────────────────────────────────────────────┐ │
+│  │                   WebView (Frontend)                         │ │
+│  │                                                              │ │
+│  │  React + TypeScript + Zustand                               │ │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │ │
+│  │  │  Proofer     │  │  Verifier    │  │  Audit       │      │ │
+│  │  │  Mode        │  │  Mode        │  │  Mode        │      │ │
+│  │  │              │  │              │  │              │      │ │
+│  │  │ 6-Step       │  │ Bundle       │  │ Timeline     │      │ │
+│  │  │ Workflow     │  │ Upload &     │  │ View         │      │ │
+│  │  │              │  │ Verify       │  │              │      │ │
+│  │  └──────────────┘  └──────────────┘  └──────────────┘      │ │
+│  │                                                              │ │
+│  │  ┌────────────────────────────────────────────────────────┐ │ │
+│  │  │  Shared Components                                     │ │ │
+│  │  │  - WorkflowStepper (Step Navigation)                   │ │ │
+│  │  │  - ProjectSidebar (Workspace Browser)                  │ │ │
+│  │  │  - AuditTimeline (Event History)                       │ │ │
+│  │  └────────────────────────────────────────────────────────┘ │ │
+│  │                                                              │ │
+│  │  ┌────────────────────────────────────────────────────────┐ │ │
+│  │  │  State Management (Zustand)                            │ │ │
+│  │  │  - workflowStore.ts (Proofer State)                    │ │ │
+│  │  │  - verificationStore.ts (Verifier State)               │ │ │
+│  │  └────────────────────────────────────────────────────────┘ │ │
+│  └─────────────────────────────────────────────────────────────┘ │
+│                              │                                    │
+│                              │ Tauri IPC (invoke/emit)            │
+│                              ↓                                    │
+│  ┌─────────────────────────────────────────────────────────────┐ │
+│  │                   Rust Backend (src-tauri)                   │ │
+│  │                                                              │ │
+│  │  ┌────────────────────────────────────────────────────────┐ │ │
+│  │  │  Tauri Commands (commands/)                            │ │ │
+│  │  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐  │ │ │
+│  │  │  │ project  │ │ import   │ │ commit   │ │ policy   │  │ │ │
+│  │  │  │ .rs      │ │ .rs      │ │ ments.rs │ │ .rs      │  │ │ │
+│  │  │  └──────────┘ └──────────┘ └──────────┘ └──────────┘  │ │ │
+│  │  │  ┌──────────┐ ┌──────────┐ ┌──────────┐               │ │ │
+│  │  │  │ manifest │ │ proof    │ │ export   │               │ │ │
+│  │  │  │ .rs      │ │ .rs      │ │ .rs      │               │ │ │
+│  │  │  └──────────┘ └──────────┘ └──────────┘               │ │ │
+│  │  └────────────────────────────────────────────────────────┘ │ │
+│  │                                                              │ │
+│  │  ┌────────────────────────────────────────────────────────┐ │ │
+│  │  │  Audit Logger (audit_logger.rs)                        │ │ │
+│  │  │  - SHA3-256 Hash Chain                                 │ │ │
+│  │  │  - V1.0 Format (seq, ts, event, details, digest)       │ │ │
+│  │  │  - Append-only audit.jsonl                             │ │ │
+│  │  └────────────────────────────────────────────────────────┘ │ │
+│  │                                                              │ │
+│  │  ┌────────────────────────────────────────────────────────┐ │ │
+│  │  │  Security Module (security.rs)                         │ │ │
+│  │  │  - Path Validation                                     │ │ │
+│  │  │  - Error Sanitization                                  │ │ │
+│  │  └────────────────────────────────────────────────────────┘ │ │
+│  └─────────────────────────────────────────────────────────────┘ │
+│                              │                                    │
+│                              │ Filesystem Access                  │
+│                              ↓                                    │
+│  ┌─────────────────────────────────────────────────────────────┐ │
+│  │                   Local Filesystem                           │ │
+│  │                                                              │ │
+│  │  ~/cap-workspace/                                            │ │
+│  │  └── cap-proof-2025-11-27-xyz123/                           │ │
+│  │      ├── input/                                              │ │
+│  │      │   ├── suppliers.csv                                   │ │
+│  │      │   ├── ubos.csv                                        │ │
+│  │      │   └── policy.yml                                      │ │
+│  │      ├── build/                                              │ │
+│  │      │   ├── commitments.json                                │ │
+│  │      │   ├── manifest.json                                   │ │
+│  │      │   ├── proof.capz                                      │ │
+│  │      │   └── audit.jsonl                                     │ │
+│  │      └── export/                                             │ │
+│  │          └── cap-bundle-2025-11-27_120000.zip                │ │
+│  └─────────────────────────────────────────────────────────────┘ │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### Tauri IPC Communication
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    IPC Communication Pattern                     │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  Frontend (TypeScript)                Backend (Rust)             │
+│  ─────────────────────               ───────────────             │
+│                                                                  │
+│  import { invoke } from               #[tauri::command]          │
+│    "@tauri-apps/api/core"             pub async fn import_csv(   │
+│                                         path: String,            │
+│  const result = await invoke(           csv_type: String,        │
+│    "import_csv",                        project: String          │
+│    {                                  ) -> Result<ImportResult,  │
+│      path: "/path/to/file.csv",                String> {        │
+│      csvType: "suppliers",              // Rust implementation   │
+│      project: "/project/path"         }                          │
+│    }                                                             │
+│  );                                                              │
+│                                                                  │
+│  // Type-safe wrapper in lib/tauri.ts                           │
+│  export async function importCsv(                                │
+│    path: string,                                                 │
+│    csvType: 'suppliers' | 'ubos',                               │
+│    project: string                                               │
+│  ): Promise<ImportResult> {                                      │
+│    return invoke('import_csv', { path, csvType, project });     │
+│  }                                                               │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 6-Step Proofer Workflow
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                    Proofer Workflow Pipeline                      │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                   │
+│  Step 1: IMPORT                                                   │
+│  ─────────────────                                                │
+│  User Action: Select CSV files (suppliers.csv, ubos.csv)         │
+│  IPC Call:    invoke("import_csv", {path, csvType, project})     │
+│  Backend:     Validate, copy to input/, parse records            │
+│  Audit:       "csv_imported" event logged                        │
+│  Output:      ImportResult {rowCount, validRows, hash}           │
+│         ↓                                                         │
+│  Step 2: COMMITMENTS                                              │
+│  ────────────────────                                             │
+│  User Action: Click "Generate Commitments"                        │
+│  IPC Call:    invoke("build_commitments", {project})             │
+│  Backend:     BLAKE3 hash each record, build Merkle tree         │
+│  Audit:       "commitments_created" event logged                 │
+│  Output:      CommitmentsResult {supplierRoot, uboRoot, ...}     │
+│         ↓                                                         │
+│  Step 3: POLICY                                                   │
+│  ──────────────                                                   │
+│  User Action: Select policy.yml or use default                    │
+│  IPC Call:    invoke("load_policy", {project, policyPath?})      │
+│  Backend:     Parse YAML, validate schema, compute hash          │
+│  Audit:       "policy_loaded" event logged                       │
+│  Output:      PolicyInfo {name, version, hash, constraints}      │
+│         ↓                                                         │
+│  Step 4: MANIFEST                                                 │
+│  ────────────────                                                 │
+│  User Action: Click "Build Manifest"                              │
+│  IPC Call:    invoke("build_manifest", {project})                │
+│  Backend:     Combine commitments + policy + audit ref           │
+│  Audit:       "manifest_built" event logged                      │
+│  Output:      ManifestResult {hash, version, createdAt}          │
+│         ↓                                                         │
+│  Step 5: PROOF                                                    │
+│  ─────────────                                                    │
+│  User Action: Click "Generate Proof"                              │
+│  IPC Call:    invoke("build_proof", {project})                   │
+│  Backend:     Load manifest, run mock verifier, create proof     │
+│  Audit:       "proof_built" event logged                         │
+│  Output:      ProofResult {proofHash, backend, status}           │
+│         ↓                                                         │
+│  Step 6: EXPORT                                                   │
+│  ─────────────                                                    │
+│  User Action: Click "Export Bundle", select destination          │
+│  IPC Call:    invoke("export_bundle", {project, output})         │
+│  Backend:     Create ZIP with cap-bundle.v1 format               │
+│  Audit:       "bundle_exported" event logged                     │
+│  Output:      ExportResult {bundlePath, sizeBytes, hash, files}  │
+│                                                                   │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### Audit Trail Format (V1.0)
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                    Audit Trail Hash Chain                         │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                   │
+│  audit.jsonl (append-only, one JSON object per line)             │
+│                                                                   │
+│  Line 1:                                                          │
+│  {                                                                │
+│    "seq": 1,                          // Sequential number        │
+│    "ts": "2025-11-27T10:00:00Z",      // ISO 8601 timestamp      │
+│    "event": "project_created",        // Event type               │
+│    "details": {                       // Event-specific data      │
+│      "project_name": "cap-proof-xyz"                             │
+│    },                                                             │
+│    "prev_digest": "0x0000...0000",    // Previous entry hash     │
+│    "digest": "0x1a2b3c..."            // SHA3-256 of this entry  │
+│  }                                                                │
+│                                                                   │
+│  Line 2:                                                          │
+│  {                                                                │
+│    "seq": 2,                                                      │
+│    "ts": "2025-11-27T10:01:00Z",                                 │
+│    "event": "csv_imported",                                       │
+│    "details": {                                                   │
+│      "file_type": "suppliers",                                    │
+│      "row_count": 150,                                            │
+│      "file_hash": "0xabc123..."                                   │
+│    },                                                             │
+│    "prev_digest": "0x1a2b3c...",      // Points to Line 1        │
+│    "digest": "0x4d5e6f..."            // SHA3-256 chain extends  │
+│  }                                                                │
+│                                                                   │
+│  Tamper Detection:                                                │
+│  ─────────────────                                                │
+│  If any entry is modified → all subsequent digests break         │
+│  Verification: Recalculate chain, compare final digest           │
+│                                                                   │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### State Management (Zustand)
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                    WorkflowStore (Zustand)                        │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                   │
+│  interface WorkflowState {                                        │
+│    // Project Info                                                │
+│    projectPath: string | null;                                    │
+│    projectName: string | null;                                    │
+│                                                                   │
+│    // Current Position                                            │
+│    currentStep: 'import'|'commitments'|'policy'|                 │
+│                 'manifest'|'proof'|'export';                      │
+│                                                                   │
+│    // Step States                                                 │
+│    steps: Record<WorkflowStep, {                                 │
+│      status: 'pending'|'in_progress'|'completed'|'error';        │
+│      error?: string;                                              │
+│    }>;                                                            │
+│                                                                   │
+│    // Step Results                                                │
+│    importResults: {suppliers: ImportResult|null; ...};           │
+│    commitmentsResult: CommitmentsResult | null;                  │
+│    policyInfo: PolicyInfo | null;                                │
+│    manifestResult: ManifestResult | null;                        │
+│    proofResult: ProofResult | null;                              │
+│    exportResult: ExportResult | null;                            │
+│                                                                   │
+│    // Actions                                                     │
+│    setProject(path, name): void;                                 │
+│    initializeFromStatus(path, name, status): void;  // Restore!  │
+│    setCurrentStep(step): void;                                   │
+│    goToNextStep(): void;                                         │
+│    goToPreviousStep(): void;                                     │
+│    reset(): void;                                                 │
+│  }                                                                │
+│                                                                   │
+│  Key Feature: initializeFromStatus()                             │
+│  ────────────────────────────────────                            │
+│  When switching back to Proofer mode, the workflow state is      │
+│  restored from the backend (project files on disk), preserving   │
+│  the user's progress. No data loss when switching modes!         │
+│                                                                   │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### Desktop App vs. Web UI Comparison
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                    Feature Comparison                             │
+├────────────────────┬────────────────────┬────────────────────────┤
+│  Feature           │  Desktop App       │  Web UI                │
+├────────────────────┼────────────────────┼────────────────────────┤
+│  Network Required  │  ❌ No             │  ✅ Yes (API Server)   │
+│  Data Location     │  Local Filesystem  │  Server + Browser      │
+│  Proof Generation  │  ✅ Yes (offline)  │  ❌ No (API only)      │
+│  Verification      │  ✅ Yes (offline)  │  ✅ Yes (via API)      │
+│  Audit Trail       │  ✅ Built-in       │  ⚠️ Server-side only   │
+│  Installation      │  Native App        │  Browser Access        │
+│  Updates           │  Manual/Auto       │  Always Latest         │
+│  Multi-User        │  Single User       │  ✅ Multi-Tenant       │
+│  Enterprise        │  Standalone        │  Centralized           │
+└────────────────────┴────────────────────┴────────────────────────┘
+
+Use Desktop App when:
+- Privacy is critical (data must stay local)
+- Offline operation is required
+- Single-user compliance workflow
+- Air-gapped environments
+
+Use Web UI when:
+- Multi-user access needed
+- Centralized verification service
+- Integration with existing web infrastructure
+- Browser-only access acceptable
 ```
 
 ## Policy Store Architektur

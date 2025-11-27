@@ -3,9 +3,10 @@
 **Production-Ready Compliance Proof System for Supply Chain Due Diligence**
 
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/TomWesselmann/Confidential-Assurance-Protocol)
-[![Version](https://img.shields.io/badge/version-0.11.0-blue)](https://github.com/TomWesselmann/Confidential-Assurance-Protocol/releases)
+[![Version](https://img.shields.io/badge/version-0.12.0-blue)](https://github.com/TomWesselmann/Confidential-Assurance-Protocol/releases)
 [![License](https://img.shields.io/badge/license-All%20Rights%20Reserved-red)](LICENSE)
 [![Docker](https://img.shields.io/badge/docker-ready-2496ED?logo=docker)](agent/DOCKER_DEPLOYMENT.md)
+[![Desktop](https://img.shields.io/badge/desktop-Tauri%202.0-24C8DB?logo=tauri)](src-tauri/)
 [![Monitoring](https://img.shields.io/badge/monitoring-production--ready-success)](agent/monitoring/)
 
 ---
@@ -16,15 +17,16 @@ The **Confidential Assurance Protocol (CAP)** is a cryptographic compliance proo
 
 ### Key Features
 
+✅ **Desktop App (NEW v0.12.0)** - Offline-capable Tauri 2.0 application with 6-step workflow
 ✅ **Zero-Knowledge Proofs** - Prove compliance without disclosing raw data
 ✅ **Cryptographic Commitments** - BLAKE3 Merkle roots + SHA3-256 audit trails
 ✅ **Policy Engine** - Flexible YAML-based compliance rules (v2 with linting)
 ✅ **REST API** - OAuth2-secured endpoints with rate limiting (100 req/min global)
-✅ **Web UI** - React-based interface for proof upload and verification (v0.11.0)
+✅ **Web UI** - React-based interface for proof upload and verification
 ✅ **Production Monitoring** - Full observability stack (Prometheus, Grafana, Loki, Jaeger)
 ✅ **Policy Store System** - Pluggable backend (InMemory + SQLite) with deduplication
 ✅ **Proof Upload API** - Multipart file upload endpoint for ZIP bundles
-✅ **Audit Trail** - Immutable SHA3-256 hash chain for all operations
+✅ **Audit Trail** - Immutable SHA3-256 hash chain for all operations (V1.0 format)
 ✅ **Key Management** - Ed25519 signing with key rotation and attestation
 ✅ **Docker & Kubernetes** - Production-ready deployment configs
 ✅ **Load Tested** - 22-27 RPS sustained throughput, 100% success rate
@@ -62,20 +64,32 @@ docker compose up -d
 
 ### 3. Run CAP Agent
 
-**Option A: Using Docker** (Recommended)
+**Option A: Desktop App** (Recommended for individuals)
 ```bash
-docker pull ghcr.io/tomwesselmann/cap-agent:v0.11.0-alpine
-docker run --rm -p 8080:8080 ghcr.io/tomwesselmann/cap-agent:v0.11.0-alpine
+cd src-tauri
+cargo tauri build
+# macOS:
+open target/release/bundle/macos/CAP\ Desktop\ Proofer.app
+# Windows:
+.\target\release\bundle\msi\CAP_Desktop_Proofer.msi
+# Linux:
+./target/release/bundle/appimage/cap-desktop-proofer.AppImage
 ```
 
-**Option B: From Source**
+**Option B: Using Docker** (For servers)
+```bash
+docker pull ghcr.io/tomwesselmann/cap-agent:v0.12.0-alpine
+docker run --rm -p 8080:8080 ghcr.io/tomwesselmann/cap-agent:v0.12.0-alpine
+```
+
+**Option C: From Source** (For development)
 ```bash
 cd agent
 cargo build --release
 ./target/release/cap-agent --help
 ```
 
-### 4. Start WebUI (Optional)
+### 4. Start WebUI (Optional, requires server)
 
 ```bash
 cd webui
@@ -117,7 +131,13 @@ curl http://localhost:8080/healthz
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    CAP System v0.11.0                           │
+│                    CAP System v0.12.0                           │
+├─────────────────────────────────────────────────────────────────┤
+│  Desktop App Layer (Tauri 2.0) - NEW in v0.12.0                │
+│  ├─ 6-Step Proofer Workflow (Import→Commit→Policy→Manifest→Proof→Export)
+│  ├─ Verifier Mode (Offline bundle verification)                │
+│  ├─ Audit Mode (Timeline with SHA3-256 hash chain)            │
+│  └─ IPC Commands (Tauri invoke/emit pattern)                   │
 ├─────────────────────────────────────────────────────────────────┤
 │  REST API Layer (Axum)                                         │
 │  ├─ OAuth2 Middleware (JWT RS256)                              │
@@ -132,7 +152,7 @@ curl http://localhost:8080/healthz
 │  ├─ Policy Engine (YAML-based Rules v2 with linting)          │
 │  ├─ Proof Engine (ZK-Ready, currently SimplifiedZK)            │
 │  ├─ Verifier Core (I/O-free, portable)                         │
-│  └─ Audit Trail (SHA3-256 Hash Chain)                          │
+│  └─ Audit Trail (SHA3-256 Hash Chain, V1.0 Format)             │
 ├─────────────────────────────────────────────────────────────────┤
 │  Storage Layer                                                  │
 │  ├─ Registry (JSON or SQLite)                                  │
@@ -140,7 +160,7 @@ curl http://localhost:8080/healthz
 │  ├─ BLOB Store (Content-Addressable Storage)                   │
 │  └─ Key Store (Ed25519 with KID rotation)                      │
 ├─────────────────────────────────────────────────────────────────┤
-│  Observability Layer (Week 2)                                  │
+│  Observability Layer                                            │
 │  ├─ Metrics (Prometheus, 15s scrape, 30d retention)           │
 │  ├─ Logs (Loki + Promtail, 31d retention)                     │
 │  ├─ Traces (Jaeger, 100% sampling)                            │

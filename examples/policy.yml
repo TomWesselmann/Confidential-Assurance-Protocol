@@ -1,0 +1,36 @@
+name: LkSG Demo Policy
+version: lksg.v1.0
+description: Demo-Policy für Lieferkettensorgfaltspflichtengesetz (LkSG) Tests
+
+rules:
+  - id: jurisdiction_check
+    description: Prüfung der Jurisdiktion gegen Hochrisikoländer
+    type: blocklist
+    field: jurisdiction
+    values:
+      - KP  # Nordkorea
+      - IR  # Iran
+      - SY  # Syrien
+      - CU  # Kuba
+
+  - id: tier_validation
+    description: Validierung der Lieferanten-Tiers
+    type: range
+    field: tier
+    min: 1
+    max: 3
+
+  - id: ubo_citizenship_check
+    description: UBO Staatsbürgerschaft gegen Sanktionslisten
+    type: blocklist
+    field: citizenship
+    values:
+      - KP
+      - IR
+      - SY
+
+metadata:
+  created_at: 2024-11-25
+  author: CAP Demo
+  compliance_framework: LkSG
+  valid_until: 2025-12-31

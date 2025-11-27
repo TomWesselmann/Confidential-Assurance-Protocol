@@ -34,9 +34,10 @@ Dieses Vokabelbuch ist Ihr **Nachschlagewerk für alle Fachbegriffe** aus dem Ls
 14. [WASM & WebAssembly](#14-wasm--webassembly) (5 Begriffe)
 15. [Proof-Systeme](#15-proof-systeme) (8 Begriffe)
 16. [Allgemeine IT-Begriffe](#16-allgemeine-it-begriffe) (15 Begriffe)
-17. [WebUI & Frontend](#17-webui--frontend) (10 Begriffe) ✨ NEU
+17. [WebUI & Frontend](#17-webui--frontend) (10 Begriffe)
+18. [Desktop-App & Tauri](#18-desktop-app--tauri) (15 Begriffe) ✨ NEU
 
-**Gesamt: 195+ Begriffe** (Stand: v0.11.0)
+**Gesamt: 212+ Begriffe** (Stand: v0.12.0)
 
 ---
 
@@ -3762,11 +3763,289 @@ Z: [Zero-Knowledge Proof](#zero-knowledge-proof-zkp)
 
 ---
 
+## 18. Desktop-App & Tauri ✨ NEU v0.12.0
+
+### Tauri ⭐
+**Einfach:** Framework zur Erstellung von Desktop-Apps mit Web-Technologien (HTML/CSS/JavaScript) und einem Rust-Backend.
+
+**Technisch:** Cross-platform desktop application framework that uses OS-native WebView for rendering UI and Rust for backend logic. Much smaller binary size than Electron.
+
+**Analogie:** Wie ein Schaufenster (WebView) mit einem starken Lagerhaus dahinter (Rust) - die Präsentation ist webbasiert, aber die Arbeit passiert effizient in Rust.
+
+**Im Projekt:** Basis für die CAP Desktop Proofer App - ermöglicht Offline-First Compliance-Workflows.
+
+**Vorteile gegenüber Electron:**
+- Kleinere Bundle-Größe (~10MB vs ~150MB)
+- Geringerer RAM-Verbrauch
+- Sichereres IPC (kein Node.js)
+- Native OS-Features
+
+**Verwandte Begriffe:** [WebView](#webview), [IPC](#ipc-inter-process-communication), [Rust](#rust)
+
+---
+
+### WebView
+**Einfach:** Ein eingebettetes Browser-Fenster innerhalb einer Desktop-App.
+
+**Technisch:** OS-native component (WKWebView on macOS, WebView2 on Windows, WebKitGTK on Linux) that renders HTML/CSS/JS content.
+
+**Analogie:** Wie ein Bilderrahmen, der statt eines Bildes eine Website anzeigt.
+
+**Im Projekt:** Rendert die React-UI innerhalb der Tauri-App.
+
+**Verwandte Begriffe:** [Tauri](#tauri), [SPA](#spa-single-page-application)
+
+---
+
+### IPC (Inter-Process Communication) ⭐
+**Einfach:** Kommunikation zwischen dem Frontend (UI) und Backend (Rust) einer Desktop-App.
+
+**Technisch:** Mechanism for exchanging data between separate processes. In Tauri: Frontend invokes Rust commands, Rust can emit events to Frontend.
+
+**Analogie:** Wie ein Rohrpost-System zwischen zwei Abteilungen - Anfragen werden abgeschickt und Antworten kommen zurück.
+
+**Im Projekt:**
+- `invoke('command_name', {args})` - Frontend ruft Rust auf
+- `emit('event:name', payload)` - Rust sendet Events an Frontend
+
+**Code-Beispiel:**
+```typescript
+// Frontend
+const result = await invoke<ProjectInfo>('create_project', {
+  workspace: '/path/to/workspace',
+  name: 'mein-projekt'
+});
+
+// Backend (Rust)
+#[tauri::command]
+pub async fn create_project(workspace: String, name: String) -> Result<ProjectInfo, String> {
+  // ...
+}
+```
+
+**Verwandte Begriffe:** [Tauri Command](#tauri-command), [Event Emitter](#event-emitter)
+
+---
+
+### Tauri Command ⭐
+**Einfach:** Eine Rust-Funktion, die vom Frontend aus aufgerufen werden kann.
+
+**Technisch:** Rust function annotated with `#[tauri::command]` that can be invoked from JavaScript via Tauri's IPC bridge.
+
+**Im Projekt:** 14 Commands für Workflow, Verifikation und Audit:
+- `create_project`, `list_projects`, `get_project_status`
+- `import_csv`, `create_commitments`, `load_policy`
+- `build_manifest`, `build_proof`, `export_bundle`
+- `verify_bundle`, `get_bundle_info`
+- `get_audit_log`, `verify_audit_chain`
+
+**Verwandte Begriffe:** [IPC](#ipc-inter-process-communication), [invoke](#invoke)
+
+---
+
+### invoke
+**Einfach:** JavaScript-Funktion zum Aufrufen von Tauri-Commands.
+
+**Technisch:** Async function from `@tauri-apps/api/core` that sends a request to the Rust backend and returns a Promise with the result.
+
+**Im Projekt:** Alle Tauri-Aufrufe in `webui/src/lib/tauri.ts` nutzen `invoke()`.
+
+**Code-Beispiel:**
+```typescript
+import { invoke } from '@tauri-apps/api/core';
+
+const status = await invoke<ProjectStatus>('get_project_status', {
+  project: '/path/to/project'
+});
+```
+
+**Verwandte Begriffe:** [Tauri Command](#tauri-command), [Promise](#promise)
+
+---
+
+### Event Emitter
+**Einfach:** Mechanismus, mit dem das Rust-Backend Nachrichten an das Frontend senden kann.
+
+**Technisch:** Tauri's event system allows Rust to emit events that JavaScript can listen to via `listen()`.
+
+**Im Projekt:** Wird für Proof-Generierung Progress verwendet:
+```rust
+// Rust
+app_handle.emit("proof:progress", ProofProgress { percent: 50, message: "..." });
+
+// Frontend
+const unlisten = await listen('proof:progress', (event) => {
+  console.log(event.payload.percent);
+});
+```
+
+**Verwandte Begriffe:** [IPC](#ipc-inter-process-communication), [Progress Event](#progress-event)
+
+---
+
+### Zustand (State Management)
+**Einfach:** Bibliothek zur Verwaltung des UI-Zustands in React-Apps.
+
+**Technisch:** Lightweight state management library for React using hooks and subscriptions. Simpler than Redux.
+
+**Analogie:** Wie ein zentrales Notizbuch, in dem alle wichtigen Informationen stehen und das automatisch alle Leser benachrichtigt, wenn sich etwas ändert.
+
+**Im Projekt:** `workflowStore.ts` für Proofer-Workflow, `verificationStore.ts` für Verifier.
+
+**Code-Beispiel:**
+```typescript
+const useWorkflowStore = create<WorkflowState>((set) => ({
+  currentStep: 'import',
+  setCurrentStep: (step) => set({ currentStep: step }),
+}));
+```
+
+**Verwandte Begriffe:** [React](#react), [Store](#store)
+
+---
+
+### Offline-First
+**Einfach:** App-Design, bei dem alle Funktionen ohne Internetverbindung funktionieren.
+
+**Technisch:** Architecture pattern where the application is designed to work completely offline, with optional online features.
+
+**Im Projekt:** CAP Desktop Proofer ist komplett offline-fähig:
+- Keine API-Server nötig
+- Alle Crypto-Operationen lokal
+- Audit-Logs auf lokalem Filesystem
+
+**Verwandte Begriffe:** [Local Storage](#local-storage), [Filesystem](#filesystem)
+
+---
+
+### Proofer Workflow ⭐
+**Einfach:** Der 6-Schritte-Prozess zur Erstellung eines Compliance-Beweises in der Desktop-App.
+
+**Technisch:** Guided wizard-style workflow: Import → Commitments → Policy → Manifest → Proof → Export.
+
+**Schritte:**
+1. **Import:** CSV-Dateien (suppliers.csv, ubos.csv) importieren
+2. **Commitments:** Merkle-Roots aus CSVs berechnen
+3. **Policy:** Compliance-Policy laden (YAML)
+4. **Manifest:** Manifest aus Commitments + Policy erstellen
+5. **Proof:** Kryptographischen Beweis generieren
+6. **Export:** CAP-Bundle als ZIP exportieren
+
+**Im Projekt:** Jeder Schritt erzeugt einen Audit-Event im Hash-Chain-Log.
+
+**Verwandte Begriffe:** [Workflow Step](#workflow-step), [Audit Trail](#audit-trail)
+
+---
+
+### Workflow Step
+**Einfach:** Ein einzelner Schritt im 6-Schritte-Proofer-Workflow.
+
+**Technisch:** Enum value representing current position in workflow: `'import' | 'commitments' | 'policy' | 'manifest' | 'proof' | 'export'`.
+
+**Zustände pro Step:**
+- `pending` - Noch nicht gestartet
+- `in_progress` - Wird gerade bearbeitet
+- `completed` - Erfolgreich abgeschlossen
+- `error` - Fehler aufgetreten
+
+**Verwandte Begriffe:** [Proofer Workflow](#proofer-workflow), [WorkflowStepper](#workflowstepper)
+
+---
+
+### WorkflowStepper
+**Einfach:** UI-Komponente, die den aktuellen Workflow-Fortschritt anzeigt.
+
+**Technisch:** React component displaying 6 steps with visual indicators for completion status, current step highlighting, and navigation.
+
+**Im Projekt:** `webui/src/components/workflow/WorkflowStepper.tsx`
+
+**Verwandte Begriffe:** [Workflow Step](#workflow-step), [Progress Indicator](#progress-indicator)
+
+---
+
+### ProjectSidebar
+**Einfach:** Seitenleiste zur Auswahl und Verwaltung von Projekten.
+
+**Technisch:** React component displaying workspace projects with creation dialog and project selection.
+
+**Funktionen:**
+- Workspace auswählen/wechseln
+- Projekte auflisten
+- Neues Projekt erstellen
+- Projekt zum Bearbeiten auswählen
+
+**Im Projekt:** `webui/src/components/layout/ProjectSidebar.tsx`
+
+**Verwandte Begriffe:** [Workspace](#workspace), [Project](#project)
+
+---
+
+### AuditTimeline
+**Einfach:** UI-Komponente zur Visualisierung des Audit-Trails als Timeline.
+
+**Technisch:** React component displaying audit events chronologically with hash chain verification status, expandable details, and color-coded event types.
+
+**Features:**
+- Hash-Ketten-Status-Banner (verifiziert/manipuliert)
+- Expandierbare Event-Details
+- Farbkodierung nach Event-Typ
+- Pagination für große Logs
+
+**Im Projekt:** `webui/src/components/audit/AuditTimeline.tsx`
+
+**Verwandte Begriffe:** [Audit Trail](#audit-trail), [Hash Chain](#hash-chain)
+
+---
+
+### tauri.conf.json
+**Einfach:** Konfigurationsdatei für die Tauri-App.
+
+**Technisch:** JSON configuration file defining app metadata, window properties, security settings, and plugin permissions.
+
+**Wichtige Einstellungen:**
+```json
+{
+  "productName": "CAP Desktop Proofer",
+  "identifier": "com.cap.desktop-proofer",
+  "plugins": {
+    "dialog": {},
+    "fs": { "scope": ["$HOME/**"] }
+  }
+}
+```
+
+**Im Projekt:** `src-tauri/tauri.conf.json`
+
+**Verwandte Begriffe:** [Tauri](#tauri), [Capability](#capability)
+
+---
+
+### Capability (Tauri)
+**Einfach:** Berechtigungen, die festlegen, was die App darf (z.B. Dateien lesen).
+
+**Technisch:** Tauri's security model where each feature (fs access, dialog, etc.) requires explicit permission in configuration.
+
+**Im Projekt:**
+- `dialog:default` - Datei-Dialoge öffnen
+- `fs:default` - Filesystem-Zugriff
+
+**Verwandte Begriffe:** [tauri.conf.json](#tauriconfjson), [Security](#security)
+
+---
+
 **Ende des Glossars**
 
-*Version: 2.1* (aktualisiert mit cap-bundle.v1 Format)
-*Letzte Aktualisierung: 24. November 2025*
-*Projekt: LsKG-Agent v0.11.0*
+*Version: 2.2* (aktualisiert mit Desktop-App & Tauri)
+*Letzte Aktualisierung: 27. November 2024*
+*Projekt: LsKG-Agent v0.12.0*
+
+**Changelog v2.2:**
+- ✨ **NEU:** Kategorie 18: Desktop-App & Tauri (15 Begriffe)
+- ✨ Tauri, WebView, IPC, Tauri Command, invoke, Event Emitter
+- ✨ Zustand, Offline-First, Proofer Workflow, Workflow Step
+- ✨ WorkflowStepper, ProjectSidebar, AuditTimeline
+- ✨ tauri.conf.json, Capability
+- 📊 Gesamt: 212+ Begriffe (+ 15 neue Begriffe seit v2.1)
 
 **Changelog v2.1:**
 - ✨ **NEU:** cap-bundle.v1 - Standardisiertes Proof-Paket-Format mit strukturierten Metadaten

@@ -1,0 +1,51 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "CAP Desktop Proofer",
+  "version": "0.1.0",
+  "identifier": "com.cap.desktop-proofer",
+  "build": {
+    "beforeDevCommand": { "script": "npm run dev", "cwd": "../webui" },
+    "devUrl": "http://localhost:5173",
+    "beforeBuildCommand": "",
+    "frontendDist": "../webui/dist"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "CAP Desktop Proofer",
+        "width": 1280,
+        "height": 720,
+        "resizable": true,
+        "center": true,
+        "minWidth": 800,
+        "minHeight": 600,
+        "decorations": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": {
+        "default-src": "'self'",
+        "connect-src": "'none'",
+        "script-src": "'self' 'unsafe-inline'",
+        "style-src": "'self' 'unsafe-inline'",
+        "img-src": "'self' data:",
+        "font-src": "'self' data:"
+      }
+    }
+  },
+  "bundle": {
+    "active": false,
+    "targets": "all",
+    "icon": [],
+    "resources": [],
+    "externalBin": [],
+    "copyright": "Copyright (c) 2025 CAP Team",
+    "category": "Utility",
+    "shortDescription": "Offline-First Proof Verification Tool",
+    "longDescription": "CAP Desktop Proofer provides secure, offline verification of cryptographic proofs following the Confidential Assurance Protocol (CAP) specification."
+  },
+  "plugins": {}
+}

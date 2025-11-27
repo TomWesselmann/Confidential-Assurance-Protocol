@@ -1,11 +1,12 @@
 # CAP System - Backend Status für WebUI-Entwicklung
 
-**Datum:** 2025-11-24
-**Version:** v0.11.0
-**Status:** ✅ WebUI Integration Complete - Production-Ready (Phase 1+2+3 abgeschlossen)
-**Zweck:** Technische Grundlage für WebUI-Entwicklung
+**Datum:** 2025-11-27
+**Version:** v0.12.0
+**Status:** ✅ WebUI + Desktop App Complete - Production-Ready (Phase 1+2+3+Desktop abgeschlossen)
+**Zweck:** Technische Grundlage für WebUI- und Desktop App-Entwicklung
 **Compliance:** Folgt CAP Engineering Guide & Security Requirements
 **WebUI:** ✅ React-based Upload & Verification Interface Live
+**Desktop App:** ✅ **Tauri 2.0 Offline App mit 6-Schritt Workflow** (NEU in v0.12.0)
 **Performance:** ✅ Load Tested (22-27 RPS sustained, 100% success rate, P95 890ms)
 **Coverage:** ✅ 100% test success rate with 556/556 tests passing (0 failures)
 
@@ -27,6 +28,8 @@ Das CAP-Backend folgt strengen Engineering-Prinzipien. **Alle** WebUI-Implementi
 
 ```
 ┌────────────────────────────────────────┐
+│  Desktop App (Tauri 2.0) - v0.12.0    │  ← Offline-fähig, lokaler Workflow
+├────────────────────────────────────────┤
 │  WebUI (Imperative Shell)             │  ← I/O, User Interaction
 ├────────────────────────────────────────┤
 │  REST API (Imperative Shell)          │  ← HTTP, Auth, TLS/mTLS
@@ -36,6 +39,7 @@ Das CAP-Backend folgt strengen Engineering-Prinzipien. **Alle** WebUI-Implementi
 │  - Policy Engine (Constraint Checks)  │
 │  - Proof Engine (ZK-Ready)            │
 │  - Verifier Core (portable)           │
+│  - Audit Trail (SHA3-256 Hash-Chain)  │
 └────────────────────────────────────────┘
 ```
 
@@ -44,17 +48,30 @@ Das CAP-Backend folgt strengen Engineering-Prinzipien. **Alle** WebUI-Implementi
 - Alle Logik ist im Backend → WebUI ist **nur** Präsentationsschicht
 - Keine Client-seitige Verifikation → alle Checks via REST API
 
+**Bedeutung für Desktop App (NEU v0.12.0):**
+- Desktop App nutzt **direkt den Functional Core** (kein REST API nötig)
+- Tauri IPC ersetzt HTTP-Kommunikation (invoke/emit Pattern)
+- Vollständig offline-fähig für Einzelpersonen/Freelancer
+- Audit-Trail wird lokal in JSONL mit SHA3-256 Hash-Chain gespeichert
+
 ---
 
 ## 1. Systemübersicht
 
 Das **Confidential Assurance Protocol (CAP)** ist ein kryptographisches Compliance-Proof-System für das deutsche Lieferkettensorgfaltspflichtengesetz (LkSG). Es ermöglicht Unternehmen, Compliance nachzuweisen **ohne sensible Geschäftsdaten offenzulegen**.
 
-### 1.1 Architektur-Status (v0.11.0)
+### 1.1 Architektur-Status (v0.12.0)
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                  REST API Layer (v0.11.0)                   │
+│                  Desktop App Layer (v0.12.0) - NEU          │
+│  ✅ Tauri 2.0 Framework (Rust + WebView)                    │
+│  ✅ 6-Schritt Proofer Workflow (Offline)                    │
+│  ✅ Verifier Mode (Bundle-Verifikation)                     │
+│  ✅ Audit Mode (Timeline mit Hash-Chain)                    │
+│  ✅ IPC Commands (invoke/emit Pattern)                      │
+├─────────────────────────────────────────────────────────────┤
+│                  REST API Layer (v0.12.0)                   │
 │  ✅ OAuth2 (JWT RS256) - Client Credentials Flow            │
 │  ✅ TLS/mTLS Support - Production-Ready                     │
 │  ✅ Health/Readiness Checks - K8s-kompatibel                │
@@ -70,8 +87,8 @@ Das **Confidential Assurance Protocol (CAP)** ist ein kryptographisches Complian
 │     → ZK-Backend-Abstraktion vorhanden                     │
 │  ✅ Verifier Core (I/O-frei, portabel)                      │
 │     → Rein funktional, für WASM/zkVM ready                 │
-│  ✅ Audit Trail (SHA3-256 Hash Chain)                       │
-│     → Append-only, unveränderbar                           │
+│  ✅ Audit Trail (SHA3-256 Hash Chain, V1.0 Format)          │
+│     → Append-only, unveränderbar, JSONL                    │
 ├─────────────────────────────────────────────────────────────┤
 │                  Storage Layer                              │
 │  ✅ Registry (JSON + SQLite) - WAL Mode                     │
@@ -79,6 +96,7 @@ Das **Confidential Assurance Protocol (CAP)** ist ein kryptographisches Complian
 │     → BLAKE3-basiert, dedupliziert                         │
 │  ✅ Key Store (Ed25519 mit KID Rotation)                    │
 │     → HSM-ready, Chain-of-Trust                            │
+│  ✅ Project Store (Desktop App) - Lokale Projekte           │
 ├─────────────────────────────────────────────────────────────┤
 │                  Observability Layer                        │
 │  ✅ Prometheus (Metrics) - 15s scrape interval              │

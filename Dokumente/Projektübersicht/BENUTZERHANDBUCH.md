@@ -1,8 +1,8 @@
 # CAP Agent - Vollständiges Benutzerhandbuch
 
-**Version:** 0.11.0
+**Version:** 0.12.0
 **Für:** Einsteiger und Fortgeschrittene
-**Datum:** 2025-11-20
+**Datum:** 2025-11-27
 
 ---
 
@@ -19,20 +19,21 @@
 ## 📑 Inhaltsverzeichnis
 
 1. [Schnellstart](#schnellstart)
-2. [Server-Commands](#server-commands)
-3. [Commitment-Commands](#commitment-commands)
-4. [Policy-Commands](#policy-commands)
-5. [Manifest-Commands](#manifest-commands)
-6. [Proof-Commands](#proof-commands)
-7. [Verifier-Commands](#verifier-commands)
-8. [Signatur-Commands](#signatur-commands)
-9. [Schlüssel-Commands](#schlüssel-commands)
-10. [Registry-Commands](#registry-commands)
-11. [BLOB-Store-Commands](#blob-store-commands)
-12. [WebUI Anleitung (v0.11.0)](#webui-anleitung-v0110)
-13. [Monitoring & Observability (v0.11.0)](#monitoring--observability-v0110)
-14. [Performance & Metrics (v0.11.0)](#performance--metrics-v0110)
-15. [Hilfreiche Tipps](#hilfreiche-tipps)
+2. [Desktop App (NEU v0.12.0)](#desktop-app-neu-v0120)
+3. [Server-Commands](#server-commands)
+4. [Commitment-Commands](#commitment-commands)
+5. [Policy-Commands](#policy-commands)
+6. [Manifest-Commands](#manifest-commands)
+7. [Proof-Commands](#proof-commands)
+8. [Verifier-Commands](#verifier-commands)
+9. [Signatur-Commands](#signatur-commands)
+10. [Schlüssel-Commands](#schlüssel-commands)
+11. [Registry-Commands](#registry-commands)
+12. [BLOB-Store-Commands](#blob-store-commands)
+13. [WebUI Anleitung](#webui-anleitung)
+14. [Monitoring & Observability](#monitoring--observability)
+15. [Performance & Metrics](#performance--metrics)
+16. [Hilfreiche Tipps](#hilfreiche-tipps)
 
 ---
 
@@ -99,12 +100,180 @@ npm run dev
 
 ---
 
+## 🖥️ Desktop App (NEU v0.12.0)
+
+> ⭐ **Empfohlen für Einzelpersonen und Freelancer!** Die Desktop App funktioniert komplett offline - kein Server, keine Kommandozeile nötig.
+
+### Was ist die Desktop App?
+
+Eine **native Desktop-Anwendung** (gebaut mit Tauri 2.0), die alle CAP Agent Funktionen in einer benutzerfreundlichen Oberfläche bietet:
+
+- **Proofer Mode:** 6-Schritt Workflow zum Erstellen von Compliance-Nachweisen
+- **Verifier Mode:** Bundles hochladen und offline verifizieren
+- **Audit Mode:** Audit-Trail Timeline mit Hash-Chain-Anzeige
+
+### Vorteile gegenüber CLI/WebUI
+
+| Aspekt | Desktop App | CLI | WebUI |
+|--------|-------------|-----|-------|
+| **Offline** | ✅ Vollständig | ✅ | ❌ Server nötig |
+| **Benutzerfreundlich** | ✅ Grafisch | ⚠️ Terminal nötig | ✅ |
+| **Installation** | ✅ 1 Datei | ⚠️ Rust + Build | ⚠️ Node + Server |
+| **Daten bleiben lokal** | ✅ | ✅ | ⚠️ Server |
+
+### Installation
+
+**macOS:**
+```bash
+# Option 1: Von Release herunterladen
+# (Noch nicht verfügbar - aus Source bauen)
+
+# Option 2: Aus Source bauen
+cd src-tauri
+cargo tauri build
+
+# App öffnen
+open target/release/bundle/macos/CAP\ Desktop\ Proofer.app
+```
+
+**Windows:**
+```powershell
+# Aus Source bauen
+cd src-tauri
+cargo tauri build
+
+# Installer ausführen
+.\target\release\bundle\msi\CAP_Desktop_Proofer.msi
+```
+
+**Linux:**
+```bash
+cd src-tauri
+cargo tauri build
+
+# AppImage ausführen
+./target/release/bundle/appimage/cap-desktop-proofer.AppImage
+```
+
+### Der 6-Schritt Proofer Workflow
+
+Die Desktop App führt dich durch jeden Schritt:
+
+```
+┌─────────┐    ┌─────────────┐    ┌────────┐    ┌──────────┐    ┌───────┐    ┌────────┐
+│ Import  │ →  │ Commitments │ →  │ Policy │ →  │ Manifest │ →  │ Proof │ →  │ Export │
+└─────────┘    └─────────────┘    └────────┘    └──────────┘    └───────┘    └────────┘
+     ↓                ↓               ↓              ↓             ↓            ↓
+  CSV laden      Hashes          Regeln         Verknüpfen      ZK-Proof    Bundle
+  (Suppliers,   berechnen        laden          aller Teile    erstellen   erstellen
+   UBOs)
+```
+
+### Schritt für Schritt Anleitung
+
+#### 1. Workspace wählen
+- Starte die App
+- Klicke auf "Neues Projekt erstellen" oder wähle einen Workspace-Ordner
+- Alle Projekte werden in deinem gewählten Ordner gespeichert
+
+#### 2. Import (CSV-Dateien hochladen)
+- Wähle deine **suppliers.csv** (Lieferantenliste)
+- Wähle deine **ubos.csv** (Ultimate Beneficial Owners)
+- Die App zeigt dir eine Vorschau der Daten
+
+**CSV-Format:**
+```csv
+# suppliers.csv
+name,jurisdiction,tier
+"ACME GmbH","DE","1"
+"Parts Inc","US","2"
+
+# ubos.csv
+name,birthdate,citizenship
+"Max Mustermann","1980-01-15","DE"
+"Jane Doe","1975-06-20","US"
+```
+
+#### 3. Commitments (Hashes berechnen)
+- Klicke auf "Commitments berechnen"
+- Die App berechnet BLAKE3 Merkle-Roots
+- Deine echten Daten verlassen **nie** den Rechner - nur Hashes!
+
+#### 4. Policy (Regeln definieren)
+- Wähle eine vorhandene Policy oder lade eine YAML-Datei
+- Die Default-Policy (LkSG) ist bereits integriert
+
+#### 5. Manifest (Alles verknüpfen)
+- Klicke auf "Manifest erstellen"
+- Das Manifest verknüpft: Commitments + Policy + Metadaten
+
+#### 6. Proof (ZK-Beweis generieren)
+- Klicke auf "Proof erstellen"
+- Der Progress-Balken zeigt den Fortschritt
+- ⚠️ Dies kann einige Sekunden dauern
+
+#### 7. Export (Bundle erstellen)
+- Klicke auf "Bundle exportieren"
+- Wähle einen Speicherort
+- Fertig! Das Bundle enthält:
+  - `_meta.json` (Bundle-Metadaten mit SHA3-256 Hashes)
+  - `manifest.json`
+  - `proof.dat`
+
+### Verifier Mode
+
+1. Wechsle zu **Verifier** (Tab oben rechts)
+2. Ziehe ein Bundle (Ordner) per Drag & Drop oder klicke "Bundle wählen"
+3. Die App verifiziert:
+   - ✅ Alle Dateien vorhanden?
+   - ✅ SHA3-256 Hashes korrekt?
+   - ✅ Proof gültig gegen Policy?
+4. Ergebnis: **OK** (grün) oder **FAIL** (rot)
+
+### Audit Mode
+
+1. Wähle ein Projekt in der Sidebar
+2. Wechsle zu **Audit** (Tab oben rechts)
+3. Sieh die komplette Timeline aller Aktionen:
+   - `project_created` - Projekt angelegt
+   - `csv_imported` - CSVs importiert
+   - `commitments_built` - Hashes berechnet
+   - `policy_loaded` - Policy geladen
+   - `manifest_built` - Manifest erstellt
+   - `proof_built` - Proof generiert
+   - `bundle_exported` - Bundle exportiert
+
+**Hash-Chain:**
+Jeder Eintrag enthält einen `prev_hash`, der auf den vorherigen zeigt. Dadurch ist Manipulation erkennbar!
+
+### Tipps & Tricks
+
+**CSV-Probleme:**
+- Kodierung muss **UTF-8** sein (nicht Windows-1252)
+- Trennzeichen muss **Komma** sein (nicht Semikolon)
+- Excel-Tipp: "Speichern unter" → "CSV UTF-8"
+
+**Workflow-Fortschritt:**
+- Der Fortschritt wird automatisch gespeichert
+- Projekt erneut öffnen → Fortschritt bleibt erhalten
+- Verwendet `initializeFromStatus()` um Status zu laden
+
+**DevTools öffnen:**
+- macOS: `Cmd+Option+I`
+- Windows/Linux: `Ctrl+Shift+I`
+
+**Fehler melden:**
+- Logs unter: `~/Library/Logs/CAP Desktop Proofer/` (macOS)
+- Oder: `%APPDATA%\CAP Desktop Proofer\logs\` (Windows)
+
+---
+
 ## 🖥️ Server-Commands
 
 ### `cap-verifier-api` - REST API Server starten
 
 **Wofür brauche ich das?**
-Nur wenn du die **WebUI** nutzen willst oder wenn mehrere Leute **remote** auf deine API zugreifen sollen.
+Nur wenn du die **WebUI** nutzen willst oder wenn mehrere Leute **remote** auf deine API zugreifen sollen. **Für Einzelpersonen empfehlen wir die Desktop App!**
 
 **Warum ist das wichtig?**
 Die WebUI (Browser) kann nicht direkt mit dem Filesystem arbeiten - sie braucht einen Server als "Brücke" zur Rust-Logik.

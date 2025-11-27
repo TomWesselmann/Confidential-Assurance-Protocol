@@ -1,0 +1,17 @@
+{
+  "$schema": "https://schema.tauri.app/config/2/capability",
+  "identifier": "default",
+  "description": "Default capabilities for CAP Desktop Proofer",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-close",
+    "core:window:allow-minimize",
+    "core:window:allow-maximize",
+    "dialog:allow-open",
+    "dialog:allow-save",
+    "fs:default",
+    "fs:read-all",
+    "fs:write-all"
+  ]
+}

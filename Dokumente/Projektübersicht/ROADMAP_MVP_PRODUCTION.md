@@ -2,14 +2,16 @@
 
 ## 📋 Über diese Roadmap
 
-Diese Roadmap definiert alle notwendigen Schritte, um den LsKG-Agent von v0.11.0 zu einem **produktionsreifen MVP** zu entwickeln, das in fremden Unternehmen eingesetzt werden kann.
+Diese Roadmap definiert alle notwendigen Schritte, um den LsKG-Agent von v0.12.0 zu einem **produktionsreifen MVP** zu entwickeln, das in fremden Unternehmen eingesetzt werden kann.
 
-**Aktueller Stand:** v0.11.0 (24. November 2025)
+**Aktueller Stand:** v0.12.0 (27. November 2025)
 - ✅ CLI vollständig (Proof Engine, Registry, Keys, BLOB Store)
 - ✅ REST API mit OAuth2 + TLS/mTLS + Rate Limiting
+- ✅ **Desktop App (NEU!)** (Tauri 2.0) - Offline-fähiger 6-Schritt Workflow ✨
 - ✅ **Web UI** (React + TypeScript + Vite) - Upload & Verification ✨
 - ✅ **Policy Store System** (InMemory + SQLite, 19/19 Tests)
 - ✅ **Standardized Bundle Format** (cap-bundle.v1: SHA3-256, proof_units, policy auto-extraction) ✨
+- ✅ **Audit Trail V1.0** (SHA3-256 Hash-Chain, JSONL Format) ✨
 - ✅ **Production Monitoring Stack** (Prometheus, Grafana, Loki, Jaeger) - Week 2 ✨
 - ✅ **Docker Deployment** (Dockerfile.optimized, docker-compose.yml)
 - ✅ **Kubernetes Manifests** (Basic deployment configs)
@@ -18,20 +20,24 @@ Diese Roadmap definiert alle notwendigen Schritte, um den LsKG-Agent von v0.11.0
 - 🔄 Mock ZK-Proofs (SimplifiedZK - ausreichend für MVP)
 - 🔄 SAP-Adapter (Stub vorhanden)
 
-**Letzte Änderungen (24. November 2025):**
+**Letzte Änderungen (27. November 2025):**
+- ✅ **Desktop App (Tauri 2.0):** Offline-fähige Desktop-Anwendung mit Proofer/Verifier/Audit Modes ✨
+- ✅ **6-Schritt Proofer Workflow:** Import → Commitments → Policy → Manifest → Proof → Export
+- ✅ **Audit Trail V1.0:** SHA3-256 Hash-Chain für manipulationssichere Event-Dokumentation
+- ✅ **State Persistence:** initializeFromStatus() für Workflow-Fortschritt
 - ✅ **WebUI Integration komplett:** React Frontend mit Upload, Manifest Viewer, Verification View
 - ✅ **Policy Store System:** Pluggable Backends (InMemory + SQLite) mit 19/19 Tests
 - ✅ **Week 2 Monitoring:** Full Observability Stack (8 Services, 2 Dashboards, SLO Monitoring)
 - ✅ **Rate Limiting:** IP-basierte Token Bucket Algorithm (100 req/min global, 20/10 per endpoint)
 - ✅ **Load Testing:** 22-27 RPS sustained throughput, 100% success rate, P95 890ms
 - ✅ **Code Coverage:** 556/556 tests passing (100% Success Rate, 0 Failures)
-- ✅ **Dokumentation:** CLAUDE.md (680+ Zeilen WebUI), DOCKER_DEPLOYMENT.md, GETTING_STARTED.md
-- ✅ **Alle Projektübersicht-Dokumente aktualisiert:** 13/16 Dokumente vollständig mit v0.11.0 Features
-- ➡️ **Woche 1+2+3 ABGESCHLOSSEN - Bereit für Woche 4!**
+- ✅ **Dokumentation:** Alle 12 Projektübersicht-Dokumente aktualisiert mit v0.12.0 Features
+- ➡️ **Desktop App FERTIG - Woche 8 abgeschlossen!**
 
 **Ziel-MVP:** v1.0.0 (Production-Ready bis 31. Dezember 2025)
 - ✅ Deployment & Monitoring (FERTIG - Woche 1+2)
 - ✅ Web UI Basic (FERTIG - Woche 3 vorgezogen)
+- ✅ **Desktop App (FERTIG - Woche 8)** ✨
 - 🎯 SAP-Integration (Woche 3-4)
 - 🎯 Advanced Features & Integration (Woche 4)
 - 🎯 Security Hardening (Woche 5)
@@ -49,10 +55,11 @@ Ein produktionsreifes MVP muss folgende **KERN-Kriterien** erfüllen:
 
 ### ✅ Funktionale Anforderungen
 - [x] **Deployment & Infrastructure** ✅ (Docker, K8s, Monitoring - **FERTIG!**)
+- [x] **Desktop App** ✅ (Tauri 2.0, 6-Schritt Workflow, Offline - **FERTIG v0.12.0!**) ✨
 - [ ] **SAP-Integration** (OData-Client, Basic Mapping) - **WOCHE 3-4**
 - [x] **Web UI** ✅ (Dashboard, Upload, Proof-Liste - **BASIC VERSION FERTIG!**)
 - [x] **REST API** vollständig ✅ (OAuth2, TLS/mTLS, Policy Store)
-- [x] **Vollständige Audit-Trails** ✅ (SHA3-256 Hash Chain)
+- [x] **Vollständige Audit-Trails** ✅ (SHA3-256 Hash Chain, V1.0 Format)
 - [x] **Proof System** ✅ (SimplifiedZK ausreichend für MVP)
 
 ### 🔒 Sicherheitsanforderungen

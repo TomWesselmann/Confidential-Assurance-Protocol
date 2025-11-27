@@ -20,9 +20,9 @@ Nachdem Sie in den vorherigen Kapiteln gelernt haben, **was** das System macht (
 
 ---
 
-## 👔 Für Management: Zwei Arten der Bedienung
+## 👔 Für Management: Drei Arten der Bedienung
 
-Das System hat **zwei Schnittstellen** (wie ein Auto mit Lenkrad UND Tempomat):
+Das System hat **drei Schnittstellen** (wie ein Auto mit Lenkrad, Tempomat UND App-Steuerung):
 
 ### 1. REST API (für andere Programme)
 **Was ist das?** Eine "Steckdose für Software" - andere Programme (z.B. SAP) können das System automatisch nutzen
@@ -50,9 +50,25 @@ Das System hat **zwei Schnittstellen** (wie ein Auto mit Lenkrad UND Tempomat):
 ✅ Keine grafische Oberfläche nötig
 ✅ Skriptfähig (automatisierbar)
 
+### 3. Desktop App (für Offline-Nutzung)
+**Was ist das?** Eine eigenständige Anwendung wie Word oder Excel - funktioniert komplett offline
+
+**Beispiel-Anwendung:**
+- Compliance-Beauftragter startet Desktop App
+- Lädt CSV-Dateien per Drag & Drop
+- Durchläuft 6-Schritte-Workflow
+- Exportiert Compliance-Nachweis als ZIP
+
+**Vorteile:**
+✅ Keine Internetverbindung nötig
+✅ Alle Daten bleiben auf dem lokalen Rechner
+✅ Integrierter Audit-Trail
+✅ Native Performance
+
 **Wann wird was genutzt?**
 - **REST API:** Für Integration in Unternehmenssoftware (SAP, ERP-Systeme)
 - **CLI:** Für manuelle Operationen, Tests, Administration
+- **Desktop App:** Für Offline-Workflow, datenschutzkritische Umgebungen, Air-Gapped Systeme
 
 ---
 
@@ -818,6 +834,373 @@ curl -X POST https://verifier.example.com/policy/v2/compile \
 - Linter-Integration mit Error-Kategorien
 - `persist` Flag für optionale Speicherung
 - `lint_mode` für flexible Validierung
+
+---
+
+## Desktop App IPC Commands (Tauri 2.0) - v0.12.0
+
+**Für Management:** Die Desktop App kommuniziert intern über "IPC" (Inter-Process Communication) - das Frontend (was Sie sehen) redet mit dem Backend (was die Arbeit macht). Für Endbenutzer unsichtbar, aber wichtig für Entwickler.
+
+### Technische Grundlagen
+
+**Protokoll:** Tauri IPC (invoke/emit Pattern)
+**Kommunikation:** TypeScript Frontend → Rust Backend
+**Authentifizierung:** Nicht erforderlich (lokale App)
+**Format:** JSON-serialisierte Parameter
+
+**TypeScript-Aufruf (Frontend):**
+```typescript
+import { invoke } from '@tauri-apps/api/core';
+
+// Beispiel: CSV importieren
+const result = await invoke<ImportResult>('import_csv', {
+  path: '/Users/user/suppliers.csv',
+  csvType: 'suppliers',
+  project: '/Users/user/cap-workspace/my-project'
+});
+```
+
+**Rust-Handler (Backend):**
+```rust
+#[tauri::command]
+pub async fn import_csv(
+    path: String,
+    csv_type: String,
+    project: String
+) -> Result<ImportResult, String> {
+    // Implementation
+}
+```
+
+---
+
+### Project Management Commands
+
+#### select_workspace
+
+Öffnet einen nativen Ordner-Dialog zur Workspace-Auswahl.
+
+**Aufruf:**
+```typescript
+const path = await selectWorkspace();
+// Returns: "/Users/user/cap-workspace" oder null (abgebrochen)
+```
+
+**Response:**
+```typescript
+string | null  // Ausgewählter Pfad oder null
+```
+
+---
+
+#### create_project
+
+Erstellt ein neues Projekt im ausgewählten Workspace.
+
+**Aufruf:**
+```typescript
+const project = await createProject(workspace, projectName);
+```
+
+**Parameter:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `workspace` | string | Pfad zum Workspace |
+| `name` | string | Projektname |
+
+**Response:**
+```typescript
+interface ProjectResult {
+  path: string;      // Vollständiger Projektpfad
+  name: string;      // Projektname
+  createdAt: string; // ISO 8601 Timestamp
+}
+```
+
+**Erstellt:**
+- `{workspace}/{name}/input/`
+- `{workspace}/{name}/build/`
+- `{workspace}/{name}/export/`
+- Audit Event: `project_created`
+
+---
+
+#### get_project_status
+
+Liest den aktuellen Status eines Projekts (welche Schritte bereits abgeschlossen).
+
+**Aufruf:**
+```typescript
+const status = await getProjectStatus(projectPath);
+```
+
+**Parameter:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `project` | string | Projektpfad |
+
+**Response:**
+```typescript
+interface ProjectStatus {
+  hasSuppliersCSv: boolean;
+  hasUbosCsv: boolean;
+  hasPolicy: boolean;
+  hasCommitments: boolean;
+  hasManifest: boolean;
+  hasProof: boolean;
+  currentStep: string;  // "import" | "commitments" | "policy" | ...
+  info: ProjectInfo;
+}
+```
+
+---
+
+### Workflow Step Commands
+
+#### import_csv
+
+Importiert eine CSV-Datei (Suppliers oder UBOs).
+
+**Aufruf:**
+```typescript
+const result = await importCsv(filePath, csvType, projectPath);
+```
+
+**Parameter:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `path` | string | Pfad zur CSV-Datei |
+| `csvType` | string | "suppliers" oder "ubos" |
+| `project` | string | Projektpfad |
+
+**Response:**
+```typescript
+interface ImportResult {
+  rowCount: number;   // Gesamtzahl Zeilen
+  validRows: number;  // Gültige Zeilen
+  hash: string;       // BLAKE3 Hash (0x-präfixiert)
+  fileType: string;   // "suppliers" oder "ubos"
+}
+```
+
+**Audit Event:** `csv_imported`
+
+---
+
+#### build_commitments
+
+Berechnet kryptographische Commitments für alle importierten Daten.
+
+**Aufruf:**
+```typescript
+const result = await buildCommitments(projectPath);
+```
+
+**Parameter:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `project` | string | Projektpfad |
+
+**Response:**
+```typescript
+interface CommitmentsResult {
+  supplierRoot: string;   // Merkle Root für Suppliers
+  uboRoot: string;        // Merkle Root für UBOs
+  supplierCount: number;  // Anzahl Supplier-Records
+  uboCount: number;       // Anzahl UBO-Records
+}
+```
+
+**Erstellt:** `build/commitments.json`
+**Audit Event:** `commitments_created`
+
+---
+
+#### load_policy
+
+Lädt eine Policy-Datei oder verwendet die Default-Policy.
+
+**Aufruf:**
+```typescript
+const info = await loadPolicy(projectPath, policyPath?);
+```
+
+**Parameter:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `project` | string | Projektpfad |
+| `policyPath` | string? | Optional: Pfad zu eigener Policy |
+
+**Response:**
+```typescript
+interface PolicyInfo {
+  name: string;           // Policy-Name
+  version: string;        // z.B. "lksg.v1"
+  hash: string;           // SHA3-256 Hash
+  constraints: string[];  // Liste der Regeln
+}
+```
+
+**Erstellt:** `input/policy.yml` (wenn nicht vorhanden)
+**Audit Event:** `policy_loaded`
+
+---
+
+#### build_manifest
+
+Erstellt das Compliance-Manifest.
+
+**Aufruf:**
+```typescript
+const result = await buildManifest(projectPath);
+```
+
+**Parameter:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `project` | string | Projektpfad |
+
+**Response:**
+```typescript
+interface ManifestResult {
+  hash: string;       // SHA3-256 des Manifests
+  version: string;    // "manifest.v1.0"
+  createdAt: string;  // ISO 8601 Timestamp
+}
+```
+
+**Erstellt:** `build/manifest.json`
+**Audit Event:** `manifest_built`
+
+---
+
+#### build_proof
+
+Generiert den Compliance-Proof.
+
+**Aufruf:**
+```typescript
+const result = await buildProof(projectPath);
+```
+
+**Parameter:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `project` | string | Projektpfad |
+
+**Response:**
+```typescript
+interface ProofResult {
+  proofHash: string;  // SHA3-256 des Proofs
+  backend: string;    // "mock" (später: "zkvm", "halo2")
+  status: string;     // "ok" oder "fail"
+}
+```
+
+**Erstellt:** `build/proof.capz`
+**Audit Event:** `proof_built`
+
+---
+
+#### export_bundle
+
+Exportiert das fertige Bundle als ZIP-Datei.
+
+**Aufruf:**
+```typescript
+const result = await exportBundle(projectPath, outputPath);
+```
+
+**Parameter:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `project` | string | Projektpfad |
+| `output` | string | Zielpfad für ZIP |
+
+**Response:**
+```typescript
+interface ExportResult {
+  bundlePath: string;  // Pfad zur erstellten ZIP
+  sizeBytes: number;   // Dateigröße
+  hash: string;        // BLAKE3 Bundle-Hash
+  files: string[];     // Enthaltene Dateien
+}
+```
+
+**Erstellt:**
+- ZIP-Datei am angegebenen Pfad
+- Kopie in `export/cap-bundle-{timestamp}.zip`
+
+**Audit Event:** `bundle_exported`
+
+---
+
+### Audit & Verification Commands
+
+#### read_audit_log
+
+Liest den Audit-Trail eines Projekts.
+
+**Aufruf:**
+```typescript
+const entries = await readAuditLog(projectPath);
+```
+
+**Response:**
+```typescript
+interface AuditEntry {
+  seq: number;          // Sequenznummer
+  ts: string;           // ISO 8601 Timestamp
+  event: string;        // Event-Typ
+  details: object;      // Event-spezifische Daten
+  prevDigest: string;   // Hash des vorherigen Eintrags
+  digest: string;       // SHA3-256 Hash dieses Eintrags
+}[]
+```
+
+---
+
+#### verify_bundle
+
+Verifiziert ein exportiertes Bundle offline.
+
+**Aufruf:**
+```typescript
+const result = await verifyBundle(bundlePath);
+```
+
+**Parameter:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `bundlePath` | string | Pfad zur ZIP-Datei |
+
+**Response:**
+```typescript
+interface VerificationResult {
+  status: string;        // "ok" | "warn" | "fail"
+  manifestHash: string;  // SHA3-256 des Manifests
+  proofHash: string;     // SHA3-256 des Proofs
+  details: string[];     // Details zur Verifikation
+}
+```
+
+---
+
+### Audit Event Types
+
+Die Desktop App schreibt folgende Events in den Audit-Trail:
+
+| Event | Trigger | Details |
+|-------|---------|---------|
+| `project_created` | create_project | `{project_name}` |
+| `csv_imported` | import_csv | `{file_type, row_count, file_hash}` |
+| `commitments_created` | build_commitments | `{supplier_root, ubo_root}` |
+| `policy_loaded` | load_policy | `{policy_name, policy_hash}` |
+| `manifest_built` | build_manifest | `{manifest_hash}` |
+| `proof_built` | build_proof | `{proof_hash, backend}` |
+| `bundle_exported` | export_bundle | `{output_path, hash, size}` |
+
+**Hash-Chain:** Jeder Eintrag enthält `prev_digest` → Manipulationen sofort erkennbar
 
 ---
 
@@ -1625,12 +2008,14 @@ Router::new()
 
 ## Versioning
 
-**API Version:** v0.11.0
+**API Version:** v0.12.0
+**Desktop App Version:** v0.12.0
 **Manifest Version:** manifest.v1.0
 **Proof Version:** proof.v0
 **Policy Version:** lksg.v1
 **Key Metadata Version:** cap-key.v1
 **Attestation Version:** cap-attestation.v1
+**Audit Trail Version:** v1.0
 
 ---
 

@@ -6,7 +6,6 @@
  */
 
 import type { Manifest } from '../models/Manifest';
-import type { VerificationResult } from '../models/VerificationResult';
 
 /**
  * Health Check Response

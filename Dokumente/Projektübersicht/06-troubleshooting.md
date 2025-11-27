@@ -26,6 +26,8 @@ Sie haben jetzt das komplette System kennengelernt: **was** es macht, **wie** es
 - Vergessenes Passwort/Token → Neu anfordern
 - Alte Dateien können nicht gelesen werden → Dateien aktualisieren
 - "Service nicht erreichbar" → Prüfen Sie Ihre Internetverbindung
+- **Desktop App:** CSV-Datei falsch formatiert → UTF-8 Kodierung prüfen
+- **Desktop App:** Workflow-Fortschritt verloren → Projekt erneut aus Sidebar wählen
 
 ### Probleme für IT-Support: ⚠️
 - "Authentication failed" trotz korrektem Token → Support kontaktieren
@@ -1607,6 +1609,303 @@ tar -tzf cap-proof.tar.gz | grep _meta.json
 
 ---
 
+### 16. Desktop App Errors (Tauri 2.0) - v0.12.0
+
+> ⭐ **NEU in v0.12.0:** Troubleshooting für die Desktop App (Tauri 2.0)
+
+**Symptom:**
+```
+App startet nicht
+Workflow-Fortschritt verloren
+Audit Trail Hash-Chain broken
+CSV Import schlägt fehl
+IPC-Kommunikation fehlgeschlagen
+```
+
+**Ursachen & Lösungen:**
+
+**A) macOS: App startet nicht (Gatekeeper)**
+```bash
+# Fehler:
+# "CAP Desktop Proofer" kann nicht geöffnet werden, da es von einem
+# nicht identifizierten Entwickler stammt.
+
+# Lösung 1: Gatekeeper für diese App deaktivieren
+xattr -cr "/Applications/CAP Desktop Proofer.app"
+
+# Lösung 2: In Systemeinstellungen erlauben
+# System Settings → Privacy & Security → "Trotzdem öffnen"
+
+# Lösung 3: Aus Source bauen (signiert mit lokalem Zertifikat)
+cd src-tauri
+cargo tauri build
+# App in target/release/bundle/ ist automatisch erlaubt
+```
+
+**B) Windows: .exe wird von Antivirus blockiert**
+```powershell
+# Fehler:
+# Windows Defender blockiert cap-desktop-proofer.exe
+
+# Lösung 1: Ausnahme hinzufügen
+# Windows Security → Virus & threat protection → Manage settings
+# → Exclusions → Add exclusion → Folder
+# → C:\Program Files\CAP Desktop Proofer\
+
+# Lösung 2: SmartScreen umgehen
+# Rechtsklick → Eigenschaften → "Zulassen" aktivieren
+
+# Lösung 3: App signieren (für Distribution)
+# Requires Windows Code Signing Certificate
+```
+
+**C) CSV Import: UTF-8 Encoding Fehler**
+```bash
+# Fehler:
+# Fehler: CSV-Parsing fehlgeschlagen: InvalidRecord
+# Zeile 42: Ungültige UTF-8 Sequenz
+
+# Ursache: CSV ist nicht UTF-8 kodiert (häufig Excel-Export mit Windows-1252)
+
+# Diagnose: Encoding prüfen
+file -i suppliers.csv
+# Sollte: text/csv; charset=utf-8
+
+# Lösung 1: In UTF-8 konvertieren (macOS/Linux)
+iconv -f WINDOWS-1252 -t UTF-8 suppliers.csv > suppliers_utf8.csv
+
+# Lösung 2: In Excel korrekt speichern
+# Datei → Speichern unter → CSV UTF-8 (durch Trennzeichen getrennt)
+
+# Lösung 3: In LibreOffice
+# Datei → Speichern unter → CSV → Zeichensatz: UTF-8
+```
+
+**D) CSV Import: Falsches Delimiter**
+```bash
+# Fehler:
+# Fehler: Erwartete 3 Spalten, gefunden 1
+# CSV hat nur eine Spalte (Delimiter falsch)
+
+# Ursache: Deutsche Excel-Versionen nutzen Semikolon statt Komma
+
+# Diagnose: Delimiter prüfen
+head -1 suppliers.csv
+# Falls: "name;jurisdiction;tier" → Semikolon-Delimiter
+
+# Lösung (macOS/Linux):
+sed 's/;/,/g' suppliers.csv > suppliers_fixed.csv
+
+# Lösung (PowerShell):
+(Get-Content suppliers.csv) -replace ';',',' | Set-Content suppliers_fixed.csv
+
+# Erwartetes Format:
+# name,jurisdiction,tier
+# "Supplier A","DE","1"
+```
+
+**E) Workflow-Fortschritt verloren nach App-Neustart**
+```bash
+# Symptom: Nach App-Schließen ist Projekt zurückgesetzt
+
+# Ursache 1: Projekt wurde nicht korrekt gespeichert
+# → Prüfe ob Dateien im Projektordner existieren
+ls -la ~/CAP-Projects/cap-proof-2025-01-15-abc123/
+
+# Ursache 2: App wurde während Schreibvorgang beendet
+# → Audit-Log prüfen auf incomplete entries
+cat ~/CAP-Projects/cap-proof-*/audit.jsonl | jq -s 'last'
+
+# Lösung: Projekt aus Sidebar neu laden
+# 1. App starten
+# 2. Sidebar → Workspace wählen
+# 3. Projekt anklicken
+# → initializeFromStatus() lädt Fortschritt aus Backend
+
+# Falls Projekt nicht erscheint:
+# Workspace erneut wählen (Hamburger-Menü → Workspace ändern)
+```
+
+**F) Audit Trail: Hash-Chain Fehler**
+```bash
+# Fehler:
+# Hash-Chain Validierung fehlgeschlagen
+# Entry 5: prev_hash stimmt nicht mit vorherigem Entry überein
+
+# Ursache 1: audit.jsonl wurde manuell editiert
+# → NIEMALS audit.jsonl manuell editieren!
+
+# Ursache 2: Concurrent Write (sehr selten)
+# → App wurde während Schreibvorgang beendet
+
+# Diagnose: Hash-Chain validieren
+cat audit.jsonl | while IFS= read -r line; do
+  echo "$line" | jq -r '.hash'
+done
+
+# Lösung 1: Projekt als kompromittiert markieren
+# In Desktop App: Audit-Tab zeigt Warnung an
+
+# Lösung 2: Von Backup wiederherstellen
+cp ~/CAP-Backups/cap-proof-*/audit.jsonl ~/CAP-Projects/cap-proof-*/
+
+# Best Practice: Regelmäßige Backups
+rsync -av ~/CAP-Projects/ ~/CAP-Backups/
+```
+
+**G) IPC-Kommunikation: invoke() schlägt fehl**
+```bash
+# Fehler in Browser DevTools:
+# Unhandled Promise Rejection: invoke() failed
+# Command 'build_commitments' not found
+
+# Ursache 1: Tauri Backend nicht bereit
+# → App neu starten
+
+# Ursache 2: Command Name falsch (typo)
+# → In src/lib/tauri.ts prüfen:
+# invoke<CommitmentsResult>('build_commitments', { project })
+
+# Ursache 3: Rust Panic im Backend
+# → Logs prüfen:
+# macOS: ~/Library/Logs/CAP Desktop Proofer/
+# Windows: %APPDATA%\CAP Desktop Proofer\logs\
+# Linux: ~/.local/share/CAP Desktop Proofer/logs/
+
+# Debug: Mit DevTools starten
+# macOS: Cmd+Option+I
+# Windows/Linux: Ctrl+Shift+I
+```
+
+**H) Proof-Generierung hängt (keine Progress-Updates)**
+```bash
+# Symptom: Progress-Bar bleibt bei 0% stehen
+
+# Ursache 1: Event Listener nicht registriert
+# → App neu starten
+
+# Ursache 2: Proof-Backend Fehler
+# → Logs prüfen
+
+# Diagnose: Tauri Events prüfen
+# In DevTools Console:
+const { listen } = window.__TAURI__.event;
+listen('proof_progress', (event) => console.log(event));
+
+# Lösung: Proof-Schritt erneut starten
+# → "Proof" Schritt im Workflow erneut ausführen
+```
+
+**I) Export: Bundle kann nicht erstellt werden**
+```bash
+# Fehler:
+# Export fehlgeschlagen: Kein Schreibzugriff auf Zielverzeichnis
+
+# Ursache 1: Zielverzeichnis existiert nicht
+mkdir -p ~/CAP-Exports
+
+# Ursache 2: Keine Schreibrechte
+chmod 755 ~/CAP-Exports
+
+# Ursache 3: Disk voll
+df -h ~/CAP-Exports
+
+# Lösung: Anderes Verzeichnis wählen
+# Export-Dialog → Anderen Ordner wählen
+```
+
+**J) Dark Mode: UI nicht lesbar**
+```bash
+# Symptom: Text in Dark Mode nicht sichtbar
+
+# Ursache: System Dark Mode nicht erkannt
+
+# Lösung 1 (macOS):
+# System Settings → Appearance → Dark
+
+# Lösung 2: App unterstützt System-Theme
+# → Automatisch via Tailwind dark: Klassen
+
+# Falls Problem persistiert:
+# → CSS prüfen in webui/src/App.tauri.tsx
+# → dark:text-gray-100 sollte gesetzt sein
+```
+
+**Debug-Befehle:**
+
+```bash
+# 1. App-Logs anzeigen (macOS)
+tail -f ~/Library/Logs/CAP\ Desktop\ Proofer/app.log
+
+# 2. Projekt-Status prüfen
+cat ~/CAP-Projects/*/project.json | jq '.'
+
+# 3. Audit-Log analysieren
+cat ~/CAP-Projects/*/audit.jsonl | jq -s '.'
+
+# 4. Tauri DevTools öffnen
+# In laufender App: Cmd+Option+I (macOS) / Ctrl+Shift+I (Windows/Linux)
+
+# 5. App im Debug-Modus starten (macOS)
+RUST_LOG=debug /Applications/CAP\ Desktop\ Proofer.app/Contents/MacOS/desktop-proofer
+
+# 6. Tauri-Version prüfen
+cat src-tauri/Cargo.toml | grep "tauri ="
+
+# 7. WebView-Version prüfen (macOS)
+/System/Library/Frameworks/WebKit.framework/Versions/A/Resources/Info.plist
+
+# 8. Projekt-Ordner bereinigen (Neustart)
+rm -rf ~/CAP-Projects/cap-proof-*/build/
+# Dann Projekt in App neu laden
+
+# 9. Kompletten Reset (Vorsicht!)
+rm -rf ~/CAP-Projects/
+rm -rf ~/Library/Application\ Support/CAP\ Desktop\ Proofer/
+# App neu starten - alle Projekte weg!
+
+# 10. Build from Source (falls Binary fehlerhaft)
+cd src-tauri
+cargo clean
+cargo tauri build --release
+```
+
+**Best Practices zur Fehlervermeidung:**
+
+1. **CSV-Dateien vorbereiten:**
+   ```bash
+   # UTF-8 Encoding sicherstellen
+   file -i data.csv  # Muss utf-8 zeigen
+
+   # Komma als Delimiter verwenden
+   head -1 data.csv  # Sollte Komma-getrennt sein
+   ```
+
+2. **Regelmäßige Backups:**
+   ```bash
+   # Automatisches Backup-Script
+   rsync -av --delete ~/CAP-Projects/ ~/CAP-Backups/$(date +%Y%m%d)/
+   ```
+
+3. **Vor App-Update:**
+   - Alle offenen Projekte exportieren
+   - Workspace-Pfad notieren
+   - Backup erstellen
+
+4. **Nach Fehler:**
+   - DevTools öffnen (Cmd+Option+I)
+   - Console-Tab auf Fehler prüfen
+   - Network-Tab für IPC-Calls prüfen
+   - App-Logs lesen
+
+5. **Projekt-Hygiene:**
+   ```bash
+   # Alte Projekte archivieren
+   tar -czf cap-project-archive-$(date +%Y%m%d).tar.gz ~/CAP-Projects/
+   ```
+
+---
+
 ## Debug-Techniken
 
 ### 1. Verbose Logging
@@ -1724,7 +2023,7 @@ cap registry migrate \
 
 ### Q7: Welche Proof-Backends sind produktionsreif?
 
-**A:** Aktuell (v0.11.0):
+**A:** Aktuell (v0.12.0):
 - **Mock** - Produktionsreif für Testing
 - **ZK-VM** - Phase 3 (geplant)
 - **Halo2** - Phase 3 (geplant)
@@ -1752,6 +2051,41 @@ trait ProofSystem {
 - **BLAKE3:** 2^256 Möglichkeiten (≈ 10^77)
 - **SHA3-256:** 2^256 Möglichkeiten
 - Wahrscheinlichkeit: < 10^-60
+
+### Q11: Wie funktioniert die Desktop App offline? (NEU v0.12.0)
+
+**A:** Die Desktop App ist vollständig offline-fähig:
+- Kein API-Server erforderlich
+- Alle Berechnungen lokal im Tauri-Backend (Rust)
+- Daten bleiben auf Ihrem Rechner
+- Export als cap-bundle.v1 für spätere Online-Verifikation
+
+### Q12: Kann ich Desktop App und Web UI parallel nutzen?
+
+**A:** Ja, aber mit Einschränkungen:
+- Desktop App arbeitet mit lokalen Projekt-Ordnern
+- Web UI arbeitet mit REST API (Server)
+- Bundles sind kompatibel: Desktop-Export → Server-Verifikation
+- Projekte sind nicht direkt übertragbar (verschiedene Speicherformate)
+
+### Q13: Wie sichere ich Desktop App Projekte?
+
+**A:** Empfohlene Backup-Strategie:
+```bash
+# Tägliches Backup
+rsync -av ~/CAP-Projects/ ~/CAP-Backups/$(date +%Y%m%d)/
+
+# Oder als ZIP archivieren
+zip -r cap-backup-$(date +%Y%m%d).zip ~/CAP-Projects/
+```
+
+### Q14: Warum wird der Audit Trail Hash-Chain verwendet?
+
+**A:** Der SHA3-256 Hash-Chain garantiert:
+- **Integrität:** Jede Manipulation wird erkannt
+- **Reihenfolge:** Events sind unveränderbar geordnet
+- **Nachvollziehbarkeit:** Lückenlose Dokumentation aller Aktionen
+- **Compliance:** Erfüllt Anforderungen für Audit-Trails (LkSG)
 
 ---
 

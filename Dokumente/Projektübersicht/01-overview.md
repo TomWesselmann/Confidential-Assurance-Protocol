@@ -208,7 +208,8 @@ Der **LsKG-Agent** ist ein produktionsreifer, kryptographischer Compliance-Proof
 Das System bietet verschiedene Schnittstellen für unterschiedliche Nutzergruppen:
 - **CLI (Command Line Interface)** - Für technische Nutzer und Automatisierung
 - **REST API** - Für Systemintegration und Entwickler
-- **Web UI** (geplant) - Für nicht-technische Nutzer
+- **Desktop App** - Native App für Windows/macOS/Linux mit Offline-Funktionalität
+- **Web UI** - Browser-basierte Oberfläche für Verification
 
 ### Hauptfunktionen (mit Alltagsvergleich)
 
@@ -279,8 +280,56 @@ Das System bietet verschiedene Schnittstellen für unterschiedliche Nutzergruppe
 
 *Analogie:* Wie ein Bibliothekskatalog - Bücher (Policies) bekommen eine eindeutige ISBN (Hash), werden katalogisiert und können über verschiedene Wege gefunden werden. Veraltete Ausgaben bleiben auffindbar, aber markiert.
 
-#### 7. Web UI (Benutzeroberfläche) - **NEU in v0.11.0**
-**Was es macht:** Grafische Oberfläche für nicht-technische Benutzer
+#### 7. Desktop App (CAP Desktop Proofer) - **NEU in v0.12.0**
+**Was es macht:** Native Desktop-Anwendung für kompletten Offline-Betrieb
+
+**Modi:**
+1. **Proofer Modus** - 6-Schritte-Workflow zum Erstellen von Compliance-Nachweisen
+2. **Verifier Modus** - Bundle-Upload und Offline-Verifikation
+3. **Audit Modus** - Timeline-Ansicht aller Aktionen eines Projekts
+
+**6-Schritte Proofer Workflow:**
+1. **Import** - CSV-Dateien (Lieferanten, UBOs) importieren
+2. **Commitments** - Kryptographische Commitments berechnen
+3. **Policy** - Compliance-Regeln auswählen/hochladen
+4. **Manifest** - Manifest erstellen (Metadaten + Commitment-Root)
+5. **Proof** - Mock-Proof generieren
+6. **Export** - Bundle als ZIP exportieren (cap-bundle.v1)
+
+**Technologie:**
+- Tauri 2.0 (Rust-Backend + WebView-Frontend)
+- React + TypeScript + Zustand (Frontend)
+- Komplett offline - keine Netzwerkverbindung nötig
+
+**Installation:**
+```bash
+# Build für Release
+cd /Users/tomwesselmann/Desktop/LsKG-Agent/src-tauri
+cargo build --release
+
+# App starten
+./target/release/desktop-proofer
+```
+
+**Besonderheiten:**
+- **Projekt-basiert:** Jedes Projekt ist ein Ordner mit allen Dateien
+- **Audit Trail:** V1.0-Format mit SHA3-256 Hash-Chain
+- **Sidebar:** Workspace-Browser für Projektverwaltung
+- **State Persistence:** Workflow-Fortschritt bleibt erhalten
+
+*Analogie:* Wie eine Steuersoftware (WISO/Elster) - alle Daten bleiben lokal auf Ihrem Rechner, keine Cloud erforderlich. Der Compliance-Nachweis wird offline erstellt und kann dann verteilt werden.
+
+**Status:** ✅ Production-Ready (v0.12.0)
+
+**Vorteile gegenüber Web UI:**
+- ✅ Keine Server-Infrastruktur nötig
+- ✅ Sensible Daten verlassen nie den Rechner
+- ✅ Funktioniert ohne Internet
+- ✅ Native Performance
+- ✅ Integrierter Audit-Trail
+
+#### 8. Web UI (Benutzeroberfläche)
+**Was es macht:** Browser-basierte Oberfläche für Verifikation
 
 **Funktionen:**
 1. **Drag & Drop Upload** - Proof Packages hochladen (wie Datei-Upload in E-Mail)
@@ -313,7 +362,7 @@ cd webui && npm run dev
 - ⚠️ CORS-Settings müssen für Production angepasst werden
 - ⚠️ OAuth2 Authentication für echte Nutzerverwaltung erforderlich
 
-#### 8. Monitoring & Observability - **NEU in Week 2**
+#### 9. Monitoring & Observability - **NEU in Week 2**
 **Was es macht:** Überwacht System-Performance und Gesundheit in Echtzeit
 
 **Komponenten:**
@@ -365,7 +414,7 @@ docker compose up -d
 
 **Status:** ✅ Production-Ready - Alle 8 Container running, 5/5 healthy
 
-#### 9. Policy Store System - **NEU in v0.11.0**
+#### 10. Policy Store System - **NEU in v0.11.0**
 **Was es macht:** Persistente Speicherung von kompilierten Policies mit Versionierung
 
 **Funktionen:**
@@ -411,7 +460,7 @@ cargo run --bin cap-verifier-api
 
 **Status:** ✅ Production-Ready - Beide Backends erfolgreich getestet
 
-#### 10. cap-bundle.v1 Format - **NEU in v0.11.0**
+#### 11. cap-bundle.v1 Format - **NEU in v0.11.0**
 **Was es macht:** Standardisiertes Paketformat für offline-verifizierbare Compliance-Nachweise
 
 **Problem (vorher):**
@@ -519,20 +568,33 @@ cargo run -- verifier run --package build/proof_package
 
 ```
 LsKG-Agent/
-├── agent/                    # Hauptprojekt (Rust)
+├── agent/                    # CLI & API Backend (Rust)
 │   ├── src/                  # Quellcode (65+ Module)
-│   ├── tests/                # Integration Tests (24 Tests)
+│   ├── tests/                # Integration Tests (42 Suites)
 │   ├── benches/              # Performance Benchmarks
 │   └── Cargo.toml            # Dependencies
+├── src-tauri/                # Desktop App Backend (Tauri 2.0)
+│   ├── src/                  # Rust Commands + Audit Logger
+│   │   ├── commands/         # Tauri IPC Commands
+│   │   ├── audit_logger.rs   # V1.0 Audit Trail
+│   │   └── lib.rs            # Entry Point
+│   └── tauri.conf.json       # Tauri Konfiguration
+├── webui/                    # Frontend (React + TypeScript)
+│   ├── src/
+│   │   ├── components/       # UI Komponenten
+│   │   ├── store/            # Zustand State Management
+│   │   └── lib/tauri.ts      # Tauri IPC Wrapper
+│   └── package.json
 ├── sap-adapter/              # SAP Integration (geplant)
-├── docs/                     # Dokumentation (diese Dateien)
+├── Dokumente/                # Projektdokumentation
+│   └── Projektübersicht/     # Diese Dokumentation
 ├── examples/                 # Beispieldaten
 └── MD/                       # Design-Dokumente (PRDs)
 ```
 
 ### Entwicklungsstatus
 
-**Version:** 0.11.0
+**Version:** 0.12.0
 **Veröffentlicht:** November 2025
 **Status:** Produktionsbereit für Phase 1+2, MVP v1.0 bis 31. Dezember 2025
 
@@ -542,6 +604,7 @@ LsKG-Agent/
 |------|--------|
 | **CLI & Core Features** | ✅ Produktionsreif |
 | **REST API & Security** | ✅ Produktionsreif (TLS/mTLS, OAuth2) |
+| **Desktop App (Tauri)** | ✅ **Produktionsreif** (v0.12.0, Offline Proofer+Verifier+Audit) |
 | **Policy Store System** | ✅ **Produktionsreif** (v0.11.0, InMemory + SQLite) |
 | **Monitoring & Observability** | ✅ **Produktionsreif** (Week 2, Full Stack) |
 | **Web UI** | ✅ **Produktionsreif** (v0.11.0, React + TypeScript) |

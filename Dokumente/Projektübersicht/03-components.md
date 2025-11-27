@@ -39,6 +39,7 @@ Das System besteht aus **80+ spezialisierten Komponenten**, organisiert in **17 
 | **Key Providers** | 4 | Schlüssel-Speicher | Verschiedene Speicherorte |
 | **Lists** | 3 | Referenz-Listen | Sanktionslisten etc. |
 | **Support** | 6 | Hilfssysteme | Logging, Metrics |
+| **Desktop App** | 10 | Standalone-Software | Tauri 2.0 Offline Desktop Proofer (v0.12.0) |
 | **Web UI** | 7 | Benutzeroberfläche | React-basierte grafische Oberfläche (v0.11.0) |
 | **Monitoring & Observability** | 8 | Überwachungszentrale | Production Monitoring Stack (Week 2) |
 | **CLI Binary** | 1 | Kommandozentrale | Befehlseingabe |
@@ -1519,7 +1520,418 @@ cap verifier        - Verification operations
 
 ---
 
-## 16. Web UI Layer (v0.11.0) ✨
+## 16. Desktop App Layer (Tauri 2.0) - v0.12.0 ✨
+
+**Management-Zusammenfassung:** Native Desktop-Anwendung für komplett offline Compliance-Workflow. Wie eine eigenständige Software (Word, Excel) - keine Server, keine Cloud, alle Daten bleiben auf dem lokalen Rechner.
+
+**Technologie-Stack:**
+- Tauri 2.0 (Rust Backend + WebView Frontend)
+- React 18.x + TypeScript 5.x (Frontend)
+- Zustand (State Management)
+- TailwindCSS 3.x (Styling)
+
+**Modi:**
+- **Proofer:** 6-Schritte-Workflow zum Erstellen von Compliance-Nachweisen
+- **Verifier:** Bundle-Upload und Offline-Verifikation
+- **Audit:** Timeline-Ansicht aller Aktionen eines Projekts
+
+**Deployment:**
+```bash
+# Build
+cd src-tauri && cargo build --release
+
+# Start
+./target/release/desktop-proofer
+```
+
+**Analogie (Management):** Wie eine Steuersoftware (WISO/Elster) - alle Daten bleiben lokal, keine Cloud erforderlich
+
+---
+
+### src-tauri/src/lib.rs
+**Zweck:** Tauri Application Entry Point
+**Hauptfunktionen:**
+- Registriert alle Tauri Commands
+- Konfiguriert Tauri App Builder
+- Initialisiert Plugins
+
+**Module:**
+```rust
+mod audit_logger;
+mod commands;
+mod security;
+mod types;
+```
+
+**Commands Registration:**
+```rust
+.invoke_handler(tauri::generate_handler![
+    commands::project::select_workspace,
+    commands::project::create_project,
+    commands::project::get_project_status,
+    commands::import::import_csv,
+    commands::commitments::build_commitments,
+    commands::policy::load_policy,
+    commands::manifest::build_manifest,
+    commands::proof::build_proof,
+    commands::export::export_bundle,
+    commands::audit::read_audit_log,
+    commands::verify::verify_bundle,
+])
+```
+
+---
+
+### src-tauri/src/audit_logger.rs
+**Zweck:** V1.0 Audit Trail mit SHA3-256 Hash-Chain
+**Hauptstrukturen:**
+```rust
+struct AuditEntry {
+    seq: u64,                       // Sequential number
+    ts: String,                     // ISO 8601 timestamp
+    event: String,                  // Event type
+    details: serde_json::Value,     // Event-specific data
+    prev_digest: String,            // SHA3-256 of previous entry
+    digest: String,                 // SHA3-256 of this entry
+}
+```
+
+**Hauptfunktionen:**
+```rust
+fn log_event(project_path: &Path, event: &str, details: Value) -> Result<()>
+fn get_last_digest(audit_path: &Path) -> Result<String>
+fn compute_digest(entry: &AuditEntry) -> String
+```
+
+**Events Module:**
+```rust
+mod events {
+    pub fn project_created(project_path: &Path, project_name: &str)
+    pub fn csv_imported(project_path: &Path, file_type: &str, row_count: usize, hash: &str)
+    pub fn commitments_created(project_path: &Path, supplier_root: &str, ubo_root: &str)
+    pub fn policy_loaded(project_path: &Path, policy_name: &str, policy_hash: &str)
+    pub fn manifest_built(project_path: &Path, manifest_hash: &str)
+    pub fn proof_built(project_path: &Path, proof_hash: &str, backend: &str)
+    pub fn bundle_exported(project_path: &Path, output: &str, hash: &str, size: u64)
+}
+```
+
+**Hash-Chain Format:**
+```
+digest_n = SHA3-256(seq || ts || event || details || prev_digest)
+```
+
+**Tamper Detection:** Wenn ein Eintrag geändert wird, brechen alle folgenden Digests
+
+---
+
+### src-tauri/src/commands/project.rs
+**Zweck:** Project Management Commands
+**Commands:**
+```rust
+#[tauri::command]
+pub async fn select_workspace() -> Result<Option<String>, String>
+// Öffnet Ordner-Dialog, gibt ausgewählten Pfad zurück
+
+#[tauri::command]
+pub async fn create_project(workspace: String, name: String) -> Result<ProjectResult, String>
+// Erstellt Projektordner mit input/, build/, export/ Unterordnern
+
+#[tauri::command]
+pub async fn get_project_status(project: String) -> Result<ProjectStatus, String>
+// Prüft welche Dateien existieren, bestimmt aktuellen Workflow-Schritt
+```
+
+**ProjectStatus:**
+```rust
+struct ProjectStatus {
+    has_suppliers_csv: bool,
+    has_ubos_csv: bool,
+    has_policy: bool,
+    has_commitments: bool,
+    has_manifest: bool,
+    has_proof: bool,
+    current_step: String,           // "import", "commitments", etc.
+    info: ProjectInfo,
+}
+```
+
+---
+
+### src-tauri/src/commands/import.rs
+**Zweck:** CSV Import Command
+**Command:**
+```rust
+#[tauri::command]
+pub async fn import_csv(
+    path: String,
+    csv_type: String,               // "suppliers" | "ubos"
+    project: String
+) -> Result<ImportResult, String>
+```
+
+**Workflow:**
+1. Validiert CSV-Datei (UTF-8, Pflichtfelder)
+2. Kopiert nach `input/suppliers.csv` oder `input/ubos.csv`
+3. Parsed Zeilen und zählt valide Records
+4. Berechnet BLAKE3 Hash der Datei
+5. Schreibt `csv_imported` Audit Event
+6. Gibt ImportResult zurück
+
+**ImportResult:**
+```rust
+struct ImportResult {
+    row_count: usize,
+    valid_rows: usize,
+    hash: String,                   // BLAKE3 (0x-präfixiert)
+    file_type: String,
+}
+```
+
+---
+
+### src-tauri/src/commands/commitments.rs
+**Zweck:** Commitment Generation Command
+**Command:**
+```rust
+#[tauri::command]
+pub async fn build_commitments(project: String) -> Result<CommitmentsResult, String>
+```
+
+**Workflow:**
+1. Lädt `input/suppliers.csv` und `input/ubos.csv`
+2. Berechnet BLAKE3 Hash pro Record
+3. Baut Merkle Tree für Suppliers und UBOs
+4. Schreibt `build/commitments.json`
+5. Schreibt `commitments_created` Audit Event
+6. Gibt CommitmentsResult zurück
+
+**CommitmentsResult:**
+```rust
+struct CommitmentsResult {
+    supplier_root: String,          // Merkle Root
+    ubo_root: String,
+    supplier_count: usize,
+    ubo_count: usize,
+}
+```
+
+---
+
+### src-tauri/src/commands/policy.rs
+**Zweck:** Policy Loading Command
+**Command:**
+```rust
+#[tauri::command]
+pub async fn load_policy(
+    project: String,
+    policy_path: Option<String>     // Optional: eigene Policy
+) -> Result<PolicyInfo, String>
+```
+
+**Workflow:**
+1. Falls `policy_path` gesetzt: Kopiert Policy nach `input/policy.yml`
+2. Sonst: Verwendet Default-Policy (embedded)
+3. Parsed YAML, validiert Schema
+4. Berechnet SHA3-256 Policy Hash
+5. Schreibt `policy_loaded` Audit Event
+6. Gibt PolicyInfo zurück
+
+**PolicyInfo:**
+```rust
+struct PolicyInfo {
+    name: String,
+    version: String,
+    hash: String,                   // SHA3-256
+    constraints: Vec<String>,       // Liste der Regeln
+}
+```
+
+---
+
+### src-tauri/src/commands/manifest.rs
+**Zweck:** Manifest Building Command
+**Command:**
+```rust
+#[tauri::command]
+pub async fn build_manifest(project: String) -> Result<ManifestResult, String>
+```
+
+**Workflow:**
+1. Lädt `build/commitments.json`
+2. Lädt `input/policy.yml`
+3. Liest aktuellen Audit Trail Digest
+4. Baut Manifest mit allen Metadaten
+5. Schreibt `build/manifest.json`
+6. Schreibt `manifest_built` Audit Event
+7. Gibt ManifestResult zurück
+
+**ManifestResult:**
+```rust
+struct ManifestResult {
+    hash: String,                   // SHA3-256 of manifest
+    version: String,
+    created_at: String,
+}
+```
+
+---
+
+### src-tauri/src/commands/proof.rs
+**Zweck:** Proof Generation Command
+**Command:**
+```rust
+#[tauri::command]
+pub async fn build_proof(project: String) -> Result<ProofResult, String>
+```
+
+**Workflow:**
+1. Lädt `build/manifest.json`
+2. Führt Mock-Verifier aus (prüft Policy-Constraints)
+3. Generiert Proof-Daten (Mock-Backend)
+4. Schreibt `build/proof.capz`
+5. Schreibt `proof_built` Audit Event
+6. Gibt ProofResult zurück
+
+**ProofResult:**
+```rust
+struct ProofResult {
+    proof_hash: String,
+    backend: String,                // "mock"
+    status: String,                 // "ok" | "fail"
+}
+```
+
+---
+
+### src-tauri/src/commands/export.rs
+**Zweck:** Bundle Export Command
+**Command:**
+```rust
+#[tauri::command]
+pub async fn export_bundle(
+    project: String,
+    output: String
+) -> Result<ExportResult, String>
+```
+
+**Workflow:**
+1. Prüft ob manifest.json und proof.capz existieren
+2. Erstellt ZIP-Datei mit cap-bundle.v1 Format
+3. Fügt _meta.json, manifest.json, proof.capz hinzu
+4. Berechnet SHA3-256 Hashes für alle Dateien
+5. Kopiert ZIP in `export/` Ordner
+6. Schreibt `bundle_exported` Audit Event
+7. Gibt ExportResult zurück
+
+**ExportResult:**
+```rust
+struct ExportResult {
+    bundle_path: String,
+    size_bytes: u64,
+    hash: String,                   // BLAKE3 Bundle Hash
+    files: Vec<String>,             // Liste der enthaltenen Dateien
+}
+```
+
+---
+
+### webui/src/store/workflowStore.ts
+**Zweck:** Zustand State Management für Proofer Workflow
+**Hauptfunktionen:**
+```typescript
+interface WorkflowState {
+    projectPath: string | null;
+    projectName: string | null;
+    currentStep: WorkflowStep;
+    steps: Record<WorkflowStep, StepState>;
+
+    // Results
+    importResults: { suppliers: ImportResult | null; ubos: ImportResult | null };
+    commitmentsResult: CommitmentsResult | null;
+    policyInfo: PolicyInfo | null;
+    manifestResult: ManifestResult | null;
+    proofResult: ProofResult | null;
+    exportResult: ExportResult | null;
+
+    // Actions
+    setProject(path, name): void;
+    initializeFromStatus(path, name, status): void;  // State Restoration!
+    setCurrentStep(step): void;
+    goToNextStep(): void;
+    goToPreviousStep(): void;
+    reset(): void;
+}
+```
+
+**Key Feature: initializeFromStatus()**
+Stellt Workflow-Zustand aus Backend wieder her wenn User zwischen Modi wechselt.
+
+---
+
+### webui/src/components/workflow/WorkflowStepper.tsx
+**Zweck:** 6-Schritte-Navigation mit visueller Fortschrittsanzeige
+**Features:**
+- Schritte: Import → Commitments → Policy → Manifest → Proof → Export
+- Farbcodes: Grau (pending), Blau (in_progress), Grün (completed), Rot (error)
+- Klickbar für Navigation (nur zu erlaubten Schritten)
+
+---
+
+### webui/src/components/layout/ProjectSidebar.tsx
+**Zweck:** Workspace Browser und Projektverwaltung
+**Features:**
+- Workspace-Auswahl per Button
+- Liste aller Projekte im Workspace
+- Projekt-Erstellung
+- Status-Badge pro Projekt (Fortschrittsanzeige)
+
+---
+
+### webui/src/components/audit/AuditTimeline.tsx
+**Zweck:** Timeline-Ansicht des Audit-Trails
+**Features:**
+- Zeigt alle Events chronologisch
+- Event-Type Icons (Datei, Hash, Export, etc.)
+- Timestamp und Details
+- Hash-Chain Visualisierung
+
+---
+
+### webui/src/lib/tauri.ts
+**Zweck:** Type-Safe Tauri IPC Wrapper
+**Funktionen:**
+```typescript
+// Project Management
+export async function selectWorkspace(): Promise<string | null>
+export async function createProject(workspace: string, name: string): Promise<ProjectResult>
+export async function getProjectStatus(project: string): Promise<ProjectStatus>
+
+// Workflow Steps
+export async function importCsv(path: string, csvType: string, project: string): Promise<ImportResult>
+export async function buildCommitments(project: string): Promise<CommitmentsResult>
+export async function loadPolicy(project: string, policyPath?: string): Promise<PolicyInfo>
+export async function buildManifest(project: string): Promise<ManifestResult>
+export async function buildProof(project: string): Promise<ProofResult>
+export async function exportBundle(project: string, output: string): Promise<ExportResult>
+
+// Audit & Verification
+export async function readAuditLog(project: string): Promise<AuditEntry[]>
+export async function verifyBundle(bundlePath: string): Promise<VerificationResult>
+```
+
+**Usage:**
+```typescript
+import { invoke } from '@tauri-apps/api/core';
+
+export async function importCsv(path: string, csvType: string, project: string) {
+    return invoke<ImportResult>('import_csv', { path, csvType, project });
+}
+```
+
+---
+
+## 17. Web UI Layer (v0.11.0) ✨
 
 **Management-Zusammenfassung:** Moderne React-basierte Benutzeroberfläche für nicht-technische Nutzer. Ermöglicht Drag & Drop Upload von Proof Packages und Ein-Klick-Verifikation ohne CLI-Kenntnisse.
 
@@ -2186,15 +2598,22 @@ chmod +x test-monitoring.sh
 ## Zusammenfassung
 
 Der LsKG-Agent besteht aus:
-- **17 Kategorien** mit klaren Verantwortlichkeiten
-- **80+ Module** für verschiedene Funktionen (Backend + Frontend + Monitoring)
+- **18 Kategorien** mit klaren Verantwortlichkeiten
+- **90+ Module** für verschiedene Funktionen (Backend + Frontend + Desktop + Monitoring)
 - **Trait-basierte Abstraktion** für Erweiterbarkeit
 - **Type-Safe** durch Rust's starkes Typsystem (Backend) und TypeScript (Frontend)
 - **Testbar** durch klare Schnittstellen
 - **Production-Ready** mit vollständigem Monitoring Stack (Metrics, Logs, Traces)
-- **User-Friendly** durch React-basierte Web UI für nicht-technische Nutzer
+- **User-Friendly** durch React-basierte Web UI und Desktop App für nicht-technische Nutzer
+- **Offline-fähig** durch Tauri Desktop App ohne Server-Abhängigkeit
 
-**Neue Komponenten in v0.11.0:**
+**Neue Komponenten in v0.12.0:**
+- 🖥️ **Desktop App** (10 Komponenten) - Tauri 2.0 Offline Proofer mit 6-Schritte-Workflow
+- 📋 **Audit Logger** - V1.0 Format mit SHA3-256 Hash-Chain
+- 📂 **Project Management** - Workspace Browser und Projekt-Lifecycle
+- 🔄 **State Persistence** - Workflow-Zustand bleibt bei Modus-Wechsel erhalten
+
+**Komponenten aus v0.11.0:**
 - ✨ **Web UI** (7 Komponenten) - React + TypeScript für grafische Oberfläche
 - 📊 **Monitoring Stack** (8 Services) - Prometheus, Grafana, Loki, Jaeger, Node Exporter, cAdvisor
 - 🗄️ **Policy Store** (4 Module) - InMemory + SQLite Backends mit Content Deduplication
@@ -2207,3 +2626,4 @@ Der LsKG-Agent besteht aus:
 - 2 Grafana Dashboards mit 30 Panels
 - Full Observability (Logs ↔ Traces ↔ Metrics Correlation)
 - 8/8 Docker Containers running, 5/5 Health Checks passing
+- Desktop App für Air-Gapped und Offline-Umgebungen

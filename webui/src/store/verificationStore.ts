@@ -1,72 +1,45 @@
 /**
- * CAP Verification Store
+ * CAP Verification Store (Tauri Version)
  *
- * @description Zustand state management for verification workflow
+ * @description Zustand state management for offline verification workflow
  * @architecture Imperative Shell (manages UI state)
+ * @offline Simplified for Tauri - no upload state needed
  */
 
 import { create } from 'zustand';
-import type { Manifest } from '../core/models/Manifest';
-import type { VerificationResult } from '../core/models/VerificationResult';
+import type { VerifyBundleResponse } from '../lib/tauri';
 
 export interface VerificationState {
-  // Upload state
-  uploadedFile: File | null;
-  uploadProgress: number;
-  uploadError: string | null;
-
-  // Extracted data from bundle
-  manifest: Manifest | null;
-  policyHash: string | null;
-  proofBundle: string | null; // Base64-encoded
-
   // Verification state
-  isVerifying: boolean;
-  verificationResult: VerificationResult | null;
+  verificationResult: VerifyBundleResponse | null;
   verificationError: string | null;
+  isVerifying: boolean;
 
   // Actions
-  setUploadedFile: (file: File | null) => void;
-  setUploadProgress: (progress: number) => void;
-  setUploadError: (error: string | null) => void;
-
-  setManifest: (manifest: Manifest | null) => void;
-  setPolicyHash: (hash: string | null) => void;
-  setProofBundle: (bundle: string | null) => void;
-
-  setIsVerifying: (isVerifying: boolean) => void;
-  setVerificationResult: (result: VerificationResult | null) => void;
+  setVerificationResult: (result: VerifyBundleResponse | null) => void;
   setVerificationError: (error: string | null) => void;
+  setIsVerifying: (isVerifying: boolean) => void;
 
   reset: () => void;
 }
 
 const initialState = {
-  uploadedFile: null,
-  uploadProgress: 0,
-  uploadError: null,
-  manifest: null,
-  policyHash: null,
-  proofBundle: null,
-  isVerifying: false,
   verificationResult: null,
   verificationError: null,
+  isVerifying: false,
 };
 
 export const useVerificationStore = create<VerificationState>((set) => ({
   ...initialState,
 
-  setUploadedFile: (file) => set({ uploadedFile: file }),
-  setUploadProgress: (progress) => set({ uploadProgress: progress }),
-  setUploadError: (error) => set({ uploadError: error }),
+  setVerificationResult: (result) =>
+    set({ verificationResult: result, verificationError: null, isVerifying: false }),
 
-  setManifest: (manifest) => set({ manifest }),
-  setPolicyHash: (hash) => set({ policyHash: hash }),
-  setProofBundle: (bundle) => set({ proofBundle: bundle }),
+  setVerificationError: (error) =>
+    set({ verificationError: error, verificationResult: null, isVerifying: false }),
 
-  setIsVerifying: (isVerifying) => set({ isVerifying }),
-  setVerificationResult: (result) => set({ verificationResult: result }),
-  setVerificationError: (error) => set({ verificationError: error }),
+  setIsVerifying: (isVerifying) =>
+    set({ isVerifying }),
 
   reset: () => set(initialState),
 }));

@@ -1,4 +1,5 @@
 use crate::crypto;
+use crate::bundle::{BundleSource, load_bundle_atomic};
 /// Verifier Core – Pure Verification Logic
 ///
 /// This module provides portable, I/O-free verification logic that can be used
@@ -55,10 +56,14 @@ pub struct VerifyOptions {
 }
 
 impl Default for VerifyOptions {
+    /// Default options for offline-first verification (REQ-07)
+    ///
+    /// Timestamp and registry checks are disabled by default to support
+    /// offline verification workflows (e.g., desktop proofer).
     fn default() -> Self {
         Self {
-            check_timestamp: true,
-            check_registry: true,
+            check_timestamp: false,
+            check_registry: false,
         }
     }
 }
@@ -318,6 +323,76 @@ pub fn verify(
         registry_match,
         details: serde_json::Value::Object(details),
     })
+}
+
+/// Verifies a proof package from a BundleSource (REQ-03, REQ-07)
+///
+/// High-level verification function that loads a bundle atomically from
+/// a source (Directory or ZipFile) and verifies it with default offline options.
+///
+/// This function is designed for offline-first workflows (desktop proofer) where
+/// bundles are loaded from local file system without network access.
+///
+/// # Arguments
+/// * `source` - Bundle source (Directory or ZipFile)
+/// * `opts` - Optional verification options (uses offline defaults if None)
+///
+/// # Returns
+/// VerifyReport with detailed results
+///
+/// # Security
+/// - Atomic bundle loading (TOCTOU prevention, REQ-04)
+/// - Path traversal prevention (REQ-13)
+/// - Zip bomb protection (REQ-13)
+///
+/// # Example
+/// ```
+/// use cap_agent::bundle::BundleSource;
+/// use cap_agent::verifier::core::{verify_from_source, VerifyOptions};
+/// use std::path::Path;
+///
+/// let source = BundleSource::from_path(Path::new("./bundle.zip")).unwrap();
+/// let opts = VerifyOptions::default(); // Offline defaults
+/// let report = verify_from_source(&source, Some(&opts)).unwrap();
+/// assert!(report.status == "ok" || report.status == "fail");
+/// ```
+pub fn verify_from_source(
+    source: &BundleSource,
+    opts: Option<&VerifyOptions>,
+) -> Result<VerifyReport> {
+    // Load bundle atomically (REQ-04: TOCTOU prevention)
+    let bundle_data = load_bundle_atomic(source)?;
+
+    // Find the first proof unit (MVP: single proof unit only)
+    let proof_unit = bundle_data
+        .meta
+        .proof_units
+        .first()
+        .ok_or_else(|| anyhow!("No proof units found in bundle"))?;
+
+    // Extract manifest file
+    let manifest_bytes = bundle_data
+        .files
+        .get(&proof_unit.manifest_file)
+        .ok_or_else(|| anyhow!("Manifest file not found: {}", proof_unit.manifest_file))?;
+
+    let manifest: serde_json::Value = serde_json::from_slice(manifest_bytes)?;
+
+    // Extract proof file
+    let proof_bytes = bundle_data
+        .files
+        .get(&proof_unit.proof_file)
+        .ok_or_else(|| anyhow!("Proof file not found: {}", proof_unit.proof_file))?;
+
+    // Extract statement from manifest
+    let stmt = extract_statement_from_manifest(&manifest)?;
+
+    // Use provided options or default (offline)
+    let default_opts = VerifyOptions::default();
+    let verify_opts = opts.unwrap_or(&default_opts);
+
+    // Verify with existing pure function
+    verify(&manifest, proof_bytes, &stmt, verify_opts)
 }
 
 /// Validates that statement matches manifest content

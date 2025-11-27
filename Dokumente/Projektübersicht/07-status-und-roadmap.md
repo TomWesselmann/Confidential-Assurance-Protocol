@@ -3,7 +3,7 @@
 ## 📖 Über dieses Kapitel
 
 Dieses Kapitel zeigt Ihnen:
-- **Was bereits fertig ist** (v0.11.0 - Aktueller Stand)
+- **Was bereits fertig ist** (v0.12.0 - Aktueller Stand)
 - **Was bis Ende Dezember 2025 kommt** (MVP v1.0 - 6 Wochen)
 - **Welche Erweiterungen danach möglich sind** (v2.0 und darüber hinaus)
 
@@ -13,19 +13,20 @@ Dieses Kapitel zeigt Ihnen:
 
 ### Wo stehen wir heute?
 
-**Version 0.11.0** (Stand: 17. November 2025)
+**Version 0.12.0** (Stand: 27. November 2025)
 
 ✅ **Fertig und produktionsbereit:**
 - Komplettes Kommandozeilen-Tool (CLI) für Experten
 - REST API für Software-Integration (z.B. mit SAP)
+- **NEU: Desktop App (Tauri 2.0)** - Offline-fähig, für Einzelpersonen
 - Sichere Verschlüsselung (TLS/mTLS, OAuth2)
 - Digitale Signaturen und Schlüsselverwaltung
-- Manipulationssichere Dokumentation (Audit-Trail)
+- Manipulationssichere Dokumentation (Audit-Trail mit SHA3-256 Hash-Chain)
+- Web-Oberfläche für Upload und Verifikation
 
 🔄 **In Arbeit:**
 - Echte Zero-Knowledge-Beweise (aktuell: vereinfachte Version)
 - SAP-Integration (Grundstruktur vorhanden)
-- Benutzerfreundliche Web-Oberfläche
 
 ### Was kommt als Nächstes?
 
@@ -43,17 +44,18 @@ In 6 Wochen wird das System:
 
 ### Vergleich
 
-| Feature | Heute (v0.11.0) | Bis Jahresende (v1.0) |
+| Feature | Heute (v0.12.0) | Bis Jahresende (v1.0) |
 |---------|-----------------|----------------------|
 | Nachweise erstellen | ✅ Ja (vereinfacht) | ✅ Ja (vollständig) |
 | SAP-Anbindung | ⏳ Vorbereitet | ✅ Funktionsfähig |
-| Web-Oberfläche | ❌ Nein | ✅ Ja (Basic) |
+| Web-Oberfläche | ✅ Ja (Basic) | ✅ Ja (Advanced) |
+| **Desktop App** | ✅ **Ja (Offline)** | ✅ Ja (erweitert) |
 | Security-Prüfung | 🔄 Intern | ✅ Extern geprüft |
-| Einsatzbereit | 🔄 Tests | ✅ Produktion |
+| Einsatzbereit | ✅ Tests + Desktop | ✅ Produktion |
 
 ---
 
-## ✅ Aktueller Status (v0.11.0) - Was ist FERTIG
+## ✅ Aktueller Status (v0.12.0) - Was ist FERTIG
 
 ### Phase 1: Grundfunktionen ✅ (Abgeschlossen)
 
@@ -842,6 +844,78 @@ cap-proof/
 
 ---
 
+### Week 8: Desktop App (Tauri 2.0) ✅ (Abgeschlossen) - NEU in v0.12.0
+
+**Ziel:** Offline-fähige Desktop-Anwendung für Einzelpersonen und Freelancer
+
+**Core Features:**
+- [x] **Tauri 2.0 Framework** - Rust-Backend + WebView-Frontend
+- [x] **6-Schritt Proofer Workflow** - Import → Commitments → Policy → Manifest → Proof → Export
+- [x] **Verifier Mode** - Bundle-Upload und Offline-Verifikation
+- [x] **Audit Mode** - Audit-Trail Timeline mit Hash-Chain-Anzeige
+
+**Architektur:**
+- [x] **IPC Commands** (Tauri invoke/emit Pattern)
+  - `select_workspace` - Workspace-Ordner wählen
+  - `create_project` - Neues Projekt erstellen
+  - `get_project_status` - Projekt-Fortschritt laden
+  - `import_csv` - CSV-Dateien importieren
+  - `build_commitments` - Commitments berechnen
+  - `load_policy` - Policy laden/erstellen
+  - `build_manifest` - Manifest erstellen
+  - `build_proof` - Proof generieren
+  - `export_bundle` - cap-bundle.v1 exportieren
+  - `read_audit_log` - Audit-Trail lesen
+  - `verify_bundle` - Bundle offline verifizieren
+
+**Audit Trail (V1.0 Format):**
+- [x] **SHA3-256 Hash-Chain** - Manipulationssichere Event-Verkettung
+- [x] **Event Types:** project_created, csv_imported, commitments_built, policy_loaded, manifest_built, proof_built, bundle_exported
+- [x] **JSONL Format** - Ein JSON-Objekt pro Zeile
+
+**UI Komponenten:**
+- [x] **WorkflowStepper** - Horizontale Step-Navigation
+- [x] **ProjectSidebar** - Projekt-Liste mit Status-Badges
+- [x] **AuditTimeline** - Vertikale Event-Timeline
+- [x] **ImportView, CommitmentsView, PolicyView, ManifestView, ProofView, ExportView**
+
+**State Management:**
+- [x] **Zustand Store** (workflowStore.ts) - React State Management
+- [x] **initializeFromStatus()** - Persistenz beim Projektwechsel
+- [x] **canGoToStep()** - Navigation-Guards für Workflow
+
+**Build & Distribution:**
+```bash
+# Development
+cd src-tauri && cargo tauri dev
+
+# Production Build
+cargo tauri build
+
+# Output:
+# macOS: target/release/bundle/macos/CAP Desktop Proofer.app
+# Windows: target/release/bundle/msi/CAP_Desktop_Proofer.msi
+# Linux: target/release/bundle/appimage/cap-desktop-proofer.AppImage
+```
+
+**Vorteile gegenüber Web UI:**
+| Aspekt | Desktop App | Web UI |
+|--------|-------------|--------|
+| Offline | ✅ Vollständig | ❌ Server nötig |
+| Installation | ✅ Single Binary | ❌ Browser + Server |
+| Daten-Speicherort | ✅ Lokal (User-Kontrolle) | ⚠️ Server |
+| Startup | ✅ Instant | ⏳ Server-Start |
+| Auto-Updates | 📅 Geplant | ✅ Automatisch |
+
+**Dokumentation:**
+- [x] `05-deployment.md` - Desktop App Deployment Guide
+- [x] `06-troubleshooting.md` - Desktop App Troubleshooting
+- [x] `src-tauri/README.md` - Entwickler-Dokumentation
+
+**Status:** ✅ Production-Ready - Offline Proofer, Verifier, Audit komplett funktional
+
+---
+
 ### Phase 3: Erweiterte Integration 🔄 (70% fertig)
 
 **SAP-Adapter:**
@@ -958,9 +1032,9 @@ cap-proof/
 
 ---
 
-## 📊 Feature-Vergleich: v0.11.0 → v1.0 → v2.0
+## 📊 Feature-Vergleich: v0.12.0 → v1.0 → v2.0
 
-| Feature | v0.11.0 (Heute) | v1.0 (Dez 2025) | v2.0 (2026) |
+| Feature | v0.12.0 (Heute) | v1.0 (Dez 2025) | v2.0 (2026) |
 |---------|-----------------|-----------------|-------------|
 | **Nachweise** |
 | Proof Generation | 🔄 Mock (SimplifiedZK) | ✅ **Halo2 (echt)** | ✅ Multi-Backend |
@@ -970,7 +1044,8 @@ cap-proof/
 | **Benutzerfreundlichkeit** |
 | CLI | ✅ | ✅ | ✅ |
 | REST API | ✅ | ✅ | ✅ GraphQL |
-| Web UI | ❌ | ✅ **Basic** | ✅ **Advanced** |
+| Web UI | ✅ **Basic** | ✅ **Advanced** | ✅ **Enterprise** |
+| **Desktop App** | ✅ **Tauri 2.0** | ✅ Auto-Updates | ✅ Multi-Platform |
 | Mobile App | ❌ | ❌ | 📅 Geplant |
 | **Integration** |
 | CSV Import | ✅ | ✅ | ✅ |
@@ -1274,6 +1349,6 @@ v0.11.0               MVP v1.0              v1.1                 v2.0
 
 ---
 
-**Letzte Aktualisierung:** 17. November 2025
-**Version:** 1.0
+**Letzte Aktualisierung:** 27. November 2025
+**Version:** 1.1 (mit Desktop App v0.12.0)
 **Nächstes Review:** Wöchentlich (jeden Montag)
