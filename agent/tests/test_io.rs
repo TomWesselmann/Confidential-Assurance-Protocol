@@ -1,7 +1,7 @@
-/// Integration Tests für io.rs
-///
-/// Diese Tests wurden aus inline test modules extrahiert um Tarpaulin Coverage-Tracking zu ermöglichen.
-/// Tarpaulin hat eine bekannte Limitation mit #[cfg(test)] inline modules.
+//! Integration Tests für io.rs
+//!
+//! Diese Tests wurden aus inline test modules extrahiert um Tarpaulin Coverage-Tracking zu ermöglichen.
+//! Tarpaulin hat eine bekannte Limitation mit #[cfg(test)] inline modules.
 
 use cap_agent::io::{read_suppliers_csv, read_ubos_csv, Supplier, Ubo};
 use std::fs;

@@ -167,7 +167,10 @@ pub fn verify_core(input: CoreVerifyInput) -> CoreVerifyResult {
 
     // 3. Policy-Verifikation
     // Parse Manifest JSON
-    eprintln!("DEBUG [verify_core]: Parsing manifest JSON ({} bytes)", input.manifest_bytes.len());
+    eprintln!(
+        "DEBUG [verify_core]: Parsing manifest JSON ({} bytes)",
+        input.manifest_bytes.len()
+    );
     match serde_json::from_slice::<serde_json::Value>(&input.manifest_bytes) {
         Ok(manifest) => {
             eprintln!("DEBUG [verify_core]: Manifest JSON parsed successfully");
@@ -341,14 +344,15 @@ fn finalize_result(
     let finished_at = Utc::now().to_rfc3339();
 
     // Gesamtstatus: Fail wenn mind. ein Fail, Error wenn mind. ein Error, Warn wenn mind. ein Warn, sonst Ok
-    let overall_status = checks.iter().fold(VerifyStatus::Ok, |acc, check| {
-        match (acc, check.status) {
-            (VerifyStatus::Error, _) | (_, VerifyStatus::Error) => VerifyStatus::Error,
-            (VerifyStatus::Fail, _) | (_, VerifyStatus::Fail) => VerifyStatus::Fail,
-            (VerifyStatus::Warn, _) | (_, VerifyStatus::Warn) => VerifyStatus::Warn,
-            _ => VerifyStatus::Ok,
-        }
-    });
+    let overall_status =
+        checks
+            .iter()
+            .fold(VerifyStatus::Ok, |acc, check| match (acc, check.status) {
+                (VerifyStatus::Error, _) | (_, VerifyStatus::Error) => VerifyStatus::Error,
+                (VerifyStatus::Fail, _) | (_, VerifyStatus::Fail) => VerifyStatus::Fail,
+                (VerifyStatus::Warn, _) | (_, VerifyStatus::Warn) => VerifyStatus::Warn,
+                _ => VerifyStatus::Ok,
+            });
 
     // Extrahiere optionale Felder
     let signature_valid = checks
@@ -387,7 +391,10 @@ fn verify_signature(data: &[u8], sig: &[u8], pubkey: &[u8]) -> Result<bool> {
     use crate::crypto::{Ed25519PublicKey, Ed25519Signature};
 
     if sig.len() != 64 {
-        return Err(anyhow!("Invalid signature length: {}, expected 64", sig.len()));
+        return Err(anyhow!(
+            "Invalid signature length: {}, expected 64",
+            sig.len()
+        ));
     }
 
     if pubkey.len() != 32 {
@@ -440,11 +447,9 @@ mod tests {
         let manifest_bytes = br#"{"version":"manifest.v1.0","policy":{"hash":"0xtest"}}"#;
         let proof_bytes = b"mock_proof_data";
 
-        let manifest_hash = crate::crypto::hex_lower_prefixed32(crate::crypto::sha3_256(
-            manifest_bytes,
-        ));
-        let proof_hash =
-            crate::crypto::hex_lower_prefixed32(crate::crypto::sha3_256(proof_bytes));
+        let manifest_hash =
+            crate::crypto::hex_lower_prefixed32(crate::crypto::sha3_256(manifest_bytes));
+        let proof_hash = crate::crypto::hex_lower_prefixed32(crate::crypto::sha3_256(proof_bytes));
 
         let input = CoreVerifyInput {
             protocol_version: "cap-core-verify.v1".to_string(),
@@ -527,9 +532,8 @@ mod tests {
     #[test]
     fn test_verify_core_options_disable_checks() {
         let manifest_bytes = br#"{"version":"manifest.v1.0","policy":{"hash":"0xtest"}}"#;
-        let manifest_hash = crate::crypto::hex_lower_prefixed32(crate::crypto::sha3_256(
-            manifest_bytes,
-        ));
+        let manifest_hash =
+            crate::crypto::hex_lower_prefixed32(crate::crypto::sha3_256(manifest_bytes));
         let proof_hash = crate::crypto::hex_lower_prefixed32(crate::crypto::sha3_256(b"proof"));
 
         let input = CoreVerifyInput {
@@ -563,9 +567,8 @@ mod tests {
     #[test]
     fn test_verify_core_result_timestamps() {
         let manifest_bytes = br#"{"version":"manifest.v1.0","policy":{"hash":"0xtest"}}"#;
-        let manifest_hash = crate::crypto::hex_lower_prefixed32(crate::crypto::sha3_256(
-            manifest_bytes,
-        ));
+        let manifest_hash =
+            crate::crypto::hex_lower_prefixed32(crate::crypto::sha3_256(manifest_bytes));
         let proof_hash = crate::crypto::hex_lower_prefixed32(crate::crypto::sha3_256(b"proof"));
 
         let input = CoreVerifyInput {

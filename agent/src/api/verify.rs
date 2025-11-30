@@ -343,7 +343,9 @@ fn compute_company_root(ctx: &VerifyContext) -> Result<String> {
     }
 
     if combined.is_empty() {
-        return Err(anyhow!("No supplier or UBO hashes provided and no company_commitment_root"));
+        return Err(anyhow!(
+            "No supplier or UBO hashes provided and no company_commitment_root"
+        ));
     }
 
     let hash = crypto::blake3_256(combined.as_bytes());
@@ -383,10 +385,12 @@ mod tests {
         IrV1 {
             ir_version: "1.0".to_string(),
             policy_id: "test-policy".to_string(),
-            policy_hash: "0x1234567890123456789012345678901234567890123456789012345678901234".to_string(),
+            policy_hash: "0x1234567890123456789012345678901234567890123456789012345678901234"
+                .to_string(),
             rules: vec![],
             adaptivity: None,
-            ir_hash: "0x5555555555555555555555555555555555555555555555555555555555555555".to_string(),
+            ir_hash: "0x5555555555555555555555555555555555555555555555555555555555555555"
+                .to_string(),
         }
     }
 
@@ -399,7 +403,9 @@ mod tests {
             ubo_hashes: vec![
                 "0x3333333333333333333333333333333333333333333333333333333333333333".to_string(),
             ],
-            company_commitment_root: Some("0x4444444444444444444444444444444444444444444444444444444444444444".to_string()),
+            company_commitment_root: Some(
+                "0x4444444444444444444444444444444444444444444444444444444444444444".to_string(),
+            ),
             sanctions_root: None,
             jurisdiction_root: None,
         }
@@ -436,7 +442,9 @@ mod tests {
         let ctx = VerifyContext {
             supplier_hashes: vec![],
             ubo_hashes: vec![],
-            company_commitment_root: Some("0x4444444444444444444444444444444444444444444444444444444444444444".to_string()),
+            company_commitment_root: Some(
+                "0x4444444444444444444444444444444444444444444444444444444444444444".to_string(),
+            ),
             sanctions_root: None,
             jurisdiction_root: None,
         };
@@ -444,7 +452,10 @@ mod tests {
         let result = compute_company_root(&ctx).unwrap();
 
         // Should return the provided root
-        assert_eq!(result, "0x4444444444444444444444444444444444444444444444444444444444444444");
+        assert_eq!(
+            result,
+            "0x4444444444444444444444444444444444444444444444444444444444444444"
+        );
     }
 
     #[test]
@@ -460,7 +471,10 @@ mod tests {
         let result = compute_company_root(&ctx);
 
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("No supplier or UBO hashes"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("No supplier or UBO hashes"));
     }
 
     #[test]
@@ -499,15 +513,20 @@ mod tests {
         assert_eq!(manifest["version"], "manifest.v1.0");
         assert_eq!(manifest["policy"]["name"], "test-policy");
         assert_eq!(manifest["policy"]["version"], "lksg.v1");
-        assert_eq!(manifest["policy"]["hash"], "0x1234567890123456789012345678901234567890123456789012345678901234");
+        assert_eq!(
+            manifest["policy"]["hash"],
+            "0x1234567890123456789012345678901234567890123456789012345678901234"
+        );
         assert_eq!(manifest["proof"]["proof_type"], "mock");
     }
 
     #[test]
     fn test_create_mock_proof() {
         let stmt = ProofStatement {
-            policy_hash: "0x1234567890123456789012345678901234567890123456789012345678901234".to_string(),
-            company_commitment_root: "0x4444444444444444444444444444444444444444444444444444444444444444".to_string(),
+            policy_hash: "0x1234567890123456789012345678901234567890123456789012345678901234"
+                .to_string(),
+            company_commitment_root:
+                "0x4444444444444444444444444444444444444444444444444444444444444444".to_string(),
             sanctions_root: None,
             jurisdiction_root: None,
             extensions: None,
@@ -589,9 +608,9 @@ mod tests {
         let req: VerifyRequest = serde_json::from_str(json).unwrap();
 
         // When "options" field is missing entirely, Default::default() is used (all false)
-        assert_eq!(req.options.adaptive, false);
-        assert_eq!(req.options.check_timestamp, false);
-        assert_eq!(req.options.check_registry, false);
+        assert!(!req.options.adaptive);
+        assert!(!req.options.check_timestamp);
+        assert!(!req.options.check_registry);
     }
 
     #[test]
@@ -609,17 +628,19 @@ mod tests {
         let req: VerifyRequest = serde_json::from_str(json).unwrap();
 
         // Field-level defaults from #[serde(default = "default_true")]
-        assert_eq!(req.options.adaptive, false);
-        assert_eq!(req.options.check_timestamp, true);
-        assert_eq!(req.options.check_registry, true);
+        assert!(!req.options.adaptive);
+        assert!(req.options.check_timestamp);
+        assert!(req.options.check_registry);
     }
 
     #[test]
     fn test_verify_response_serialization() {
         let report = VerifyReport {
             status: "ok".to_string(),
-            manifest_hash: "0x1111111111111111111111111111111111111111111111111111111111111111".to_string(),
-            proof_hash: "0x2222222222222222222222222222222222222222222222222222222222222222".to_string(),
+            manifest_hash: "0x1111111111111111111111111111111111111111111111111111111111111111"
+                .to_string(),
+            proof_hash: "0x2222222222222222222222222222222222222222222222222222222222222222"
+                .to_string(),
             signature_valid: true,
             timestamp_valid: Some(true),
             registry_match: Some(true),
@@ -628,8 +649,10 @@ mod tests {
 
         let response = VerifyResponse {
             result: "OK".to_string(),
-            manifest_hash: "0x1111111111111111111111111111111111111111111111111111111111111111".to_string(),
-            proof_hash: "0x2222222222222222222222222222222222222222222222222222222222222222".to_string(),
+            manifest_hash: "0x1111111111111111111111111111111111111111111111111111111111111111"
+                .to_string(),
+            proof_hash: "0x2222222222222222222222222222222222222222222222222222222222222222"
+                .to_string(),
             trace: Some(serde_json::json!({"test": "value"})),
             signature: Some("signature_base64".to_string()),
             timestamp: None,
@@ -650,7 +673,7 @@ mod tests {
 
     #[test]
     fn test_default_true() {
-        assert_eq!(default_true(), true);
+        assert!(default_true());
     }
 
     // ========================================================================
@@ -676,14 +699,21 @@ mod tests {
 
         let result = handle_verify(req);
 
-        assert!(result.is_ok(), "Mode B verification handler should complete successfully");
+        assert!(
+            result.is_ok(),
+            "Mode B verification handler should complete successfully"
+        );
         let response = result.unwrap();
 
         // Verify handler produces valid output (result can be OK, WARN, or FAIL depending on verification)
         assert!(response.result == "OK" || response.result == "WARN" || response.result == "FAIL");
         assert!(response.manifest_hash.starts_with("0x"));
         assert!(response.proof_hash.starts_with("0x"));
-        assert!(response.report.status == "ok" || response.report.status == "warn" || response.report.status == "fail");
+        assert!(
+            response.report.status == "ok"
+                || response.report.status == "warn"
+                || response.report.status == "fail"
+        );
 
         // Verify trace contains Mode B metadata
         assert!(response.trace.is_some());
@@ -709,7 +739,10 @@ mod tests {
         let result = handle_verify(req);
 
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Cannot specify both policy_id and ir"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Cannot specify both policy_id and ir"));
     }
 
     #[test]
@@ -728,7 +761,10 @@ mod tests {
         let result = handle_verify(req);
 
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Must specify either policy_id or ir"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Must specify either policy_id or ir"));
     }
 
     #[test]
@@ -770,8 +806,10 @@ mod tests {
         // Test manifest building with all optional fields
         let ir = create_test_ir();
         let mut ctx = create_test_context();
-        ctx.sanctions_root = Some("0x5555555555555555555555555555555555555555555555555555555555555555".to_string());
-        ctx.jurisdiction_root = Some("0x6666666666666666666666666666666666666666666666666666666666666666".to_string());
+        ctx.sanctions_root =
+            Some("0x5555555555555555555555555555555555555555555555555555555555555555".to_string());
+        ctx.jurisdiction_root =
+            Some("0x6666666666666666666666666666666666666666666666666666666666666666".to_string());
 
         let req = VerifyRequest {
             policy_id: None,
@@ -786,10 +824,22 @@ mod tests {
         // Verify all fields
         assert_eq!(manifest["version"], "manifest.v1.0");
         assert_eq!(manifest["policy"]["name"], "test-policy");
-        assert_eq!(manifest["policy"]["hash"], "0x1234567890123456789012345678901234567890123456789012345678901234");
-        assert_eq!(manifest["company_commitment_root"], "0x4444444444444444444444444444444444444444444444444444444444444444");
-        assert_eq!(manifest["sanctions_root"], "0x5555555555555555555555555555555555555555555555555555555555555555");
-        assert_eq!(manifest["jurisdiction_root"], "0x6666666666666666666666666666666666666666666666666666666666666666");
+        assert_eq!(
+            manifest["policy"]["hash"],
+            "0x1234567890123456789012345678901234567890123456789012345678901234"
+        );
+        assert_eq!(
+            manifest["company_commitment_root"],
+            "0x4444444444444444444444444444444444444444444444444444444444444444"
+        );
+        assert_eq!(
+            manifest["sanctions_root"],
+            "0x5555555555555555555555555555555555555555555555555555555555555555"
+        );
+        assert_eq!(
+            manifest["jurisdiction_root"],
+            "0x6666666666666666666666666666666666666666666666666666666666666666"
+        );
     }
 
     #[test]

@@ -1,10 +1,10 @@
-/// Integration Tests für tls.rs
-///
-/// Diese Tests wurden aus inline test modules extrahiert um Tarpaulin Coverage-Tracking zu ermöglichen.
-/// Tarpaulin hat eine bekannte Limitation mit #[cfg(test)] inline modules.
-///
-/// Note: Tests für private Funktionen (load_certs, load_private_key) bleiben im inline module,
-/// da Integration Tests nur die öffentliche API testen sollten.
+//! Integration Tests für tls.rs
+//!
+//! Diese Tests wurden aus inline test modules extrahiert um Tarpaulin Coverage-Tracking zu ermöglichen.
+//! Tarpaulin hat eine bekannte Limitation mit #[cfg(test)] inline modules.
+//!
+//! Note: Tests für private Funktionen (load_certs, load_private_key) bleiben im inline module,
+//! da Integration Tests nur die öffentliche API testen sollten.
 
 use cap_agent::api::tls::*;
 

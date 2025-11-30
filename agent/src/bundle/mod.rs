@@ -16,5 +16,5 @@
 pub mod meta;
 pub mod source;
 
-pub use meta::{BundleMeta, BundleFileMeta, ProofUnitMeta, BUNDLE_SCHEMA_V1};
-pub use source::{BundleSource, BundleData, parse_bundle_source, load_bundle_atomic};
+pub use meta::{BundleFileMeta, BundleMeta, ProofUnitMeta, BUNDLE_SCHEMA_V1};
+pub use source::{load_bundle_atomic, parse_bundle_source, BundleData, BundleSource};

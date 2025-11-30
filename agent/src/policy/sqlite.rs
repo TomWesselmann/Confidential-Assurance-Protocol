@@ -1,13 +1,13 @@
 #![allow(dead_code)]
-use async_trait::async_trait;
 use anyhow::{anyhow, Result};
-use rusqlite::{Connection, params, OptionalExtension};
+use async_trait::async_trait;
+use rusqlite::{params, Connection, OptionalExtension};
 use std::sync::{Arc, Mutex};
 use uuid::Uuid;
 
-use crate::policy::Policy;
 use super::metadata::{CompiledPolicy, PolicyMetadata, PolicyStatus};
 use super::store::{compute_policy_hash, now_iso8601, PolicyStore};
+use crate::policy::Policy;
 
 /// SQLite-based Policy Store (Production)
 /// Note: rusqlite::Connection is not Sync, so we wrap it in Arc<Mutex<>>
@@ -24,7 +24,9 @@ impl SqlitePolicyStore {
         conn.pragma_update(None, "synchronous", "NORMAL")?;
 
         // Run migrations
-        conn.execute_batch(include_str!("../../migrations/001_create_policies_table.sql"))?;
+        conn.execute_batch(include_str!(
+            "../../migrations/001_create_policies_table.sql"
+        ))?;
 
         Ok(Self {
             conn: Arc::new(Mutex::new(conn)),
@@ -141,8 +143,17 @@ impl PolicyStore for SqlitePolicyStore {
             )
             .optional()?;
 
-        if let Some((id_str, name, version, hash, status, created_at, updated_at, policy_json, compiled_bytes)) =
-            result
+        if let Some((
+            id_str,
+            name,
+            version,
+            hash,
+            status,
+            created_at,
+            updated_at,
+            policy_json,
+            compiled_bytes,
+        )) = result
         {
             let policy: Policy = serde_json::from_str(&policy_json)?;
             let status = Self::status_from_string(&status);
@@ -169,9 +180,11 @@ impl PolicyStore for SqlitePolicyStore {
     async fn get_by_hash(&self, hash: &str) -> Result<Option<CompiledPolicy>> {
         let id: Option<String> = {
             let conn = self.conn.lock().unwrap();
-            conn.query_row("SELECT id FROM policies WHERE hash = ?1", params![hash], |row| {
-                row.get(0)
-            })
+            conn.query_row(
+                "SELECT id FROM policies WHERE hash = ?1",
+                params![hash],
+                |row| row.get(0),
+            )
             .optional()?
         };
 

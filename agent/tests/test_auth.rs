@@ -1,9 +1,8 @@
-/// Integration Tests für auth.rs
-///
-/// Diese Tests wurden als Integration Tests erstellt um Tarpaulin Coverage-Tracking zu ermöglichen.
-/// Tarpaulin hat eine bekannte Limitation mit #[cfg(test)] inline modules.
+//! Integration Tests für auth.rs
+//!
+//! Diese Tests wurden als Integration Tests erstellt um Tarpaulin Coverage-Tracking zu ermöglichen.
+//! Tarpaulin hat eine bekannte Limitation mit #[cfg(test)] inline modules.
 
-use cap_agent::api::auth::*;
 use axum::{
     body::Body,
     http::{Request, StatusCode},
@@ -12,6 +11,7 @@ use axum::{
     routing::post,
     Router,
 };
+use cap_agent::api::auth::*;
 use tower::ServiceExt;
 
 #[test]

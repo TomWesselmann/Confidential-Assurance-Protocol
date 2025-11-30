@@ -1,10 +1,14 @@
-use crate::policy::{Policy, PolicyStore, PolicyMetadata};
+use crate::policy::{Policy, PolicyMetadata, PolicyStore};
 /// Policy API - REST Endpoints for Policy Management
 ///
 /// Endpoints:
 /// - POST /policy/compile - Compiles and validates a policy
 /// - GET /policy/:id - Retrieves a policy by hash or UUID
-use axum::{extract::{Path, State}, http::StatusCode, Json};
+use axum::{
+    extract::{Path, State},
+    http::StatusCode,
+    Json,
+};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -84,7 +88,11 @@ pub async fn handle_policy_compile(
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
-    tracing::info!("Policy compiled successfully: {} (hash: {})", metadata.id, metadata.hash);
+    tracing::info!(
+        "Policy compiled successfully: {} (hash: {})",
+        metadata.id,
+        metadata.hash
+    );
 
     Ok(Json(PolicyCompileResponse {
         policy_id: metadata.id.to_string(),
@@ -140,7 +148,7 @@ pub async fn handle_policy_get(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::policy::{PolicyConstraints, InMemoryPolicyStore};
+    use crate::policy::{InMemoryPolicyStore, PolicyConstraints};
 
     #[tokio::test]
     async fn test_policy_compile_and_get() {
@@ -164,12 +172,9 @@ mod tests {
         let compile_req = PolicyCompileRequest {
             policy: policy.clone(),
         };
-        let compile_resp = handle_policy_compile(
-            State(state.clone()),
-            Json(compile_req),
-        )
-        .await
-        .expect("Compilation should succeed");
+        let compile_resp = handle_policy_compile(State(state.clone()), Json(compile_req))
+            .await
+            .expect("Compilation should succeed");
 
         let resp_data = compile_resp.0;
         assert_eq!(resp_data.status, "compiled");
@@ -177,22 +182,17 @@ mod tests {
         assert_eq!(resp_data.policy_hash.len(), 66); // 0x + 64 hex chars
 
         // Retrieve by UUID
-        let get_resp = handle_policy_get(
-            State(state.clone()),
-            Path(resp_data.policy_id.clone()),
-        )
-        .await
-        .expect("Get by UUID should succeed");
+        let get_resp = handle_policy_get(State(state.clone()), Path(resp_data.policy_id.clone()))
+            .await
+            .expect("Get by UUID should succeed");
 
         assert_eq!(get_resp.0.policy.name, "Test Policy");
 
         // Retrieve by hash
-        let get_resp_hash = handle_policy_get(
-            State(state.clone()),
-            Path(resp_data.policy_hash.clone()),
-        )
-        .await
-        .expect("Get by hash should succeed");
+        let get_resp_hash =
+            handle_policy_get(State(state.clone()), Path(resp_data.policy_hash.clone()))
+                .await
+                .expect("Get by hash should succeed");
 
         assert_eq!(get_resp_hash.0.policy.name, "Test Policy");
     }
@@ -201,11 +201,7 @@ mod tests {
     async fn test_policy_not_found() {
         let state = PolicyState::new(InMemoryPolicyStore::new());
 
-        let result = handle_policy_get(
-            State(state),
-            Path("nonexistent-id".to_string()),
-        )
-        .await;
+        let result = handle_policy_get(State(state), Path("nonexistent-id".to_string())).await;
 
         assert!(result.is_err());
         assert_eq!(result.unwrap_err(), StatusCode::NOT_FOUND);

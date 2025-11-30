@@ -32,7 +32,7 @@ export const CommitmentsView: React.FC = () => {
       const result = await createCommitments(projectPath);
       setCommitmentsResult(result);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Unbekannter Fehler';
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
       setError(errorMessage);
       setStepStatus('commitments', 'error', errorMessage);
     } finally {
@@ -46,8 +46,8 @@ export const CommitmentsView: React.FC = () => {
     <div className="space-y-3">
       {/* Header */}
       <div className="text-center">
-        <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Commitments erstellen</h2>
-        <p className="text-xs text-gray-500">Merkle-Roots generieren</p>
+        <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Create Commitments</h2>
+        <p className="text-xs text-gray-500">Generate Merkle roots</p>
       </div>
 
       {/* Main Card */}
@@ -58,13 +58,13 @@ export const CommitmentsView: React.FC = () => {
               <svg className="w-8 h-8 mx-auto text-gray-400 mb-2" width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
               </svg>
-              <p className="text-xs text-gray-500 mb-2">CSV-Daten zu Merkle-Bäumen</p>
+              <p className="text-xs text-gray-500 mb-2">CSV data to Merkle trees</p>
               <button
                 onClick={handleCreateCommitments}
                 disabled={isLoading}
                 className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded font-medium hover:bg-blue-700 disabled:opacity-50"
               >
-                {isLoading ? 'Erstelle...' : 'Commitments erstellen'}
+                {isLoading ? 'Creating...' : 'Create Commitments'}
               </button>
             </>
           ) : (
@@ -73,7 +73,7 @@ export const CommitmentsView: React.FC = () => {
                 <svg className="w-4 h-4 flex-shrink-0 text-green-500" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <span className="ml-1 text-xs font-semibold text-green-600">Erfolgreich</span>
+                <span className="ml-1 text-xs font-semibold text-green-600">Success</span>
               </div>
               <div className="space-y-1 text-left bg-gray-50 dark:bg-gray-900 rounded p-2 text-[10px]">
                 <div className="flex justify-between">
@@ -97,13 +97,13 @@ export const CommitmentsView: React.FC = () => {
 
       {/* Navigation */}
       <div className="flex justify-between max-w-sm mx-auto pt-1">
-        <button onClick={goToPreviousStep} className="px-3 py-1.5 rounded text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200">Zurück</button>
+        <button onClick={goToPreviousStep} className="px-3 py-1.5 rounded text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200">Back</button>
         <button
           onClick={goToNextStep}
           disabled={!isComplete}
           className={`px-3 py-1.5 rounded text-xs font-medium ${isComplete ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
         >
-          Weiter
+          Next
         </button>
       </div>
     </div>

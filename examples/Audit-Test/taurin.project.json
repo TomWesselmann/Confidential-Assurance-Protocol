@@ -1,7 +1,7 @@
 {
   "schema": "taurin.project.v1",
-  "name": "Audit-Tet",
-  "createdAt": "2025-11-27T10:50:05.758214+00:00",
+  "name": "Audit-Test",
+  "createdAt": "2025-11-27T11:34:22.642844+00:00",
   "description": null,
   "capVersion": "0.1.0"
 }

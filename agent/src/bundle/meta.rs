@@ -254,7 +254,10 @@ pub fn check_dependency_cycles(units: &[ProofUnitMeta]) -> Result<()> {
     // Build dependency graph
     let mut graph: HashMap<&str, Vec<&str>> = HashMap::new();
     for unit in units {
-        graph.insert(&unit.id, unit.depends_on.iter().map(|s| s.as_str()).collect());
+        graph.insert(
+            &unit.id,
+            unit.depends_on.iter().map(|s| s.as_str()).collect(),
+        );
     }
 
     // DFS-based cycle detection

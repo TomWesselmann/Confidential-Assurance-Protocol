@@ -29,13 +29,13 @@ export const ProofView: React.FC = () => {
       setIsLoading(true);
       setError(null);
       setStepStatus('proof', 'in_progress');
-      setProofProgress({ percent: 0, message: 'Initialisiere...' });
+      setProofProgress({ percent: 0, message: 'Initializing...' });
       const result = await buildProof(projectPath, (progress) => {
         setProofProgress(progress);
       });
       setProofResult(result);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Unbekannter Fehler';
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
       setError(errorMessage);
       setStepStatus('proof', 'error', errorMessage);
       setProofProgress(null);
@@ -49,8 +49,8 @@ export const ProofView: React.FC = () => {
   return (
     <div className="space-y-3">
       <div className="text-center">
-        <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Proof generieren</h2>
-        <p className="text-xs text-gray-500">Kryptographischen Beweis erstellen</p>
+        <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Generate Proof</h2>
+        <p className="text-xs text-gray-500">Create cryptographic proof</p>
       </div>
 
       <div className="max-w-sm mx-auto">
@@ -60,12 +60,12 @@ export const ProofView: React.FC = () => {
               <svg className="w-8 h-8 mx-auto text-gray-400 mb-2" width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
               </svg>
-              <p className="text-xs text-gray-500 mb-2">Proof-Generator prüft Constraints</p>
+              <p className="text-xs text-gray-500 mb-2">Proof generator checks constraints</p>
               <button
                 onClick={handleBuildProof}
                 className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded font-medium hover:bg-blue-700"
               >
-                Proof generieren
+                Generate Proof
               </button>
             </>
           ) : isLoading ? (
@@ -73,10 +73,10 @@ export const ProofView: React.FC = () => {
               <svg className="w-8 h-8 mx-auto text-blue-500 animate-pulse mb-2" width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
               </svg>
-              <p className="text-xs text-blue-600 mb-2">Generiere Proof...</p>
+              <p className="text-xs text-blue-600 mb-2">Generating Proof...</p>
               <div className="max-w-[200px] mx-auto">
                 <div className="flex justify-between text-[10px] text-gray-500 mb-1">
-                  <span>{proofProgress?.message || 'Verarbeite...'}</span>
+                  <span>{proofProgress?.message || 'Processing...'}</span>
                   <span>{proofProgress?.percent || 0}%</span>
                 </div>
                 <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
@@ -90,7 +90,7 @@ export const ProofView: React.FC = () => {
                 <svg className="w-4 h-4 flex-shrink-0 text-green-500" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <span className="ml-1 text-xs font-semibold text-green-600">Proof generiert</span>
+                <span className="ml-1 text-xs font-semibold text-green-600">Proof generated</span>
               </div>
               {proofResult && (
                 <div className="space-y-1 text-left bg-gray-50 dark:bg-gray-900 rounded p-2 text-[10px]">
@@ -103,20 +103,20 @@ export const ProofView: React.FC = () => {
           {error && (
             <div className="mt-2 p-1.5 bg-red-50 rounded text-[10px] text-red-600">
               {error}
-              <button onClick={handleBuildProof} className="ml-2 underline hover:no-underline">Erneut</button>
+              <button onClick={handleBuildProof} className="ml-2 underline hover:no-underline">Retry</button>
             </div>
           )}
         </div>
       </div>
 
       <div className="flex justify-between max-w-sm mx-auto pt-1">
-        <button onClick={goToPreviousStep} disabled={isLoading} className="px-3 py-1.5 rounded text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 disabled:opacity-50">Zurück</button>
+        <button onClick={goToPreviousStep} disabled={isLoading} className="px-3 py-1.5 rounded text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 disabled:opacity-50">Back</button>
         <button
           onClick={goToNextStep}
           disabled={!isComplete || isLoading}
           className={`px-3 py-1.5 rounded text-xs font-medium ${isComplete && !isLoading ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
         >
-          Weiter
+          Next
         </button>
       </div>
     </div>

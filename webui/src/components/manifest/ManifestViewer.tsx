@@ -78,12 +78,12 @@ export const ManifestViewer: React.FC<ManifestViewerProps> = ({ manifest }) => {
           CAP Manifest
         </h2>
         <p className="text-sm text-gray-500 dark:text-gray-400">
-          Version: {manifest.version} • Erstellt: {formatTimestamp(manifest.created_at)}
+          Version: {manifest.version} • Created: {formatTimestamp(manifest.created_at)}
         </p>
       </div>
 
       {/* Overview Section */}
-      <Section id="overview" title="Übersicht">
+      <Section id="overview" title="Overview">
         <div className="space-y-2">
           {renderHash(manifest.supplier_root, 'Supplier Root')}
           {renderHash(manifest.ubo_root, 'UBO Root')}
@@ -152,13 +152,13 @@ export const ManifestViewer: React.FC<ManifestViewerProps> = ({ manifest }) => {
             manifest.audit.audit_chain_version) && (
             <div className="border-t border-gray-200 dark:border-gray-700 pt-4 space-y-2">
               <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">
-                Erweiterte Audit-Informationen
+                Extended Audit Information
               </h4>
 
               {manifest.audit.time_range && (
                 <div className="flex items-center justify-between py-2">
                   <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Zeitspanne:
+                    Time Range:
                   </span>
                   <span className="text-xs text-gray-900 dark:text-gray-100">
                     {formatTimestamp(manifest.audit.time_range.start)} →{' '}
@@ -170,7 +170,7 @@ export const ManifestViewer: React.FC<ManifestViewerProps> = ({ manifest }) => {
               {manifest.audit.event_categories && (
                 <div className="flex items-center justify-between py-2">
                   <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Event-Kategorien:
+                    Event Categories:
                   </span>
                   <span className="text-xs text-gray-900 dark:text-gray-100">
                     {manifest.audit.event_categories.data_changes && (
@@ -189,7 +189,7 @@ export const ManifestViewer: React.FC<ManifestViewerProps> = ({ manifest }) => {
               {manifest.audit.last_event_type && (
                 <div className="flex items-center justify-between py-2">
                   <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Letztes Event:
+                    Last Event:
                   </span>
                   <code className="text-xs font-mono bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">
                     {manifest.audit.last_event_type}
@@ -200,7 +200,7 @@ export const ManifestViewer: React.FC<ManifestViewerProps> = ({ manifest }) => {
               {manifest.audit.hash_function && (
                 <div className="flex items-center justify-between py-2">
                   <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Hash-Funktion:
+                    Hash Function:
                   </span>
                   <span className="text-sm text-gray-900 dark:text-gray-100">
                     {manifest.audit.hash_function}
@@ -222,7 +222,7 @@ export const ManifestViewer: React.FC<ManifestViewerProps> = ({ manifest }) => {
               {manifest.audit.integrity && (
                 <div className="flex items-center justify-between py-2">
                   <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Integrität:
+                    Integrity:
                   </span>
                   <span
                     className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
@@ -241,7 +241,7 @@ export const ManifestViewer: React.FC<ManifestViewerProps> = ({ manifest }) => {
               {manifest.audit.audit_chain_version && (
                 <div className="flex items-center justify-between py-2">
                   <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Audit-Chain-Version:
+                    Audit Chain Version:
                   </span>
                   <span className="text-sm text-gray-900 dark:text-gray-100">
                     {manifest.audit.audit_chain_version}
@@ -254,11 +254,11 @@ export const ManifestViewer: React.FC<ManifestViewerProps> = ({ manifest }) => {
           {/* Description */}
           <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
             <p className="text-xs text-blue-700 dark:text-blue-300">
-              Der Audit Trail ist eine unveränderliche{' '}
-              {manifest.audit.hash_function || 'SHA3-256'} Hash-Kette mit{' '}
-              {manifest.audit.events_count} Events
+              The audit trail is an immutable{' '}
+              {manifest.audit.hash_function || 'SHA3-256'} hash chain with{' '}
+              {manifest.audit.events_count} events
               {manifest.audit.chain_type && ` (${manifest.audit.chain_type})`}
-              {manifest.audit.integrity === 'verified' && '. Die Integrität wurde vollständig verifiziert'}
+              {manifest.audit.integrity === 'verified' && '. Integrity has been fully verified'}
               .
             </p>
           </div>
@@ -267,7 +267,7 @@ export const ManifestViewer: React.FC<ManifestViewerProps> = ({ manifest }) => {
 
       {/* Signatures Section */}
       {manifest.signatures.length > 0 && (
-        <Section id="signatures" title={`Signaturen (${manifest.signatures.length})`}>
+        <Section id="signatures" title={`Signatures (${manifest.signatures.length})`}>
           <div className="space-y-4">
             {manifest.signatures.map((sig, index) => (
               <div
@@ -276,7 +276,7 @@ export const ManifestViewer: React.FC<ManifestViewerProps> = ({ manifest }) => {
               >
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
-                    Signatur #{index + 1}
+                    Signature #{index + 1}
                   </span>
                   <span className="text-xs text-gray-500 dark:text-gray-400">
                     {formatTimestamp(sig.signed_at)}

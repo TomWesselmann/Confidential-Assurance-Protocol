@@ -31,6 +31,7 @@
 mod audit_logger;
 mod commands;
 mod security;
+mod settings;
 mod types;
 
 use commands::{
@@ -39,6 +40,14 @@ use commands::{
     list_projects,
     get_project_status,
     read_file_content,
+    list_all_projects,
+    create_new_project,
+    create_temp_project,
+    create_project_in_folder,
+    // Settings
+    get_app_info,
+    set_workspace_path,
+    reset_workspace_path,
     // Proofer workflow
     import_csv,
     create_commitments,
@@ -52,6 +61,11 @@ use commands::{
     // Audit
     get_audit_log,
     verify_audit_chain,
+    // Signing
+    generate_keys,
+    list_keys,
+    sign_project_manifest,
+    verify_manifest_signature,
 };
 
 // ============================================================================
@@ -69,6 +83,14 @@ pub fn run() {
             list_projects,
             get_project_status,
             read_file_content,
+            list_all_projects,
+            create_new_project,
+            create_temp_project,
+            create_project_in_folder,
+            // Settings
+            get_app_info,
+            set_workspace_path,
+            reset_workspace_path,
             // Proofer workflow
             import_csv,
             create_commitments,
@@ -82,6 +104,11 @@ pub fn run() {
             // Audit
             get_audit_log,
             verify_audit_chain,
+            // Signing
+            generate_keys,
+            list_keys,
+            sign_project_manifest,
+            verify_manifest_signature,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

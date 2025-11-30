@@ -85,7 +85,7 @@ export function ProjectSidebar({
   }
 
   return (
-    <div className="w-64 bg-gray-50 border-r border-gray-200 flex flex-col h-full">
+    <div className="w-64 bg-gray-50 border-r border-gray-200 flex flex-col h-full overflow-hidden">
       {/* Workspace Header */}
       <div className="p-3 border-b border-gray-200">
         <div className="flex items-center justify-between mb-2">
@@ -96,7 +96,7 @@ export function ProjectSidebar({
             onClick={handleSelectWorkspace}
             className="text-xs text-blue-600 hover:text-blue-800"
           >
-            Wechseln
+            Switch
           </button>
         </div>
         {workspacePath ? (
@@ -108,23 +108,23 @@ export function ProjectSidebar({
             onClick={handleSelectWorkspace}
             className="w-full text-left text-sm text-gray-500 hover:text-gray-700 py-1"
           >
-            Workspace auswählen...
+            Select workspace...
           </button>
         )}
       </div>
 
       {/* Projects List */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto min-h-0">
         <div className="p-3">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-              Projekte
+              Projects
             </span>
             {workspacePath && (
               <button
                 onClick={() => setShowCreateDialog(true)}
                 className="text-blue-600 hover:text-blue-800"
-                title="Neues Projekt"
+                title="New Project"
               >
                 <svg className="w-4 h-4" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -145,11 +145,11 @@ export function ProjectSidebar({
             </div>
           ) : !workspacePath ? (
             <div className="text-sm text-gray-400 text-center py-4">
-              Bitte wählen Sie einen Workspace
+              Please select a workspace
             </div>
           ) : projects.length === 0 ? (
             <div className="text-sm text-gray-400 text-center py-4">
-              Keine Projekte vorhanden
+              No projects available
             </div>
           ) : (
             <div className="space-y-1">
@@ -179,41 +179,45 @@ export function ProjectSidebar({
         </div>
       </div>
 
-      {/* Create Project Dialog */}
+      {/* Create Project Inline Form */}
       {showCreateDialog && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl p-6 w-96">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">
-              Neues Projekt erstellen
-            </h3>
-            <input
-              type="text"
-              value={newProjectName}
-              onChange={(e) => setNewProjectName(e.target.value)}
-              placeholder="Projektname"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              autoFocus
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleCreateProject();
-                if (e.key === 'Escape') setShowCreateDialog(false);
+        <div className="flex-shrink-0 p-3 border-t border-gray-200 bg-white">
+          <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
+            New Project
+          </div>
+          <input
+            type="text"
+            value={newProjectName}
+            onChange={(e) => setNewProjectName(e.target.value)}
+            placeholder="Project name"
+            className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 mb-2"
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleCreateProject();
+              if (e.key === 'Escape') {
+                setShowCreateDialog(false);
+                setNewProjectName('');
+              }
+            }}
+          />
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                setShowCreateDialog(false);
+                setNewProjectName('');
               }}
-            />
-            <div className="flex justify-end gap-2 mt-4">
-              <button
-                onClick={() => setShowCreateDialog(false)}
-                className="px-4 py-2 text-gray-600 hover:text-gray-800"
-                disabled={creating}
-              >
-                Abbrechen
-              </button>
-              <button
-                onClick={handleCreateProject}
-                disabled={creating || !newProjectName.trim()}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {creating ? 'Erstelle...' : 'Erstellen'}
-              </button>
-            </div>
+              className="flex-1 px-2 py-1 text-xs text-gray-600 hover:text-gray-800 border border-gray-300 rounded"
+              disabled={creating}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleCreateProject}
+              disabled={creating || !newProjectName.trim()}
+              className="flex-1 px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {creating ? '...' : 'Create'}
+            </button>
           </div>
         </div>
       )}
@@ -225,7 +229,7 @@ function formatDate(isoString: string | undefined): string {
   if (!isoString) return '';
   try {
     const date = new Date(isoString);
-    return date.toLocaleDateString('de-DE', {
+    return date.toLocaleDateString('en-US', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',

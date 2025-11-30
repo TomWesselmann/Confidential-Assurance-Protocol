@@ -1,5 +1,5 @@
+use crate::bundle::{load_bundle_atomic, BundleSource};
 use crate::crypto;
-use crate::bundle::{BundleSource, load_bundle_atomic};
 /// Verifier Core – Pure Verification Logic
 ///
 /// This module provides portable, I/O-free verification logic that can be used
@@ -179,7 +179,10 @@ fn validate_hex32(hex_str: &str, field_name: &str) -> Result<()> {
     } else if let Some(stripped) = hex_str.strip_prefix("sha3-256:") {
         stripped
     } else {
-        return Err(anyhow!("{}: must start with '0x' or 'sha3-256:'", field_name));
+        return Err(anyhow!(
+            "{}: must start with '0x' or 'sha3-256:'",
+            field_name
+        ));
     };
 
     if hex_part.len() != 64 {
@@ -735,14 +738,16 @@ mod tests {
 
     #[test]
     fn test_validate_hex32_with_sha3_prefix() {
-        let valid_hash = "sha3-256:0000000000000000000000000000000000000000000000000000000000000000";
+        let valid_hash =
+            "sha3-256:0000000000000000000000000000000000000000000000000000000000000000";
         let result = validate_hex32(valid_hash, "test_field");
         assert!(result.is_ok());
     }
 
     #[test]
     fn test_validate_hex32_invalid_prefix() {
-        let invalid_hash = "invalid:0000000000000000000000000000000000000000000000000000000000000000";
+        let invalid_hash =
+            "invalid:0000000000000000000000000000000000000000000000000000000000000000";
         let result = validate_hex32(invalid_hash, "test_field");
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("must start with"));
@@ -753,7 +758,10 @@ mod tests {
         let short_hash = "0x00001234"; // Too short
         let result = validate_hex32(short_hash, "test_field");
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("expected 64 hex characters"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("expected 64 hex characters"));
     }
 
     #[test]
@@ -761,13 +769,17 @@ mod tests {
         let invalid_chars = "0x000000000000000000000000000000000000000000000000000000000000gggg";
         let result = validate_hex32(invalid_chars, "test_field");
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("invalid hex characters"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("invalid hex characters"));
     }
 
     #[test]
     fn test_extract_statement_with_sanctions_root() {
         let mut manifest = mock_manifest();
-        manifest["sanctions_root"] = json!("0x1111111111111111111111111111111111111111111111111111111111111111");
+        manifest["sanctions_root"] =
+            json!("0x1111111111111111111111111111111111111111111111111111111111111111");
 
         let stmt = extract_statement_from_manifest(&manifest).unwrap();
         assert!(stmt.sanctions_root.is_some());
@@ -780,7 +792,8 @@ mod tests {
     #[test]
     fn test_extract_statement_with_jurisdiction_root() {
         let mut manifest = mock_manifest();
-        manifest["jurisdiction_root"] = json!("0x2222222222222222222222222222222222222222222222222222222222222222");
+        manifest["jurisdiction_root"] =
+            json!("0x2222222222222222222222222222222222222222222222222222222222222222");
 
         let stmt = extract_statement_from_manifest(&manifest).unwrap();
         assert!(stmt.jurisdiction_root.is_some());
@@ -839,7 +852,7 @@ mod tests {
 
         let report = verify(&manifest, proof_bytes, &stmt, &opts).unwrap();
         assert!(report.timestamp_valid.is_some());
-        assert_eq!(report.timestamp_valid.unwrap(), true);
+        assert!(report.timestamp_valid.unwrap());
     }
 
     #[test]
@@ -863,7 +876,7 @@ mod tests {
         };
 
         let report = verify(&manifest, proof_bytes, &stmt, &opts).unwrap();
-        assert_eq!(report.timestamp_valid.unwrap(), true);
+        assert!(report.timestamp_valid.unwrap());
 
         let details = report.details.as_object().unwrap();
         assert_eq!(details.get("dual_anchor_private").unwrap(), true);
@@ -889,7 +902,7 @@ mod tests {
         };
 
         let report = verify(&manifest, proof_bytes, &stmt, &opts).unwrap();
-        assert_eq!(report.timestamp_valid.unwrap(), false);
+        assert!(!report.timestamp_valid.unwrap());
 
         let details = report.details.as_object().unwrap();
         assert!(details.get("dual_anchor_error").is_some());
@@ -917,7 +930,7 @@ mod tests {
         };
 
         let report = verify(&manifest, proof_bytes, &stmt, &opts).unwrap();
-        assert_eq!(report.timestamp_valid.unwrap(), false);
+        assert!(!report.timestamp_valid.unwrap());
 
         let details = report.details.as_object().unwrap();
         assert!(details.get("dual_anchor_error").is_some());
@@ -945,7 +958,7 @@ mod tests {
         };
 
         let report = verify(&manifest, proof_bytes, &stmt, &opts).unwrap();
-        assert_eq!(report.timestamp_valid.unwrap(), false);
+        assert!(!report.timestamp_valid.unwrap());
 
         let details = report.details.as_object().unwrap();
         assert!(details.get("dual_anchor_error").is_some());
@@ -958,7 +971,8 @@ mod tests {
 
         // Create statement with different company_commitment_root
         let mut stmt = extract_statement_from_manifest(&manifest).unwrap();
-        stmt.company_commitment_root = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string();
+        stmt.company_commitment_root =
+            "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string();
 
         let opts = VerifyOptions {
             check_timestamp: false,
@@ -969,7 +983,11 @@ mod tests {
         assert_eq!(report.status, "fail");
 
         let details = report.details.as_object().unwrap();
-        let validation = details.get("statement_validation").unwrap().as_array().unwrap();
+        let validation = details
+            .get("statement_validation")
+            .unwrap()
+            .as_array()
+            .unwrap();
         let company_check = &validation[1];
         assert_eq!(company_check["status"], "mismatch");
     }
@@ -1009,10 +1027,16 @@ mod tests {
     #[test]
     fn test_verify_missing_company_commitment_root() {
         let mut manifest = mock_manifest();
-        manifest.as_object_mut().unwrap().remove("company_commitment_root");
+        manifest
+            .as_object_mut()
+            .unwrap()
+            .remove("company_commitment_root");
 
         let result = extract_statement_from_manifest(&manifest);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Missing company_commitment_root"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Missing company_commitment_root"));
     }
 }

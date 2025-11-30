@@ -301,27 +301,26 @@ required_scopes:
 
     #[test]
     fn test_cached_jwks_not_expired() {
-        let jwks = Jwks {
-            keys: vec![],
-        };
+        let jwks = Jwks { keys: vec![] };
         let cached = CachedJwks {
             jwks: jwks.clone(),
             fetched_at: Instant::now(),
             ttl: Duration::from_secs(600),
         };
 
-        assert!(!cached.is_expired(), "Freshly cached JWKS should not be expired");
+        assert!(
+            !cached.is_expired(),
+            "Freshly cached JWKS should not be expired"
+        );
     }
 
     #[test]
     fn test_cached_jwks_expired() {
-        let jwks = Jwks {
-            keys: vec![],
-        };
+        let jwks = Jwks { keys: vec![] };
         let cached = CachedJwks {
             jwks: jwks.clone(),
             fetched_at: Instant::now() - Duration::from_secs(601), // 601 seconds ago
-            ttl: Duration::from_secs(600), // TTL is 600 seconds
+            ttl: Duration::from_secs(600),                         // TTL is 600 seconds
         };
 
         assert!(cached.is_expired(), "JWKS older than TTL should be expired");

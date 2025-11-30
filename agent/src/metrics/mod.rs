@@ -130,7 +130,8 @@ impl MetricsRegistry {
 
     /// Set database pool connections count
     pub fn set_database_pool_connections(&self, count: u64) {
-        self.database_pool_connections.store(count, Ordering::Relaxed);
+        self.database_pool_connections
+            .store(count, Ordering::Relaxed);
     }
 
     // Getter methods for testing
@@ -346,7 +347,8 @@ impl MetricsRegistry {
         ));
 
         // cap_database_pool_connections (gauge)
-        output.push_str("# HELP cap_database_pool_connections Number of database pool connections\n");
+        output
+            .push_str("# HELP cap_database_pool_connections Number of database pool connections\n");
         output.push_str("# TYPE cap_database_pool_connections gauge\n");
         output.push_str(&format!(
             "cap_database_pool_connections {}\n",
@@ -463,6 +465,9 @@ mod tests {
         timer.finish("ok");
 
         // Assert that counter was incremented by exactly 1
-        assert_eq!(metrics.requests_total_ok.load(Ordering::Relaxed), initial_ok + 1);
+        assert_eq!(
+            metrics.requests_total_ok.load(Ordering::Relaxed),
+            initial_ok + 1
+        );
     }
 }

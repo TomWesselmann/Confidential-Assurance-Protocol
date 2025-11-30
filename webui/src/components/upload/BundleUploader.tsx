@@ -80,7 +80,7 @@ export const BundleUploader: React.FC = () => {
           {isLoading ? (
             <div className="space-y-2">
               <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">
-                Verifiziere Bundle...
+                Verifying bundle...
               </p>
               <div className="w-48 h-2 mx-auto bg-gray-200 rounded-full overflow-hidden">
                 <div
@@ -93,13 +93,13 @@ export const BundleUploader: React.FC = () => {
             <div className="space-y-4">
               <div className="space-y-2">
                 <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">
-                  CAP Proof Bundle verifizieren
+                  Verify CAP Proof Bundle
                 </p>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Wählen Sie eine Bundle-ZIP-Datei zur Offline-Verifikation
+                  Select a bundle ZIP file for offline verification
                 </p>
                 <p className="text-xs text-gray-400 dark:text-gray-500">
-                  🔒 Komplett offline • Keine Netzwerk-Anfragen
+                  Completely offline - no network requests
                 </p>
               </div>
 
@@ -109,7 +109,7 @@ export const BundleUploader: React.FC = () => {
                 disabled={isLoading}
                 className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors font-semibold"
               >
-                Bundle auswählen
+                Select Bundle
               </button>
             </div>
           )}
@@ -120,7 +120,7 @@ export const BundleUploader: React.FC = () => {
       {error && (
         <div className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
           <p className="text-sm font-semibold text-red-800 dark:text-red-300">
-            Fehler bei der Verifikation
+            Verification error
           </p>
           <p className="text-xs text-red-600 dark:text-red-400 mt-1">{error}</p>
         </div>

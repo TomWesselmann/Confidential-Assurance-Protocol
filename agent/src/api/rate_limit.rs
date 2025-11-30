@@ -14,16 +14,12 @@
 // - Verify endpoint: 20 requests per minute
 // - Policy compile: 10 requests per minute
 
-use axum::{
-    http::StatusCode,
-    response::IntoResponse,
-};
-use tower_governor::{
-    governor::GovernorConfigBuilder,
-    key_extractor::SmartIpKeyExtractor,
-    GovernorError, GovernorLayer,
-};
+use axum::{http::StatusCode, response::IntoResponse};
 use governor::middleware::StateInformationMiddleware;
+use tower_governor::{
+    governor::GovernorConfigBuilder, key_extractor::SmartIpKeyExtractor, GovernorError,
+    GovernorLayer,
+};
 
 /// Rate limit configuration
 #[derive(Debug, Clone)]
@@ -58,11 +54,12 @@ impl RateLimitConfig {
             burst_size: 25,
         }
     }
-
 }
 
 /// Create rate limiter layer with IP extraction
-pub fn rate_limiter_layer(config: RateLimitConfig) -> GovernorLayer<SmartIpKeyExtractor, StateInformationMiddleware> {
+pub fn rate_limiter_layer(
+    config: RateLimitConfig,
+) -> GovernorLayer<SmartIpKeyExtractor, StateInformationMiddleware> {
     let replenish_interval = std::time::Duration::from_secs(60) / config.requests_per_minute;
 
     let governor_conf = std::sync::Arc::new(
@@ -72,7 +69,7 @@ pub fn rate_limiter_layer(config: RateLimitConfig) -> GovernorLayer<SmartIpKeyEx
             .use_headers()
             .key_extractor(SmartIpKeyExtractor)
             .finish()
-            .expect("Failed to build GovernorConfig")
+            .expect("Failed to build GovernorConfig"),
     );
 
     GovernorLayer {
@@ -132,7 +129,7 @@ mod tests {
         // Create a mock governor error (wait_time is in milliseconds as u64)
         let err = GovernorError::TooManyRequests {
             wait_time: 60_000, // 60 seconds in milliseconds
-            headers: None
+            headers: None,
         };
 
         // Call the error handler

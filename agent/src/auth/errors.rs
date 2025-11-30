@@ -112,19 +112,46 @@ mod tests {
     #[test]
     fn test_all_error_display_messages() {
         // Test all error variants have proper Display messages
-        assert_eq!(AuthError::MissingAuthHeader.to_string(), "Missing Authorization header");
-        assert_eq!(AuthError::InvalidAuthFormat.to_string(), "Invalid Authorization header format");
+        assert_eq!(
+            AuthError::MissingAuthHeader.to_string(),
+            "Missing Authorization header"
+        );
+        assert_eq!(
+            AuthError::InvalidAuthFormat.to_string(),
+            "Invalid Authorization header format"
+        );
         assert_eq!(AuthError::InvalidToken.to_string(), "Invalid token");
-        assert_eq!(AuthError::InvalidSignature.to_string(), "Invalid token signature");
+        assert_eq!(
+            AuthError::InvalidSignature.to_string(),
+            "Invalid token signature"
+        );
         assert_eq!(AuthError::TokenExpired.to_string(), "Token expired");
-        assert_eq!(AuthError::TokenNotYetValid.to_string(), "Token not yet valid");
-        assert_eq!(AuthError::IssuerMismatch.to_string(), "Token issuer mismatch");
-        assert_eq!(AuthError::AudienceMismatch.to_string(), "Token audience mismatch");
-        assert_eq!(AuthError::InsufficientScope.to_string(), "Insufficient scope");
-        assert_eq!(AuthError::JwksFetchFailed.to_string(), "Failed to fetch JWKS");
+        assert_eq!(
+            AuthError::TokenNotYetValid.to_string(),
+            "Token not yet valid"
+        );
+        assert_eq!(
+            AuthError::IssuerMismatch.to_string(),
+            "Token issuer mismatch"
+        );
+        assert_eq!(
+            AuthError::AudienceMismatch.to_string(),
+            "Token audience mismatch"
+        );
+        assert_eq!(
+            AuthError::InsufficientScope.to_string(),
+            "Insufficient scope"
+        );
+        assert_eq!(
+            AuthError::JwksFetchFailed.to_string(),
+            "Failed to fetch JWKS"
+        );
         assert_eq!(AuthError::KeyIdNotFound.to_string(), "Key ID not found");
         assert_eq!(AuthError::JwkParseError.to_string(), "Failed to parse JWK");
-        assert_eq!(AuthError::InternalError.to_string(), "Internal authentication error");
+        assert_eq!(
+            AuthError::InternalError.to_string(),
+            "Internal authentication error"
+        );
     }
 
     #[test]

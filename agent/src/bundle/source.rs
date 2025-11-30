@@ -10,7 +10,7 @@
 //! - Zip-Bomb-Protection (Größen- und Ratio-Limits)
 //! - TOCTOU-Prevention (atomic loading)
 
-use crate::bundle::meta::{BundleMeta, load_bundle_meta, sanitize_filename};
+use crate::bundle::meta::{load_bundle_meta, sanitize_filename, BundleMeta};
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -180,9 +180,8 @@ fn load_directory_atomic(dir: &Path) -> Result<BundleData> {
         }
 
         // Atomic Read
-        let content = fs::read(&file_path).map_err(|e| {
-            anyhow!("Failed to read file '{}': {}", filename, e)
-        })?;
+        let content = fs::read(&file_path)
+            .map_err(|e| anyhow!("Failed to read file '{}': {}", filename, e))?;
 
         files.insert(filename.clone(), content);
     }
@@ -217,11 +216,9 @@ fn load_zip_atomic(zip_path: &Path) -> Result<BundleData> {
         // Security: Path-Traversal-Check
         sanitize_filename(filename)?;
 
-        // Optional-Check
-        if file_meta.optional {
-            if archive.by_name(filename).is_err() {
-                continue;
-            }
+        // Optional-Check: Skip optional files that don't exist in archive
+        if file_meta.optional && archive.by_name(filename).is_err() {
+            continue;
         }
 
         let mut zip_file = archive

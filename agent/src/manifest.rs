@@ -485,9 +485,14 @@ mod tests {
     #[test]
     fn test_set_private_anchor_success() {
         let mut manifest = create_test_manifest();
-        let audit_tip = "0x1234567890123456789012345678901234567890123456789012345678901234".to_string();
+        let audit_tip =
+            "0x1234567890123456789012345678901234567890123456789012345678901234".to_string();
 
-        manifest.set_time_anchor("tsa".to_string(), "./tsa/test.tsr".to_string(), audit_tip.clone());
+        manifest.set_time_anchor(
+            "tsa".to_string(),
+            "./tsa/test.tsr".to_string(),
+            audit_tip.clone(),
+        );
 
         let result = manifest.set_private_anchor(audit_tip.clone(), None);
         assert!(result.is_ok());
@@ -502,19 +507,25 @@ mod tests {
     #[test]
     fn test_set_private_anchor_not_initialized() {
         let mut manifest = create_test_manifest();
-        let audit_tip = "0x1234567890123456789012345678901234567890123456789012345678901234".to_string();
+        let audit_tip =
+            "0x1234567890123456789012345678901234567890123456789012345678901234".to_string();
 
         // time_anchor is None
         let result = manifest.set_private_anchor(audit_tip, None);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("time_anchor must be initialized"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("time_anchor must be initialized"));
     }
 
     #[test]
     fn test_set_private_anchor_mismatch() {
         let mut manifest = create_test_manifest();
-        let anchor_tip = "0x1111111111111111111111111111111111111111111111111111111111111111".to_string();
-        let private_tip = "0x2222222222222222222222222222222222222222222222222222222222222222".to_string();
+        let anchor_tip =
+            "0x1111111111111111111111111111111111111111111111111111111111111111".to_string();
+        let private_tip =
+            "0x2222222222222222222222222222222222222222222222222222222222222222".to_string();
 
         manifest.set_time_anchor("tsa".to_string(), "./tsa/test.tsr".to_string(), anchor_tip);
 
@@ -528,7 +539,8 @@ mod tests {
     #[test]
     fn test_set_public_anchor_ethereum_success() {
         let mut manifest = create_test_manifest();
-        let audit_tip = "0x1234567890123456789012345678901234567890123456789012345678901234".to_string();
+        let audit_tip =
+            "0x1234567890123456789012345678901234567890123456789012345678901234".to_string();
 
         manifest.set_time_anchor("blockchain".to_string(), "ethereum".to_string(), audit_tip);
 
@@ -551,7 +563,11 @@ mod tests {
     #[test]
     fn test_set_public_anchor_hedera() {
         let mut manifest = create_test_manifest();
-        manifest.set_time_anchor("blockchain".to_string(), "hedera".to_string(), "0x1234567890123456789012345678901234567890123456789012345678901234".to_string());
+        manifest.set_time_anchor(
+            "blockchain".to_string(),
+            "hedera".to_string(),
+            "0x1234567890123456789012345678901234567890123456789012345678901234".to_string(),
+        );
 
         let result = manifest.set_public_anchor(
             PublicChain::Hedera,
@@ -568,7 +584,11 @@ mod tests {
     #[test]
     fn test_set_public_anchor_btc() {
         let mut manifest = create_test_manifest();
-        manifest.set_time_anchor("blockchain".to_string(), "btc".to_string(), "0x1234567890123456789012345678901234567890123456789012345678901234".to_string());
+        manifest.set_time_anchor(
+            "blockchain".to_string(),
+            "btc".to_string(),
+            "0x1234567890123456789012345678901234567890123456789012345678901234".to_string(),
+        );
 
         let result = manifest.set_public_anchor(
             PublicChain::Btc,
@@ -594,7 +614,10 @@ mod tests {
         );
 
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("time_anchor must be initialized"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("time_anchor must be initialized"));
     }
 
     // --- validate_dual_anchor() Tests ---
@@ -609,12 +632,17 @@ mod tests {
     #[test]
     fn test_validate_dual_anchor_private_mismatch() {
         let mut manifest = create_test_manifest();
-        manifest.set_time_anchor("tsa".to_string(), "./tsa/test.tsr".to_string(), "0x1111111111111111111111111111111111111111111111111111111111111111".to_string());
+        manifest.set_time_anchor(
+            "tsa".to_string(),
+            "./tsa/test.tsr".to_string(),
+            "0x1111111111111111111111111111111111111111111111111111111111111111".to_string(),
+        );
 
         // Manually set inconsistent private anchor
         if let Some(anchor) = &mut manifest.time_anchor {
             anchor.private = Some(TimeAnchorPrivate {
-                audit_tip_hex: "0x2222222222222222222222222222222222222222222222222222222222222222".to_string(),
+                audit_tip_hex: "0x2222222222222222222222222222222222222222222222222222222222222222"
+                    .to_string(),
                 created_at: Utc::now().to_rfc3339(),
             });
         }
@@ -627,7 +655,11 @@ mod tests {
     #[test]
     fn test_validate_dual_anchor_invalid_public_digest() {
         let mut manifest = create_test_manifest();
-        manifest.set_time_anchor("blockchain".to_string(), "eth".to_string(), "0x1234567890123456789012345678901234567890123456789012345678901234".to_string());
+        manifest.set_time_anchor(
+            "blockchain".to_string(),
+            "eth".to_string(),
+            "0x1234567890123456789012345678901234567890123456789012345678901234".to_string(),
+        );
 
         // Set public anchor with invalid digest (wrong format)
         if let Some(anchor) = &mut manifest.time_anchor {
@@ -647,36 +679,53 @@ mod tests {
     #[test]
     fn test_validate_dual_anchor_empty_txid() {
         let mut manifest = create_test_manifest();
-        manifest.set_time_anchor("blockchain".to_string(), "eth".to_string(), "0x1234567890123456789012345678901234567890123456789012345678901234".to_string());
+        manifest.set_time_anchor(
+            "blockchain".to_string(),
+            "eth".to_string(),
+            "0x1234567890123456789012345678901234567890123456789012345678901234".to_string(),
+        );
 
         // Set public anchor with empty txid
         if let Some(anchor) = &mut manifest.time_anchor {
             anchor.public = Some(TimeAnchorPublic {
                 chain: PublicChain::Ethereum,
                 txid: "".to_string(), // Empty
-                digest: "0x1234567890123456789012345678901234567890123456789012345678901234".to_string(),
+                digest: "0x1234567890123456789012345678901234567890123456789012345678901234"
+                    .to_string(),
                 created_at: Utc::now().to_rfc3339(),
             });
         }
 
         let result = manifest.validate_dual_anchor();
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("txid cannot be empty"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("txid cannot be empty"));
     }
 
     #[test]
     fn test_validate_dual_anchor_success() {
         let mut manifest = create_test_manifest();
-        let audit_tip = "0x1234567890123456789012345678901234567890123456789012345678901234".to_string();
+        let audit_tip =
+            "0x1234567890123456789012345678901234567890123456789012345678901234".to_string();
 
-        manifest.set_time_anchor("blockchain".to_string(), "eth".to_string(), audit_tip.clone());
-        manifest.set_private_anchor(audit_tip.clone(), None).unwrap();
-        manifest.set_public_anchor(
-            PublicChain::Ethereum,
-            "0xabc123".to_string(),
-            "0x5555555555555555555555555555555555555555555555555555555555555555".to_string(),
-            None,
-        ).unwrap();
+        manifest.set_time_anchor(
+            "blockchain".to_string(),
+            "eth".to_string(),
+            audit_tip.clone(),
+        );
+        manifest
+            .set_private_anchor(audit_tip.clone(), None)
+            .unwrap();
+        manifest
+            .set_public_anchor(
+                PublicChain::Ethereum,
+                "0xabc123".to_string(),
+                "0x5555555555555555555555555555555555555555555555555555555555555555".to_string(),
+                None,
+            )
+            .unwrap();
 
         let result = manifest.validate_dual_anchor();
         assert!(result.is_ok());
@@ -693,7 +742,10 @@ mod tests {
         let result = Manifest::read_audit_tail(temp_audit);
         assert!(result.is_ok());
         let (digest, count) = result.unwrap();
-        assert_eq!(digest, "0x0000000000000000000000000000000000000000000000000000000000000000");
+        assert_eq!(
+            digest,
+            "0x0000000000000000000000000000000000000000000000000000000000000000"
+        );
         assert_eq!(count, 0);
 
         fs::remove_file(temp_audit).ok();
@@ -712,7 +764,10 @@ mod tests {
         let result = Manifest::read_audit_tail(temp_audit);
         assert!(result.is_ok());
         let (digest, count) = result.unwrap();
-        assert_eq!(digest, "0x3333333333333333333333333333333333333333333333333333333333333333"); // Last digest
+        assert_eq!(
+            digest,
+            "0x3333333333333333333333333333333333333333333333333333333333333333"
+        ); // Last digest
         assert_eq!(count, 3);
 
         fs::remove_file(temp_audit).ok();
@@ -753,7 +808,10 @@ mod tests {
             sig_hex: "0xdeadbeef".to_string(),
         };
 
-        let signed = SignedManifest { manifest, signature };
+        let signed = SignedManifest {
+            manifest,
+            signature,
+        };
         signed.save(temp_path).unwrap();
 
         let loaded = SignedManifest::load(temp_path).unwrap();

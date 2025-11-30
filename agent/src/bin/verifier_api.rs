@@ -8,14 +8,13 @@
 /// - GET /readyz - Readiness Check
 /// - GET /metrics - Prometheus metrics
 use axum::{
-    http::{StatusCode, Method, header},
+    http::{header, Method, StatusCode},
     middleware,
-    response::{Response, IntoResponse},
+    response::{IntoResponse, Response},
     routing::{get, post},
     Json, Router,
 };
 use axum_server::tls_rustls::RustlsConfig;
-use tower_http::cors::{CorsLayer, Any};
 use cap_agent::api::auth::auth_middleware;
 use cap_agent::api::metrics_middleware::metrics_middleware;
 use cap_agent::api::policy::{handle_policy_compile, handle_policy_get, PolicyState};
@@ -29,6 +28,7 @@ use cap_agent::policy::{InMemoryPolicyStore, SqlitePolicyStore};
 use clap::Parser;
 use serde::Serialize;
 use std::net::SocketAddr;
+use tower_http::cors::{Any, CorsLayer};
 use tracing::{error, info};
 
 /// CLI Arguments
@@ -140,12 +140,12 @@ async fn metrics_endpoint() -> Response {
 
 /// OpenAPI Spec Endpoint (serves the YAML file)
 async fn openapi_spec() -> impl IntoResponse {
-    let openapi_yaml = include_str!("../../openapi.yaml");
+    let openapi_yaml = include_str!("../../openapi/openapi.yaml");
 
     (
         StatusCode::OK,
         [(header::CONTENT_TYPE, "application/x-yaml")],
-        openapi_yaml
+        openapi_yaml,
     )
 }
 
@@ -172,7 +172,11 @@ async fn verify_endpoint(
 }
 
 /// Build the Axum router
-fn build_router(tls_enabled: bool, policy_state: PolicyState, rate_limit_config: RateLimitConfig) -> Router {
+fn build_router(
+    tls_enabled: bool,
+    policy_state: PolicyState,
+    rate_limit_config: RateLimitConfig,
+) -> Router {
     // Closure to capture tls_enabled for health check
     let health_handler = move || health_check(tls_enabled);
 
@@ -278,7 +282,11 @@ async fn main() {
     );
 
     // Build router
-    let app = build_router(tls_mode != TlsMode::Disabled, policy_state, rate_limit_config);
+    let app = build_router(
+        tls_mode != TlsMode::Disabled,
+        policy_state,
+        rate_limit_config,
+    );
 
     // Start server based on TLS mode
     match tls_mode {
@@ -287,7 +295,10 @@ async fn main() {
             info!("⚠️  TLS disabled - HTTP only (not recommended for production!)");
             info!("🔒 OAuth2 authentication enabled for /verify");
             info!("📚 OpenAPI spec available at http://{}/openapi.yaml", addr);
-            info!("💡 View in Swagger Editor: https://editor.swagger.io/?url=http://{}/openapi.yaml", addr);
+            info!(
+                "💡 View in Swagger Editor: https://editor.swagger.io/?url=http://{}/openapi.yaml",
+                addr
+            );
 
             let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
             axum::serve(listener, app).await.unwrap();

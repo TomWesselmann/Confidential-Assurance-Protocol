@@ -1,9 +1,8 @@
-/// Integration Tests für metrics_middleware.rs
-///
-/// Diese Tests wurden aus inline test modules extrahiert um Tarpaulin Coverage-Tracking zu ermöglichen.
-/// Tarpaulin hat eine bekannte Limitation mit #[cfg(test)] inline modules.
+//! Integration Tests für metrics_middleware.rs
+//!
+//! Diese Tests wurden aus inline test modules extrahiert um Tarpaulin Coverage-Tracking zu ermöglichen.
+//! Tarpaulin hat eine bekannte Limitation mit #[cfg(test)] inline modules.
 
-use cap_agent::metrics::get_metrics;
 use axum::{
     body::Body,
     http::{Request, StatusCode},
@@ -12,8 +11,9 @@ use axum::{
     routing::post,
     Router,
 };
-use tower::ServiceExt;
+use cap_agent::metrics::get_metrics;
 use serial_test::serial;
+use tower::ServiceExt;
 
 // Helper: Create a test app with metrics middleware and a handler that returns a specific status
 fn create_test_app(status: StatusCode) -> Router {
@@ -42,7 +42,9 @@ fn create_test_app(status: StatusCode) -> Router {
         .route("/verify", handler.clone())
         .route("/policy/compile", handler.clone())
         .route("/healthz", handler)
-        .layer(middleware::from_fn(cap_agent::api::metrics_middleware::metrics_middleware))
+        .layer(middleware::from_fn(
+            cap_agent::api::metrics_middleware::metrics_middleware,
+        ))
 }
 
 #[tokio::test]
@@ -228,7 +230,9 @@ async fn test_metrics_middleware_records_duration() {
 
     let app = Router::new()
         .route("/verify", post(handler_with_delay))
-        .layer(middleware::from_fn(cap_agent::api::metrics_middleware::metrics_middleware));
+        .layer(middleware::from_fn(
+            cap_agent::api::metrics_middleware::metrics_middleware,
+        ));
 
     let req = Request::builder()
         .method("POST")

@@ -1,0 +1,13 @@
+name,birthdate,citizenship,supplier_name,ownership_percentage,pep_status
+"Hans Müller","1965-03-15","DE","Müller GmbH",75.0,false
+"Anna Müller","1970-08-22","DE","Müller GmbH",25.0,false
+"Friedrich Schmidt","1958-11-03","DE","Schmidt AG",100.0,false
+"James Wilson","1972-06-18","GB","TechParts Ltd",60.0,false
+"Sarah Brown","1980-04-25","GB","TechParts Ltd",40.0,false
+"Pieter van Berg","1968-09-12","NL","ComponentWorks BV",100.0,false
+"Marcel Schneider","1975-01-30","CH","Precision Tools SA",50.0,false
+"Eva Schneider","1978-07-14","CH","Precision Tools SA",50.0,false
+"Tomasz Kowalski","1982-12-05","PL","Eastern Supply Co",100.0,false
+"Erik Lindqvist","1963-02-28","SE","Nordic Materials AB",80.0,false
+"Sofia Lindqvist","1990-05-10","SE","Nordic Materials AB",20.0,false
+"Robert Johnson","1955-10-20","US","Atlantic Trading Inc",100.0,false

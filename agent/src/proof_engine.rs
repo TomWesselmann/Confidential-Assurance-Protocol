@@ -555,7 +555,10 @@ mod tests {
 
         let result = proof.verify(&manifest);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Status ist nicht OK"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Status ist nicht OK"));
     }
 
     #[test]

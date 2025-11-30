@@ -5,9 +5,13 @@
 use crate::manifest::Manifest;
 use crate::proof_engine::Proof;
 use crate::verifier::VerifyStatus;
-use cap_agent::bundle::meta::{load_bundle_meta, BundleMeta, check_dependency_cycles, ProofUnitMeta};
-use cap_agent::crypto::{sha3_256, hex_lower_prefixed32};
-use cap_agent::verifier::core::{verify as core_verify, extract_statement_from_manifest, VerifyOptions};
+use cap_agent::bundle::meta::{
+    check_dependency_cycles, load_bundle_meta, BundleMeta, ProofUnitMeta,
+};
+use cap_agent::crypto::{hex_lower_prefixed32, sha3_256};
+use cap_agent::verifier::core::{
+    extract_statement_from_manifest, verify as core_verify, VerifyOptions,
+};
 use std::collections::HashMap;
 use std::error::Error;
 use std::fs;
@@ -46,10 +50,7 @@ const MAX_FILE_SIZE: u64 = 100 * 1024 * 1024;
 /// - TOCTOU mitigation: File read only once
 /// - DoS prevention: File size limit (100 MB)
 /// - Memory-safe: Hash computed on Vec<u8>
-fn validate_file_hash(
-    file_path: &Path,
-    expected_hash: &str,
-) -> Result<Vec<u8>, Box<dyn Error>> {
+fn validate_file_hash(file_path: &Path, expected_hash: &str) -> Result<Vec<u8>, Box<dyn Error>> {
     // 1. Load file into memory (single read)
     let bytes = fs::read(file_path)?;
 
@@ -932,7 +933,10 @@ impl BundleVerifier {
         // 1. Lade Bundle-Metadaten
         eprintln!("DEBUG: Loading bundle meta from {:?}", self.bundle_dir);
         let meta = load_bundle_meta(&self.bundle_dir)?;
-        eprintln!("DEBUG: Loaded meta, found {} proof units", meta.proof_units.len());
+        eprintln!(
+            "DEBUG: Loaded meta, found {} proof units",
+            meta.proof_units.len()
+        );
 
         // 2. Validiere Dependency-Zyklen
         check_dependency_cycles(&meta.proof_units)?;
@@ -978,18 +982,22 @@ impl BundleVerifier {
         eprintln!("DEBUG: Loaded {} bytes", proof_bytes.len());
 
         // 3. Validiere Hashes gegen _meta.json
-        let manifest_file_meta = meta
-            .files
-            .get(&unit.manifest_file)
-            .ok_or_else(|| anyhow!("Manifest file not found in _meta.json: {}", unit.manifest_file))?;
+        let manifest_file_meta = meta.files.get(&unit.manifest_file).ok_or_else(|| {
+            anyhow!(
+                "Manifest file not found in _meta.json: {}",
+                unit.manifest_file
+            )
+        })?;
 
         let proof_file_meta = meta
             .files
             .get(&unit.proof_file)
             .ok_or_else(|| anyhow!("Proof file not found in _meta.json: {}", unit.proof_file))?;
 
-        let computed_manifest_hash = crate::crypto::hex_lower_prefixed32(crate::crypto::sha3_256(&manifest_bytes));
-        let computed_proof_hash = crate::crypto::hex_lower_prefixed32(crate::crypto::sha3_256(&proof_bytes));
+        let computed_manifest_hash =
+            crate::crypto::hex_lower_prefixed32(crate::crypto::sha3_256(&manifest_bytes));
+        let computed_proof_hash =
+            crate::crypto::hex_lower_prefixed32(crate::crypto::sha3_256(&proof_bytes));
 
         if computed_manifest_hash != manifest_file_meta.hash {
             return Err(anyhow!(
@@ -1019,7 +1027,10 @@ impl BundleVerifier {
         };
 
         // 6. Call Core-Verify API
-        eprintln!("DEBUG: Calling core_verify() with manifest_hash={}, proof_hash={}", computed_manifest_hash, computed_proof_hash);
+        eprintln!(
+            "DEBUG: Calling core_verify() with manifest_hash={}, proof_hash={}",
+            computed_manifest_hash, computed_proof_hash
+        );
         let report = core_verify(&manifest_json, &proof_bytes, &stmt, &opts)?;
         eprintln!("DEBUG: core_verify() returned status={}", report.status);
         Ok(report)
@@ -1031,24 +1042,29 @@ impl BundleVerifier {
 pub struct BundleVerifyResult {
     pub bundle_id: String,
     pub schema: String,
+    #[allow(dead_code)] // Reserved for future reporting/serialization
     pub created_at: String,
     pub status: VerifyStatus,
     pub unit_results: Vec<(String, cap_agent::verifier::core::VerifyReport)>,
 }
 
 /// Aggregiert den Gesamtstatus aus allen Unit-Ergebnissen
-fn aggregate_status(unit_results: &[(String, cap_agent::verifier::core::VerifyReport)]) -> VerifyStatus {
-    unit_results.iter().fold(VerifyStatus::Ok, |acc, (_id, report)| {
-        let unit_status = match report.status.as_str() {
-            "ok" => VerifyStatus::Ok,
-            "fail" => VerifyStatus::Fail,
-            _ => VerifyStatus::Warn,
-        };
-        match (acc, unit_status) {
-            (VerifyStatus::Error, _) | (_, VerifyStatus::Error) => VerifyStatus::Error,
-            (VerifyStatus::Fail, _) | (_, VerifyStatus::Fail) => VerifyStatus::Fail,
-            (VerifyStatus::Warn, _) | (_, VerifyStatus::Warn) => VerifyStatus::Warn,
-            _ => VerifyStatus::Ok,
-        }
-    })
+fn aggregate_status(
+    unit_results: &[(String, cap_agent::verifier::core::VerifyReport)],
+) -> VerifyStatus {
+    unit_results
+        .iter()
+        .fold(VerifyStatus::Ok, |acc, (_id, report)| {
+            let unit_status = match report.status.as_str() {
+                "ok" => VerifyStatus::Ok,
+                "fail" => VerifyStatus::Fail,
+                _ => VerifyStatus::Warn,
+            };
+            match (acc, unit_status) {
+                (VerifyStatus::Error, _) | (_, VerifyStatus::Error) => VerifyStatus::Error,
+                (VerifyStatus::Fail, _) | (_, VerifyStatus::Fail) => VerifyStatus::Fail,
+                (VerifyStatus::Warn, _) | (_, VerifyStatus::Warn) => VerifyStatus::Warn,
+                _ => VerifyStatus::Ok,
+            }
+        })
 }

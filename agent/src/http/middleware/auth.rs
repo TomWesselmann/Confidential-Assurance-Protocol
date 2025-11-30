@@ -335,7 +335,10 @@ mod tests {
         );
 
         let scopes = get_required_scopes_for_path("/verify/bundle", &config);
-        assert_eq!(scopes, vec!["verify:run".to_string(), "verify:read".to_string()]);
+        assert_eq!(
+            scopes,
+            vec!["verify:run".to_string(), "verify:read".to_string()]
+        );
     }
 
     #[test]
@@ -365,10 +368,9 @@ mod tests {
             jwks_cache_ttl_sec: 600,
             required_scopes: std::collections::HashMap::new(),
         };
-        config.required_scopes.insert(
-            "policy_read".to_string(),
-            vec!["policy:read".to_string()],
-        );
+        config
+            .required_scopes
+            .insert("policy_read".to_string(), vec!["policy:read".to_string()]);
 
         let scopes = get_required_scopes_for_path("/policy/0x123abc", &config);
         assert_eq!(scopes, vec!["policy:read".to_string()]);
@@ -397,7 +399,10 @@ mod tests {
             (AuthError::InvalidToken, StatusCode::UNAUTHORIZED),
             (AuthError::TokenExpired, StatusCode::UNAUTHORIZED),
             (AuthError::InsufficientScope, StatusCode::FORBIDDEN),
-            (AuthError::JwksFetchFailed, StatusCode::INTERNAL_SERVER_ERROR),
+            (
+                AuthError::JwksFetchFailed,
+                StatusCode::INTERNAL_SERVER_ERROR,
+            ),
         ];
 
         for (err, expected_status) in test_cases {

@@ -4,10 +4,75 @@
 
 use crate::audit_logger;
 use crate::security::{sanitize_error_message, validate_project_name, validate_path_exists};
+use crate::settings::AppSettings;
 use crate::types::{ProjectInfo, ProjectMeta, ProjectStatus};
 use chrono::Utc;
 use std::fs;
 use std::path::Path;
+
+/// Lists all projects in the configured workspace
+#[tauri::command]
+pub async fn list_all_projects() -> Result<Vec<ProjectInfo>, String> {
+    let settings = AppSettings::load();
+    let workspace = settings.get_workspace_path()?;
+    list_projects(workspace).await
+}
+
+/// Creates a new project in a temporary directory
+/// Returns project info with the temp path
+#[tauri::command]
+pub async fn create_temp_project() -> Result<ProjectInfo, String> {
+    // Use system temp directory
+    let temp_dir = std::env::temp_dir();
+    let cap_temp = temp_dir.join("cap-desktop-proofer");
+
+    // Create CAP temp directory if needed
+    if !cap_temp.exists() {
+        fs::create_dir_all(&cap_temp)
+            .map_err(|e| format!("Failed to create temp directory: {}", e))?;
+    }
+
+    // Generate project name with date and short ID
+    let date = Utc::now().format("%Y-%m-%d").to_string();
+    let short_id = &uuid::Uuid::new_v4().to_string()[..8];
+    let name = format!("cap-proof-{}-{}", date, short_id);
+
+    create_project(cap_temp.to_string_lossy().to_string(), name).await
+}
+
+/// Creates a new project in a specific directory chosen by user
+#[tauri::command]
+pub async fn create_project_in_folder(folder: String) -> Result<ProjectInfo, String> {
+    // Validate folder exists
+    let folder_path = Path::new(&folder);
+    if !folder_path.exists() {
+        return Err("Folder does not exist".to_string());
+    }
+    if !folder_path.is_dir() {
+        return Err("Path is not a directory".to_string());
+    }
+
+    // Generate project name with date and short ID
+    let date = Utc::now().format("%Y-%m-%d").to_string();
+    let short_id = &uuid::Uuid::new_v4().to_string()[..8];
+    let name = format!("cap-proof-{}-{}", date, short_id);
+
+    create_project(folder, name).await
+}
+
+/// Creates a new project in the configured workspace with auto-generated name
+#[tauri::command]
+pub async fn create_new_project() -> Result<ProjectInfo, String> {
+    let settings = AppSettings::load();
+    let workspace = settings.get_workspace_path()?;
+
+    // Generate project name with date and short ID
+    let date = Utc::now().format("%Y-%m-%d").to_string();
+    let short_id = &uuid::Uuid::new_v4().to_string()[..8];
+    let name = format!("cap-proof-{}-{}", date, short_id);
+
+    create_project(workspace, name).await
+}
 
 /// Creates a new Taurin project with standard directory structure
 ///

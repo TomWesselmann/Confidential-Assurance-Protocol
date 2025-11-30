@@ -1,0 +1,9 @@
+name,jurisdiction,tier,address,contact_email,risk_category
+"Müller GmbH","DE",1,"Industriestr. 15, 80333 München","kontakt@mueller-gmbh.de","low"
+"Schmidt AG","DE",1,"Hauptweg 7, 10115 Berlin","info@schmidt-ag.de","low"
+"TechParts Ltd","GB",1,"123 Industrial Lane, London EC1A","sales@techparts.co.uk","medium"
+"ComponentWorks BV","NL",2,"Havenstraat 42, 1011 Amsterdam","info@componentworks.nl","low"
+"Precision Tools SA","CH",2,"Bahnhofstrasse 88, 8001 Zürich","contact@precisiontools.ch","low"
+"Eastern Supply Co","PL",2,"ul. Fabryczna 12, 00-001 Warszawa","biuro@easternsupply.pl","medium"
+"Nordic Materials AB","SE",3,"Industrivägen 5, 111 22 Stockholm","order@nordicmaterials.se","low"
+"Atlantic Trading Inc","US",3,"500 Commerce St, New York, NY 10001","trade@atlantictrading.com","medium"

@@ -54,7 +54,7 @@ const ImportCard: React.FC<ImportCardProps> = ({
 
       {isImported && result && (
         <div className="mb-2 p-1.5 bg-green-50 dark:bg-green-900/20 rounded text-[10px]">
-          <strong>{result.record_count}</strong> Datensätze
+          <strong>{result.record_count}</strong> records
           <span className="ml-1 font-mono text-gray-500">{truncateHash(result.hash, 4)}</span>
         </div>
       )}
@@ -70,7 +70,7 @@ const ImportCard: React.FC<ImportCardProps> = ({
           ${isImported ? 'bg-gray-100 dark:bg-gray-700 text-gray-600' : 'bg-blue-600 text-white hover:bg-blue-700'}
           disabled:opacity-50`}
       >
-        {isLoading ? 'Importiere...' : isImported ? 'Erneut' : 'CSV auswählen'}
+        {isLoading ? 'Importing...' : isImported ? 'Re-import' : 'Select CSV'}
       </button>
     </div>
   );
@@ -108,7 +108,7 @@ export const ImportView: React.FC = () => {
       // Store result
       setImportResult(csvType === 'suppliers' ? 'suppliers' : 'ubos', result);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Unbekannter Fehler';
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
       setError(errorMessage);
     } finally {
       setLoading(false);
@@ -122,10 +122,10 @@ export const ImportView: React.FC = () => {
       {/* Header - compact */}
       <div className="text-center">
         <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-          Daten importieren
+          Import Data
         </h2>
         <p className="text-xs text-gray-500 dark:text-gray-400">
-          Lieferanten- und UBO-Daten als CSV
+          Supplier and UBO data as CSV
         </p>
       </div>
 
@@ -155,7 +155,7 @@ export const ImportView: React.FC = () => {
       {/* Navigation - compact */}
       <div className="flex items-center justify-between max-w-2xl mx-auto pt-2">
         <span className="text-[10px] text-gray-500">
-          {importResults.suppliers && importResults.ubos ? '2/2' : importResults.suppliers || importResults.ubos ? '1/2' : '0/2'} importiert
+          {importResults.suppliers && importResults.ubos ? '2/2' : importResults.suppliers || importResults.ubos ? '1/2' : '0/2'} imported
         </span>
         <button
           onClick={goToNextStep}
@@ -163,7 +163,7 @@ export const ImportView: React.FC = () => {
           className={`px-3 py-1.5 rounded text-xs font-medium transition-colors
             ${canProceed ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
         >
-          Weiter
+          Next
         </button>
       </div>
     </div>

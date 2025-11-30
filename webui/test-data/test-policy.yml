@@ -1,0 +1,26 @@
+# Test Policy für CAP Desktop Proofer
+# Diese Policy validiert Lieferketten nach LkSG-Kriterien
+
+name: "LkSG Test Policy"
+version: "lksg.v1"
+
+rules:
+  # Regel 1: Lieferanten aus Hochrisiko-Ländern prüfen
+  - name: "high_risk_jurisdiction"
+    constraint: "supplier.jurisdiction NOT IN ['NK', 'SY', 'IR']"
+    description: "Keine Lieferanten aus sanktionierten Ländern"
+
+  # Regel 2: Tier-1 Lieferanten müssen bekannt sein
+  - name: "tier1_required"
+    constraint: "supplier.tier == 1 IMPLIES supplier.name IS NOT NULL"
+    description: "Direkte Lieferanten müssen identifiziert sein"
+
+  # Regel 3: UBOs müssen volljährig sein
+  - name: "ubo_adult"
+    constraint: "ubo.age >= 18"
+    description: "Wirtschaftlich Berechtigte müssen volljährig sein"
+
+  # Regel 4: Mindestens ein UBO pro Lieferant
+  - name: "ubo_exists"
+    constraint: "COUNT(ubo) >= 1"
+    description: "Jeder Lieferant muss mindestens einen UBO haben"

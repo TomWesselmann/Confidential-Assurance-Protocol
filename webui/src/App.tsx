@@ -25,7 +25,7 @@ function App() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                CAP Desktop Proofer
+                CAP Desktop Prover
               </h1>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                 Offline Proof Verification • Confidential Assurance Protocol
@@ -37,7 +37,7 @@ function App() {
                 onClick={handleReset}
                 className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors"
               >
-                Neues Bundle
+                New Bundle
               </button>
             )}
           </div>
@@ -61,7 +61,7 @@ function App() {
       <footer className="mt-16 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <p className="text-center text-sm text-gray-500 dark:text-gray-400">
-            CAP Desktop Proofer v0.1.0 • Tauri 2.0 • Offline-First Architecture
+            CAP Desktop Prover v0.1.0 • Tauri 2.0 • Offline-First Architecture
           </p>
         </div>
       </footer>

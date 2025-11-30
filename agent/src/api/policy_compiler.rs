@@ -733,10 +733,7 @@ rules: []
 
         // Retrieve the policy
         let headers = HeaderMap::new();
-        let result = handle_policy_v2_get(
-            Path("test-policy".to_string()),
-            headers,
-        ).await;
+        let result = handle_policy_v2_get(Path("test-policy".to_string()), headers).await;
 
         assert!(result.is_ok());
         let (status, _, response) = result.unwrap();
@@ -752,10 +749,7 @@ rules: []
 
         // Try to retrieve non-existent policy
         let headers = HeaderMap::new();
-        let result = handle_policy_v2_get(
-            Path("non-existent-policy".to_string()),
-            headers,
-        ).await;
+        let result = handle_policy_v2_get(Path("non-existent-policy".to_string()), headers).await;
 
         assert!(result.is_err());
         let (status, error_msg) = result.unwrap_err();
@@ -817,7 +811,7 @@ rules: []
         let (status, response) = result.unwrap();
         assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
         assert!(!response.0.lints.is_empty());
-        assert_eq!(response.0.stored, false);
+        assert!(!response.0.stored);
     }
 
     #[tokio::test]

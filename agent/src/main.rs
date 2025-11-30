@@ -29,7 +29,7 @@ use uuid::Uuid;
 use zk_system::ProofSystem;
 
 // Import portable verifier core from library
-use cap_agent::bundle::meta::{BundleMeta, BundleFileMeta, ProofUnitMeta, BUNDLE_SCHEMA_V1};
+use cap_agent::bundle::meta::{BundleFileMeta, BundleMeta, ProofUnitMeta, BUNDLE_SCHEMA_V1};
 use cap_agent::crypto;
 use cap_agent::orchestrator;
 use cap_agent::verifier;
@@ -1444,9 +1444,8 @@ For more information, see: https://cap.protocol/
     };
 
     // Helper-Funktion für Dateigröße
-    let get_size = |path: &std::path::Path| -> Result<u64, Box<dyn Error>> {
-        Ok(fs::metadata(path)?.len())
-    };
+    let get_size =
+        |path: &std::path::Path| -> Result<u64, Box<dyn Error>> { Ok(fs::metadata(path)?.len()) };
 
     // Create files map with BundleFileMeta objects
     let mut files = std::collections::HashMap::new();

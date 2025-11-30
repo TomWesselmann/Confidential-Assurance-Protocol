@@ -2,8 +2,7 @@
 ///
 /// Tests both InMemoryPolicyStore and SqlitePolicyStore implementations
 use cap_agent::policy::{
-    InMemoryPolicyStore, Policy, PolicyConstraints, PolicyStatus, PolicyStore,
-    SqlitePolicyStore,
+    InMemoryPolicyStore, Policy, PolicyConstraints, PolicyStatus, PolicyStore, SqlitePolicyStore,
 };
 use tempfile::tempdir;
 
@@ -149,7 +148,10 @@ async fn test_inmemory_not_found() {
     assert!(result.is_none());
 
     // Get by non-existent hash
-    let result = store.get_by_hash("0x0000000000000000000000000000000000000000000000000000000000000000").await.unwrap();
+    let result = store
+        .get_by_hash("0x0000000000000000000000000000000000000000000000000000000000000000")
+        .await
+        .unwrap();
     assert!(result.is_none());
 
     // Set status on non-existent ID
@@ -330,10 +332,10 @@ async fn test_sqlite_not_found() {
 
 #[tokio::test]
 async fn test_api_policy_compile_and_get() {
-    use cap_agent::api::policy::{PolicyCompileRequest, PolicyState};
-    use cap_agent::api::policy::{handle_policy_compile, handle_policy_get};
     use axum::extract::{Path, State};
     use axum::Json;
+    use cap_agent::api::policy::{handle_policy_compile, handle_policy_get};
+    use cap_agent::api::policy::{PolicyCompileRequest, PolicyState};
 
     let state = PolicyState::new(InMemoryPolicyStore::new());
     let policy = create_test_policy("API Test Policy", "lksg.v1");
@@ -349,31 +351,32 @@ async fn test_api_policy_compile_and_get() {
     assert!(compile_data.policy_hash.starts_with("0x"));
 
     // Get by UUID
-    let get_response = handle_policy_get(State(state.clone()), Path(compile_data.policy_id.clone()))
-        .await
-        .expect("Get by UUID should succeed");
+    let get_response =
+        handle_policy_get(State(state.clone()), Path(compile_data.policy_id.clone()))
+            .await
+            .expect("Get by UUID should succeed");
 
     assert_eq!(get_response.0.policy.name, "API Test Policy");
 
     // Get by hash
-    let get_response_hash =
-        handle_policy_get(State(state), Path(compile_data.policy_hash.clone()))
-            .await
-            .expect("Get by hash should succeed");
+    let get_response_hash = handle_policy_get(State(state), Path(compile_data.policy_hash.clone()))
+        .await
+        .expect("Get by hash should succeed");
 
     assert_eq!(get_response_hash.0.policy.name, "API Test Policy");
 }
 
 #[tokio::test]
 async fn test_api_policy_not_found() {
-    use cap_agent::api::policy::{handle_policy_get, PolicyState};
     use axum::extract::{Path, State};
     use axum::http::StatusCode;
+    use cap_agent::api::policy::{handle_policy_get, PolicyState};
 
     let state = PolicyState::new(InMemoryPolicyStore::new());
 
     // Try to get non-existent policy by UUID
-    let result = handle_policy_get(State(state.clone()), Path("nonexistent-uuid".to_string())).await;
+    let result =
+        handle_policy_get(State(state.clone()), Path("nonexistent-uuid".to_string())).await;
     assert!(result.is_err());
     assert_eq!(result.unwrap_err(), StatusCode::NOT_FOUND);
 
@@ -389,10 +392,10 @@ async fn test_api_policy_not_found() {
 
 #[tokio::test]
 async fn test_api_policy_invalid_policy() {
-    use cap_agent::api::policy::{handle_policy_compile, PolicyCompileRequest, PolicyState};
     use axum::extract::State;
     use axum::http::StatusCode;
     use axum::Json;
+    use cap_agent::api::policy::{handle_policy_compile, PolicyCompileRequest, PolicyState};
 
     let state = PolicyState::new(InMemoryPolicyStore::new());
 
@@ -411,9 +414,9 @@ async fn test_api_policy_invalid_policy() {
 
 #[tokio::test]
 async fn test_api_policy_deduplication() {
-    use cap_agent::api::policy::{handle_policy_compile, PolicyCompileRequest, PolicyState};
     use axum::extract::State;
     use axum::Json;
+    use cap_agent::api::policy::{handle_policy_compile, PolicyCompileRequest, PolicyState};
 
     let state = PolicyState::new(InMemoryPolicyStore::new());
     let policy = create_test_policy("Dedup Test Policy", "lksg.v1");
@@ -438,9 +441,11 @@ async fn test_api_policy_deduplication() {
 
 #[tokio::test]
 async fn test_api_sqlite_backend() {
-    use cap_agent::api::policy::{handle_policy_compile, handle_policy_get, PolicyCompileRequest, PolicyState};
     use axum::extract::{Path, State};
     use axum::Json;
+    use cap_agent::api::policy::{
+        handle_policy_compile, handle_policy_get, PolicyCompileRequest, PolicyState,
+    };
 
     let temp_dir = tempdir().unwrap();
     let db_path = temp_dir.path().join("api_test.db");
@@ -458,9 +463,10 @@ async fn test_api_sqlite_backend() {
     let compile_data = response.0;
 
     // Get by UUID
-    let get_response = handle_policy_get(State(state.clone()), Path(compile_data.policy_id.clone()))
-        .await
-        .expect("Get by UUID should succeed");
+    let get_response =
+        handle_policy_get(State(state.clone()), Path(compile_data.policy_id.clone()))
+            .await
+            .expect("Get by UUID should succeed");
 
     assert_eq!(get_response.0.policy.name, "SQLite API Test");
 
@@ -474,9 +480,9 @@ async fn test_api_sqlite_backend() {
 
 #[tokio::test]
 async fn test_api_concurrent_access() {
-    use cap_agent::api::policy::{handle_policy_compile, PolicyCompileRequest, PolicyState};
     use axum::extract::State;
     use axum::Json;
+    use cap_agent::api::policy::{handle_policy_compile, PolicyCompileRequest, PolicyState};
     use std::sync::Arc;
     use tokio::task::JoinSet;
 

@@ -55,24 +55,41 @@ pub struct PackageInfo {
 /// Accepts multipart/form-data with ZIP file upload
 /// Extracts manifest.json and proof.dat from the ZIP
 /// Returns parsed data for WebUI to use directly
-pub async fn handle_upload(mut multipart: Multipart) -> Result<impl IntoResponse, (StatusCode, String)> {
+pub async fn handle_upload(
+    mut multipart: Multipart,
+) -> Result<impl IntoResponse, (StatusCode, String)> {
     // Extract ZIP file from multipart form
     let zip_bytes = match extract_zip_from_multipart(&mut multipart).await {
         Ok(bytes) => bytes,
-        Err(e) => return Err((StatusCode::BAD_REQUEST, format!("Failed to extract ZIP: {}", e))),
+        Err(e) => {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                format!("Failed to extract ZIP: {}", e),
+            ))
+        }
     };
 
     // Parse ZIP archive
     let (manifest, proof_base64, package_info) = match parse_proof_package(&zip_bytes) {
         Ok(data) => data,
-        Err(e) => return Err((StatusCode::BAD_REQUEST, format!("Failed to parse ZIP: {}", e))),
+        Err(e) => {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                format!("Failed to parse ZIP: {}", e),
+            ))
+        }
     };
 
     // Extract company_commitment_root from manifest
     let company_commitment_root = manifest
         .get("company_commitment_root")
         .and_then(|v| v.as_str())
-        .ok_or_else(|| (StatusCode::BAD_REQUEST, "Missing company_commitment_root in manifest".to_string()))?
+        .ok_or_else(|| {
+            (
+                StatusCode::BAD_REQUEST,
+                "Missing company_commitment_root in manifest".to_string(),
+            )
+        })?
         .to_string();
 
     // Build response
@@ -88,12 +105,19 @@ pub async fn handle_upload(mut multipart: Multipart) -> Result<impl IntoResponse
 
 /// Extracts ZIP file bytes from multipart form data
 async fn extract_zip_from_multipart(multipart: &mut Multipart) -> Result<Vec<u8>> {
-    while let Some(field) = multipart.next_field().await.map_err(|e| anyhow!("Multipart error: {}", e))? {
+    while let Some(field) = multipart
+        .next_field()
+        .await
+        .map_err(|e| anyhow!("Multipart error: {}", e))?
+    {
         let name = field.name().unwrap_or("");
 
         // Look for field named "file" or "proof_package"
         if name == "file" || name == "proof_package" || name == "zip" {
-            let data = field.bytes().await.map_err(|e| anyhow!("Failed to read field: {}", e))?;
+            let data = field
+                .bytes()
+                .await
+                .map_err(|e| anyhow!("Failed to read field: {}", e))?;
             return Ok(data.to_vec());
         }
     }
@@ -105,8 +129,7 @@ async fn extract_zip_from_multipart(multipart: &mut Multipart) -> Result<Vec<u8>
 fn parse_proof_package(zip_bytes: &[u8]) -> Result<(serde_json::Value, String, PackageInfo)> {
     // Create ZIP archive reader
     let cursor = std::io::Cursor::new(zip_bytes);
-    let mut archive = ZipArchive::new(cursor)
-        .map_err(|e| anyhow!("Invalid ZIP file: {}", e))?;
+    let mut archive = ZipArchive::new(cursor).map_err(|e| anyhow!("Invalid ZIP file: {}", e))?;
 
     let file_count = archive.len();
     let mut files = Vec::new();
@@ -115,7 +138,8 @@ fn parse_proof_package(zip_bytes: &[u8]) -> Result<(serde_json::Value, String, P
 
     // Iterate through all files in ZIP
     for i in 0..archive.len() {
-        let mut file = archive.by_index(i)
+        let mut file = archive
+            .by_index(i)
             .map_err(|e| anyhow!("Failed to read ZIP entry {}: {}", i, e))?;
 
         let file_name = file.name().to_string();
@@ -127,8 +151,10 @@ fn parse_proof_package(zip_bytes: &[u8]) -> Result<(serde_json::Value, String, P
             file.read_to_string(&mut contents)
                 .map_err(|e| anyhow!("Failed to read manifest.json: {}", e))?;
 
-            manifest_json = Some(serde_json::from_str(&contents)
-                .map_err(|e| anyhow!("Invalid manifest.json: {}", e))?);
+            manifest_json = Some(
+                serde_json::from_str(&contents)
+                    .map_err(|e| anyhow!("Invalid manifest.json: {}", e))?,
+            );
         }
 
         // Extract proof.dat
@@ -138,7 +164,10 @@ fn parse_proof_package(zip_bytes: &[u8]) -> Result<(serde_json::Value, String, P
                 .map_err(|e| anyhow!("Failed to read proof.dat: {}", e))?;
 
             // Encode as base64
-            proof_base64 = Some(base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &contents));
+            proof_base64 = Some(base64::Engine::encode(
+                &base64::engine::general_purpose::STANDARD,
+                &contents,
+            ));
         }
     }
 
@@ -161,13 +190,18 @@ mod tests {
     use std::io::Write;
 
     /// Helper: Create a test ZIP with manifest.json and proof.dat
-    fn create_test_zip(include_manifest: bool, include_proof: bool, valid_manifest: bool) -> Vec<u8> {
+    fn create_test_zip(
+        include_manifest: bool,
+        include_proof: bool,
+        valid_manifest: bool,
+    ) -> Vec<u8> {
         let cursor = std::io::Cursor::new(Vec::new());
         let mut zip = zip::ZipWriter::new(cursor);
 
         // Add manifest.json if requested
         if include_manifest {
-            zip.start_file("manifest.json", zip::write::SimpleFileOptions::default()).unwrap();
+            zip.start_file("manifest.json", zip::write::SimpleFileOptions::default())
+                .unwrap();
             if valid_manifest {
                 let manifest = r#"{
                     "version": "manifest.v1.0",
@@ -184,7 +218,8 @@ mod tests {
 
         // Add proof.dat if requested
         if include_proof {
-            zip.start_file("proof.dat", zip::write::SimpleFileOptions::default()).unwrap();
+            zip.start_file("proof.dat", zip::write::SimpleFileOptions::default())
+                .unwrap();
             zip.write_all(b"proof_data_here").unwrap();
         }
 
@@ -241,7 +276,10 @@ mod tests {
         // Should fail
         let result = parse_proof_package(&zip_bytes);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("manifest.json not found"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("manifest.json not found"));
     }
 
     #[test]
@@ -252,7 +290,10 @@ mod tests {
         // Should fail
         let result = parse_proof_package(&zip_bytes);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("proof.dat not found"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("proof.dat not found"));
     }
 
     #[test]
@@ -263,6 +304,9 @@ mod tests {
         // Should fail
         let result = parse_proof_package(&zip_bytes);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Invalid manifest.json"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Invalid manifest.json"));
     }
 }

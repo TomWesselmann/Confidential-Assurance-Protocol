@@ -122,7 +122,7 @@ impl KeyMetadata {
 
 /// Derives KID from public key
 ///
-/// Formula: kid = blake3(base64(public_key))[0:16]
+/// Formula: `kid = blake3(base64(public_key))[0:16]`
 /// Returns: 32 hex characters (16 bytes)
 pub fn derive_kid(public_key_b64: &str) -> Result<Kid> {
     let hash = crypto::blake3_256(public_key_b64.as_bytes());
@@ -721,7 +721,9 @@ mod tests {
 
         let pubkey2 = vec![4, 5, 6];
         let metadata2 = KeyMetadata::new(&pubkey2, "company2", "ed25519", 730).unwrap();
-        metadata2.save(temp_dir.join("archive").join("key2.json")).unwrap();
+        metadata2
+            .save(temp_dir.join("archive").join("key2.json"))
+            .unwrap();
 
         // List should include both
         let keys = store.list().unwrap();
@@ -806,7 +808,10 @@ mod tests {
         // Verify should fail
         let result = signed_attestation.verify();
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("verification failed"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("verification failed"));
     }
 
     #[test]
@@ -846,7 +851,10 @@ mod tests {
         // Verify should fail due to KID mismatch
         let result = signed_attestation.verify();
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Signer KID mismatch"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Signer KID mismatch"));
     }
 
     #[test]
@@ -906,7 +914,10 @@ mod tests {
         // Verify chain should fail because signer key is not in store
         let result = verify_chain(&[att_file.to_str().unwrap()], &store);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Signer key not found"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Signer key not found"));
 
         fs::remove_dir_all(&temp_dir).ok();
     }

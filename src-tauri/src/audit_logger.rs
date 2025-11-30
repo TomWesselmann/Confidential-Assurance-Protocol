@@ -200,6 +200,43 @@ pub mod events {
             "size_bytes": size_bytes
         }))
     }
+
+    pub fn keys_generated(
+        project_path: &Path,
+        signer_name: &str,
+        kid: &str,
+        fingerprint: &str,
+    ) -> Result<String, String> {
+        log_event(project_path, "keys_generated", json!({
+            "signer": signer_name,
+            "kid": kid,
+            "fingerprint": fingerprint,
+            "algorithm": "Ed25519"
+        }))
+    }
+
+    pub fn manifest_signed(
+        project_path: &Path,
+        signer_name: &str,
+        signature_hash: &str,
+    ) -> Result<String, String> {
+        log_event(project_path, "manifest_signed", json!({
+            "signer": signer_name,
+            "signature_hash": signature_hash,
+            "algorithm": "Ed25519"
+        }))
+    }
+
+    pub fn signature_verified(
+        project_path: &Path,
+        signer_name: &str,
+        valid: bool,
+    ) -> Result<String, String> {
+        log_event(project_path, "signature_verified", json!({
+            "signer": signer_name,
+            "valid": valid
+        }))
+    }
 }
 
 #[cfg(test)]

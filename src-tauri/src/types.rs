@@ -335,3 +335,65 @@ pub struct ChainVerifyResult {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tail_hash: Option<String>,
 }
+
+// ============================================================================
+// Signing Types
+// ============================================================================
+
+/// Information about a generated or loaded key
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct KeyInfo {
+    /// Unique key identifier (derived from public key)
+    pub kid: String,
+
+    /// Signer name (user-provided)
+    pub signer_name: String,
+
+    /// Path to public key file
+    pub public_key_path: String,
+
+    /// SHA-256 fingerprint of public key
+    pub fingerprint: String,
+
+    /// Creation timestamp (ISO 8601)
+    pub created_at: String,
+}
+
+/// Result of manifest signing operation
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SignResult {
+    /// Whether signing was successful
+    pub success: bool,
+
+    /// Signer name
+    pub signer: String,
+
+    /// Signature hash (first 16 chars)
+    pub signature_hash: String,
+
+    /// Full signature in hex
+    pub signature_hex: String,
+
+    /// Path to updated manifest
+    pub manifest_path: String,
+}
+
+/// Result of signature verification
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SignatureVerifyResult {
+    /// Whether signature is valid
+    pub valid: bool,
+
+    /// Signer name from signature
+    pub signer: String,
+
+    /// Algorithm used
+    pub algorithm: String,
+
+    /// Error message if invalid
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}

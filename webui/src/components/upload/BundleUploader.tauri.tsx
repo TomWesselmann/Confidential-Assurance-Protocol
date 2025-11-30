@@ -71,7 +71,7 @@ export const BundleUploader: React.FC = () => {
 
       {isLoading ? (
         <div className="space-y-2">
-          <p className="text-xs text-gray-600 dark:text-gray-400">Verifiziere...</p>
+          <p className="text-xs text-gray-600 dark:text-gray-400">Verifying...</p>
           <div className="w-24 h-1 mx-auto bg-gray-200 rounded-full overflow-hidden">
             <div className="h-full bg-blue-500 animate-pulse" style={{ width: '60%' }} />
           </div>
@@ -79,14 +79,14 @@ export const BundleUploader: React.FC = () => {
       ) : (
         <>
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-            ZIP-Datei zur Offline-Verifikation
+            ZIP file for offline verification
           </p>
           <button
             onClick={handleSelectBundle}
             disabled={isLoading}
             className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors font-medium"
           >
-            Bundle auswählen
+            Select Bundle
           </button>
         </>
       )}

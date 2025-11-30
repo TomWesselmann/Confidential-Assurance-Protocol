@@ -1,13 +1,13 @@
 #![allow(dead_code)]
-use async_trait::async_trait;
 use anyhow::{anyhow, Result};
+use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use uuid::Uuid;
 
-use crate::policy::Policy;
 use super::metadata::{CompiledPolicy, PolicyMetadata, PolicyStatus};
 use super::store::{compute_policy_hash, now_iso8601, PolicyStore};
+use crate::policy::Policy;
 
 /// In-Memory Policy Store (for testing and development)
 #[derive(Clone)]
@@ -134,7 +134,7 @@ impl PolicyStore for InMemoryPolicyStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::policy::{Policy, types::PolicyConstraints};
+    use crate::policy::{types::PolicyConstraints, Policy};
 
     fn create_test_policy(name: &str) -> Policy {
         Policy {
@@ -259,10 +259,16 @@ mod tests {
 
         let _meta1 = store.save(create_test_policy("Active 1")).await.unwrap();
         let _meta2 = store.save(create_test_policy("Active 2")).await.unwrap();
-        let meta3 = store.save(create_test_policy("Deprecated 1")).await.unwrap();
+        let meta3 = store
+            .save(create_test_policy("Deprecated 1"))
+            .await
+            .unwrap();
 
         // Set one to Deprecated
-        store.set_status(&meta3.id.to_string(), PolicyStatus::Deprecated).await.unwrap();
+        store
+            .set_status(&meta3.id.to_string(), PolicyStatus::Deprecated)
+            .await
+            .unwrap();
 
         // Filter for Active
         let active = store.list(Some(PolicyStatus::Active)).await.unwrap();
@@ -304,7 +310,10 @@ mod tests {
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
         // Change to Deprecated
-        store.set_status(&id_str, PolicyStatus::Deprecated).await.unwrap();
+        store
+            .set_status(&id_str, PolicyStatus::Deprecated)
+            .await
+            .unwrap();
 
         let retrieved = store.get(&id_str).await.unwrap().unwrap();
         assert_eq!(retrieved.metadata.status, PolicyStatus::Deprecated);

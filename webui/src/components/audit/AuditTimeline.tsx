@@ -18,9 +18,11 @@ import {
 
 interface AuditTimelineProps {
   projectPath: string;
+  /** Optional key to trigger refresh (e.g., currentStep or a counter) */
+  refreshKey?: string | number;
 }
 
-export function AuditTimeline({ projectPath }: AuditTimelineProps) {
+export function AuditTimeline({ projectPath, refreshKey }: AuditTimelineProps) {
   const [auditLog, setAuditLog] = useState<AuditLog | null>(null);
   const [chainResult, setChainResult] = useState<ChainVerifyResult | null>(null);
   const [loading, setLoading] = useState(true);
@@ -29,7 +31,7 @@ export function AuditTimeline({ projectPath }: AuditTimelineProps) {
 
   useEffect(() => {
     loadAuditData();
-  }, [projectPath]);
+  }, [projectPath, refreshKey]);
 
   async function loadAuditData() {
     if (!projectPath) return;
@@ -55,7 +57,7 @@ export function AuditTimeline({ projectPath }: AuditTimelineProps) {
     return (
       <div className="flex items-center justify-center p-8">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        <span className="ml-2 text-gray-600">Lade Audit-Log...</span>
+        <span className="ml-2 text-gray-600">Loading audit log...</span>
       </div>
     );
   }
@@ -68,7 +70,7 @@ export function AuditTimeline({ projectPath }: AuditTimelineProps) {
           onClick={loadAuditData}
           className="mt-2 text-sm text-red-600 hover:text-red-800 underline"
         >
-          Erneut versuchen
+          Retry
         </button>
       </div>
     );
@@ -92,9 +94,9 @@ export function AuditTimeline({ projectPath }: AuditTimelineProps) {
             d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
           />
         </svg>
-        <p className="text-gray-500">Keine Audit-Events vorhanden</p>
+        <p className="text-gray-500">No audit events yet</p>
         <p className="text-gray-400 text-sm mt-1">
-          Events werden bei Workflow-Aktionen automatisch aufgezeichnet
+          Events are automatically recorded during workflow actions
         </p>
       </div>
     );
@@ -122,8 +124,8 @@ export function AuditTimeline({ projectPath }: AuditTimelineProps) {
           )}
           <span className={chainResult?.valid ? 'text-green-700' : 'text-red-700'}>
             {chainResult?.valid
-              ? `Hash-Chain konsistent (${chainResult.verifiedCount} Events)`
-              : `Hash-Chain inkonsistent (${chainResult?.errors.length} Fehler)`}
+              ? `Hash chain consistent (${chainResult.verifiedCount} events)`
+              : `Hash chain inconsistent (${chainResult?.errors.length} errors)`}
           </span>
         </div>
         {chainResult?.tailHash && (
@@ -187,7 +189,7 @@ export function AuditTimeline({ projectPath }: AuditTimelineProps) {
       {/* Pagination info */}
       {auditLog.totalCount > auditLog.events.length && (
         <div className="text-center text-sm text-gray-500">
-          Zeige {auditLog.events.length} von {auditLog.totalCount} Events
+          Showing {auditLog.events.length} of {auditLog.totalCount} events
         </div>
       )}
     </div>

@@ -308,6 +308,148 @@ export async function listProjects(workspace: string): Promise<ProjectInfo[]> {
   }
 }
 
+// ============================================================================
+// SIMPLIFIED PROJECT API (Uses configured workspace)
+// ============================================================================
+
+/**
+ * Lists all projects in the configured workspace
+ */
+export async function listAllProjects(): Promise<ProjectInfo[]> {
+  try {
+    return await invoke<ProjectInfo[]>('list_all_projects');
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to list projects: ${errorMessage}`);
+  }
+}
+
+/**
+ * Creates a new project with auto-generated name
+ */
+export async function createNewProject(): Promise<ProjectInfo> {
+  try {
+    return await invoke<ProjectInfo>('create_new_project');
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to create project: ${errorMessage}`);
+  }
+}
+
+/**
+ * Creates a new project in a temporary directory
+ * Best for workflows where user saves bundle at the end
+ */
+export async function createTempProject(): Promise<ProjectInfo> {
+  try {
+    return await invoke<ProjectInfo>('create_temp_project');
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to create temp project: ${errorMessage}`);
+  }
+}
+
+/**
+ * Creates a new project in a specific folder chosen by user
+ */
+export async function createProjectInFolder(folder: string): Promise<ProjectInfo> {
+  try {
+    return await invoke<ProjectInfo>('create_project_in_folder', { folder });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to create project: ${errorMessage}`);
+  }
+}
+
+/**
+ * Opens a directory dialog to select a working folder
+ */
+export async function selectWorkingFolder(): Promise<string | null> {
+  const { open } = await import('@tauri-apps/plugin-dialog');
+
+  const selected = await open({
+    multiple: false,
+    directory: true,
+    title: 'Arbeitsordner für Proof auswählen',
+  });
+
+  return selected as string | null;
+}
+
+// ============================================================================
+// APP SETTINGS API
+// ============================================================================
+
+/** App info response */
+export interface AppInfo {
+  /** Current workspace path */
+  workspacePath: string;
+  /** Whether this is the first run */
+  isFirstRun: boolean;
+  /** Whether a custom path is set */
+  hasCustomPath: boolean;
+}
+
+/**
+ * Gets app info including workspace path and first-run status
+ */
+export async function getAppInfo(): Promise<AppInfo> {
+  try {
+    const result = await invoke<{
+      workspace_path: string;
+      is_first_run: boolean;
+      has_custom_path: boolean;
+    }>('get_app_info');
+    return {
+      workspacePath: result.workspace_path,
+      isFirstRun: result.is_first_run,
+      hasCustomPath: result.has_custom_path,
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to get app info: ${errorMessage}`);
+  }
+}
+
+/**
+ * Sets the workspace path
+ */
+export async function setWorkspacePath(path: string): Promise<string> {
+  try {
+    return await invoke<string>('set_workspace_path', { path });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to set workspace path: ${errorMessage}`);
+  }
+}
+
+/**
+ * Resets workspace to default (~/Documents/CAP-Proofs)
+ */
+export async function resetWorkspacePath(): Promise<string> {
+  try {
+    return await invoke<string>('reset_workspace_path');
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to reset workspace path: ${errorMessage}`);
+  }
+}
+
+/**
+ * Opens a directory dialog to select a new workspace
+ */
+export async function selectWorkspaceFolder(): Promise<string | null> {
+  const { open } = await import('@tauri-apps/plugin-dialog');
+
+  const selected = await open({
+    multiple: false,
+    directory: true,
+    title: 'Speicherort für Proofs auswählen',
+  });
+
+  return selected as string | null;
+}
+
 /**
  * Gets the status of a project
  */
@@ -737,6 +879,195 @@ export function getEventTypeName(eventType: string): string {
     registry_entry_added: 'Registry-Eintrag hinzugefügt',
     verify_response: 'Verifikationsantwort',
     policy_compile: 'Policy kompiliert',
+    keys_generated: 'Schlüssel generiert',
+    manifest_signed: 'Manifest signiert',
+    signature_verified: 'Signatur verifiziert',
   };
   return names[eventType] || eventType;
+}
+
+// ============================================================================
+// SIGNING TYPES (matches Rust backend types.rs)
+// ============================================================================
+
+/** Key information returned from generate_keys and list_keys */
+export interface KeyInfo {
+  /** Key ID (first 16 bytes of BLAKE3 hash, hex encoded) */
+  kid: string;
+
+  /** Human-readable signer name */
+  signerName: string;
+
+  /** Path to public key file */
+  publicKeyPath: string;
+
+  /** SHA-256 fingerprint (first 8 bytes, hex encoded) */
+  fingerprint: string;
+
+  /** Creation timestamp (RFC3339) */
+  createdAt: string;
+}
+
+/** Result of signing a manifest */
+export interface SignResult {
+  /** Whether signing was successful */
+  success: boolean;
+
+  /** Signer name */
+  signer: string;
+
+  /** Truncated signature hash for display */
+  signatureHash: string;
+
+  /** Full signature hex (0x-prefixed) */
+  signatureHex: string;
+
+  /** Path to the signed manifest */
+  manifestPath: string;
+}
+
+/** Result of verifying a signature */
+export interface SignatureVerifyResult {
+  /** Whether the signature is valid */
+  valid: boolean;
+
+  /** Signer name from signature */
+  signer: string;
+
+  /** Algorithm used (e.g., "Ed25519") */
+  algorithm: string;
+
+  /** Error message if verification failed */
+  error?: string;
+}
+
+// ============================================================================
+// SIGNING COMMANDS
+// ============================================================================
+
+/**
+ * Generates a new Ed25519 key pair for signing
+ *
+ * @param project - Path to the project directory
+ * @param signerName - Human-readable name for the signer (e.g., "Company Name")
+ * @returns KeyInfo with key details
+ * @throws Error if key generation fails or signer name is invalid
+ *
+ * @example
+ * ```typescript
+ * const key = await generateKeys('/path/to/project', 'My Company');
+ * console.log(`Key generated: ${key.kid}`);
+ * ```
+ */
+export async function generateKeys(
+  project: string,
+  signerName: string
+): Promise<KeyInfo> {
+  try {
+    return await invoke<KeyInfo>('generate_keys', { project, signerName });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to generate keys: ${errorMessage}`);
+  }
+}
+
+/**
+ * Lists all available signing keys in a project
+ *
+ * @param project - Path to the project directory
+ * @returns Array of KeyInfo for each key found (sorted by creation date, newest first)
+ *
+ * @example
+ * ```typescript
+ * const keys = await listKeys('/path/to/project');
+ * if (keys.length === 0) {
+ *   console.log('No keys found');
+ * }
+ * ```
+ */
+export async function listKeys(project: string): Promise<KeyInfo[]> {
+  try {
+    return await invoke<KeyInfo[]>('list_keys', { project });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to list keys: ${errorMessage}`);
+  }
+}
+
+/**
+ * Signs the manifest with the specified key
+ *
+ * @param project - Path to the project directory
+ * @param signerName - Name of the signer (must match existing key)
+ * @returns SignResult with signature details
+ * @throws Error if manifest not found, key not found, or signing fails
+ *
+ * @example
+ * ```typescript
+ * const result = await signProjectManifest('/path/to/project', 'My Company');
+ * if (result.success) {
+ *   console.log(`Signed with hash: ${result.signatureHash}`);
+ * }
+ * ```
+ */
+export async function signProjectManifest(
+  project: string,
+  signerName: string
+): Promise<SignResult> {
+  try {
+    return await invoke<SignResult>('sign_project_manifest', { project, signerName });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to sign manifest: ${errorMessage}`);
+  }
+}
+
+/**
+ * Verifies the signature on the manifest
+ *
+ * @param project - Path to the project directory
+ * @returns SignatureVerifyResult with verification status
+ * @throws Error if manifest not found
+ *
+ * @example
+ * ```typescript
+ * const result = await verifyManifestSignature('/path/to/project');
+ * if (result.valid) {
+ *   console.log(`Valid signature from: ${result.signer}`);
+ * } else {
+ *   console.log(`Invalid: ${result.error}`);
+ * }
+ * ```
+ */
+export async function verifyManifestSignature(
+  project: string
+): Promise<SignatureVerifyResult> {
+  try {
+    return await invoke<SignatureVerifyResult>('verify_manifest_signature', { project });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to verify signature: ${errorMessage}`);
+  }
+}
+
+/**
+ * Validates a signer name (client-side pre-validation)
+ *
+ * @param name - Signer name to validate
+ * @returns true if valid, error message if invalid
+ */
+export function validateSignerName(name: string): true | string {
+  if (!name || name.trim().length === 0) {
+    return 'Signer-Name ist erforderlich';
+  }
+  if (name.length > 64) {
+    return 'Signer-Name zu lang (max. 64 Zeichen)';
+  }
+  if (name.includes('..') || name.includes('/') || name.includes('\\')) {
+    return 'Ungültiger Signer-Name: Pfad-Zeichen nicht erlaubt';
+  }
+  if (!/^[a-zA-Z0-9_\- ]+$/.test(name)) {
+    return 'Ungültiger Signer-Name: Nur Buchstaben, Zahlen, Unterstrich, Bindestrich und Leerzeichen erlaubt';
+  }
+  return true;
 }

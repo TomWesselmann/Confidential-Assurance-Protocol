@@ -1,8 +1,8 @@
 #![allow(dead_code)]
-use async_trait::async_trait;
-use anyhow::Result;
-use crate::policy::Policy;
 use super::metadata::{CompiledPolicy, PolicyMetadata, PolicyStatus};
+use crate::policy::Policy;
+use anyhow::Result;
+use async_trait::async_trait;
 
 /// PolicyStore Trait - Abstraction for policy persistence
 #[async_trait]

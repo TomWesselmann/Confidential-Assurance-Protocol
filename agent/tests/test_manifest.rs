@@ -1,12 +1,12 @@
-/// Integration Tests für manifest.rs
-///
-/// Diese Tests wurden aus inline test modules extrahiert um Tarpaulin Coverage-Tracking zu ermöglichen.
-/// Tarpaulin hat eine bekannte Limitation mit #[cfg(test)] inline modules.
+//! Integration Tests für manifest.rs
+//!
+//! Diese Tests wurden aus inline test modules extrahiert um Tarpaulin Coverage-Tracking zu ermöglichen.
+//! Tarpaulin hat eine bekannte Limitation mit #[cfg(test)] inline modules.
 
 use cap_agent::commitment::Commitments;
 use cap_agent::manifest::{
-    AuditInfo, Manifest, ProofInfo, PublicChain, SignatureInfo, SignedManifest,
-    TimeAnchorPrivate, TimeAnchorPublic, MANIFEST_SCHEMA_VERSION,
+    AuditInfo, Manifest, ProofInfo, PublicChain, SignatureInfo, SignedManifest, TimeAnchorPrivate,
+    TimeAnchorPublic, MANIFEST_SCHEMA_VERSION,
 };
 use cap_agent::policy::PolicyInfo;
 use chrono::Utc;
@@ -157,7 +157,11 @@ fn test_manifest_set_private_anchor_success() {
         "0x1234567890123456789012345678901234567890123456789012345678901234".to_string();
 
     // First set time anchor
-    manifest.set_time_anchor("tsa".to_string(), "./tsa/test.tsr".to_string(), audit_tip.clone());
+    manifest.set_time_anchor(
+        "tsa".to_string(),
+        "./tsa/test.tsr".to_string(),
+        audit_tip.clone(),
+    );
 
     // Then set private anchor
     let result = manifest.set_private_anchor(audit_tip.clone(), None);
@@ -309,8 +313,8 @@ fn test_manifest_validate_dual_anchor_private_mismatch() {
     // Manually set inconsistent private anchor
     if let Some(anchor) = &mut manifest.time_anchor {
         anchor.private = Some(TimeAnchorPrivate {
-            audit_tip_hex:
-                "0x2222222222222222222222222222222222222222222222222222222222222222".to_string(),
+            audit_tip_hex: "0x2222222222222222222222222222222222222222222222222222222222222222"
+                .to_string(),
             created_at: Utc::now().to_rfc3339(),
         });
     }
@@ -383,7 +387,9 @@ fn test_manifest_validate_dual_anchor_success() {
         "eth".to_string(),
         audit_tip.clone(),
     );
-    manifest.set_private_anchor(audit_tip.clone(), None).unwrap();
+    manifest
+        .set_private_anchor(audit_tip.clone(), None)
+        .unwrap();
     manifest
         .set_public_anchor(
             PublicChain::Ethereum,

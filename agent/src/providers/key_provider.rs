@@ -195,7 +195,7 @@ fn default_version() -> String {
 /// * `config` - Provider configuration (loaded from YAML)
 ///
 /// # Returns
-/// Box<dyn KeyProvider> or KeyError
+/// `Box<dyn KeyProvider>` or `KeyError`
 pub fn create_provider(config: ProviderConfig) -> Result<Box<dyn KeyProvider>, KeyError> {
     let provider_type = ProviderType::from_str(&config.provider)?;
 

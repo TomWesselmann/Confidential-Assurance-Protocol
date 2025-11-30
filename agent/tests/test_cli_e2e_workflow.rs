@@ -186,7 +186,9 @@ notes: "End-to-End Integration Test Policy"
         .arg(&package_dir)
         .assert()
         .success()
-        .stdout(predicate::str::contains("Bundle-Verifikation abgeschlossen")); // Should show verification success
+        .stdout(predicate::str::contains(
+            "Bundle-Verifikation abgeschlossen",
+        )); // Should show verification success
 
     println!("✅ Complete CLI E2E Workflow Test PASSED");
     println!("   Steps completed:");
@@ -211,7 +213,10 @@ fn test_cli_workflow_with_registry() -> Result<()> {
     let suppliers_csv = test_dir.join("suppliers.csv");
     fs::write(&suppliers_csv, "name,jurisdiction,tier\nSupplier A,DE,1\n")?;
     let ubos_csv = test_dir.join("ubos.csv");
-    fs::write(&ubos_csv, "name,birthdate,citizenship\nOwner A,1990-01-01,DE\n")?;
+    fs::write(
+        &ubos_csv,
+        "name,birthdate,citizenship\nOwner A,1990-01-01,DE\n",
+    )?;
 
     // Create policy
     let policy_file = test_dir.join("policy.yml");
@@ -305,7 +310,10 @@ fn test_cli_workflow_invalid_policy_fails() -> Result<()> {
     let suppliers_csv = test_dir.join("suppliers.csv");
     fs::write(&suppliers_csv, "name,jurisdiction,tier\nTest,DE,1\n")?;
     let ubos_csv = test_dir.join("ubos.csv");
-    fs::write(&ubos_csv, "name,birthdate,citizenship\nTest,1990-01-01,DE\n")?;
+    fs::write(
+        &ubos_csv,
+        "name,birthdate,citizenship\nTest,1990-01-01,DE\n",
+    )?;
 
     // Run prepare
     Command::cargo_bin("cap-agent")?
@@ -348,7 +356,10 @@ fn test_meta_json_generation() -> Result<()> {
     let suppliers_csv = test_dir.join("suppliers.csv");
     fs::write(&suppliers_csv, "name,jurisdiction,tier\nSupplier A,DE,1\n")?;
     let ubos_csv = test_dir.join("ubos.csv");
-    fs::write(&ubos_csv, "name,birthdate,citizenship\nOwner A,1990-01-01,DE\n")?;
+    fs::write(
+        &ubos_csv,
+        "name,birthdate,citizenship\nOwner A,1990-01-01,DE\n",
+    )?;
 
     // Create policy
     let policy_file = test_dir.join("policy.yml");
@@ -430,13 +441,20 @@ fn test_meta_json_generation() -> Result<()> {
     eprintln!("DEBUG: created_at value: '{}'", created_at);
     assert!(
         created_at.contains('T') && (created_at.contains('Z') || created_at.contains('+')),
-        "created_at should be RFC3339 format, got: {}", created_at
+        "created_at should be RFC3339 format, got: {}",
+        created_at
     );
 
     // Verify files section
     let files = meta_json["files"].as_object().unwrap();
-    assert!(files.contains_key("manifest.json"), "files should contain manifest.json");
-    assert!(files.contains_key("proof.dat"), "files should contain proof.dat");
+    assert!(
+        files.contains_key("manifest.json"),
+        "files should contain manifest.json"
+    );
+    assert!(
+        files.contains_key("proof.dat"),
+        "files should contain proof.dat"
+    );
 
     // Verify file hashes are SHA3-256 (0x + 64 hex chars)
     let manifest_meta = &files["manifest.json"];
@@ -456,8 +474,15 @@ fn test_meta_json_generation() -> Result<()> {
     assert!(!proof_units.is_empty(), "proof_units should not be empty");
 
     let first_unit = &proof_units[0];
-    assert_eq!(first_unit["id"].as_str().unwrap(), "main", "First proof unit should have id 'main'");
-    assert_eq!(first_unit["manifest_file"].as_str().unwrap(), "manifest.json");
+    assert_eq!(
+        first_unit["id"].as_str().unwrap(),
+        "main",
+        "First proof unit should have id 'main'"
+    );
+    assert_eq!(
+        first_unit["manifest_file"].as_str().unwrap(),
+        "manifest.json"
+    );
     assert_eq!(first_unit["proof_file"].as_str().unwrap(), "proof.dat");
     assert_eq!(first_unit["backend"].as_str().unwrap(), "mock");
 
@@ -477,7 +502,10 @@ fn test_hash_manipulation_detection() -> Result<()> {
     let suppliers_csv = test_dir.join("suppliers.csv");
     fs::write(&suppliers_csv, "name,jurisdiction,tier\nSupplier A,DE,1\n")?;
     let ubos_csv = test_dir.join("ubos.csv");
-    fs::write(&ubos_csv, "name,birthdate,citizenship\nOwner A,1990-01-01,DE\n")?;
+    fs::write(
+        &ubos_csv,
+        "name,birthdate,citizenship\nOwner A,1990-01-01,DE\n",
+    )?;
 
     // Create policy
     let policy_file = test_dir.join("policy.yml");
@@ -535,7 +563,7 @@ fn test_hash_manipulation_detection() -> Result<()> {
     // TAMPER: Modify manifest.json after export
     let manifest_path = package_dir.join("manifest.json");
     let mut manifest_content = fs::read_to_string(&manifest_path)?;
-    manifest_content.push_str(" "); // Add whitespace to change hash
+    manifest_content.push(' '); // Add whitespace to change hash
     fs::write(&manifest_path, manifest_content)?;
 
     // Verification should FAIL due to hash mismatch
@@ -571,7 +599,10 @@ fn test_legacy_bundle_backward_compatibility() -> Result<()> {
     let suppliers_csv = test_dir.join("suppliers.csv");
     fs::write(&suppliers_csv, "name,jurisdiction,tier\nSupplier A,DE,1\n")?;
     let ubos_csv = test_dir.join("ubos.csv");
-    fs::write(&ubos_csv, "name,birthdate,citizenship\nOwner A,1990-01-01,DE\n")?;
+    fs::write(
+        &ubos_csv,
+        "name,birthdate,citizenship\nOwner A,1990-01-01,DE\n",
+    )?;
 
     // Create policy
     let policy_file = test_dir.join("policy.yml");
@@ -648,8 +679,6 @@ fn test_legacy_bundle_backward_compatibility() -> Result<()> {
 
 #[test]
 fn test_dependency_cycle_detection() -> Result<()> {
-    use std::collections::HashMap;
-
     let temp_dir = TempDir::new()?;
     let test_dir = temp_dir.path();
     let package_dir = test_dir.join("cyclic_bundle");
@@ -675,7 +704,7 @@ fn test_dependency_cycle_detection() -> Result<()> {
 
     fs::write(
         package_dir.join("manifest.json"),
-        serde_json::to_string_pretty(&manifest_json)?
+        serde_json::to_string_pretty(&manifest_json)?,
     )?;
 
     // Create dummy proof.dat
@@ -731,7 +760,7 @@ fn test_dependency_cycle_detection() -> Result<()> {
 
     fs::write(
         package_dir.join("_meta.json"),
-        serde_json::to_string_pretty(&meta_json)?
+        serde_json::to_string_pretty(&meta_json)?,
     )?;
 
     // Verification should FAIL due to circular dependency

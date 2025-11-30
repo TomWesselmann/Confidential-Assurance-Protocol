@@ -1,7 +1,7 @@
-/// Integration Tests für sign.rs
-///
-/// Diese Tests wurden aus inline test modules extrahiert um Tarpaulin Coverage-Tracking zu ermöglichen.
-/// Tarpaulin hat eine bekannte Limitation mit #[cfg(test)] inline modules.
+//! Integration Tests für sign.rs
+//!
+//! Diese Tests wurden aus inline test modules extrahiert um Tarpaulin Coverage-Tracking zu ermöglichen.
+//! Tarpaulin hat eine bekannte Limitation mit #[cfg(test)] inline modules.
 
 use cap_agent::manifest::{AuditInfo, Manifest, ProofInfo};
 use cap_agent::policy::PolicyInfo;
@@ -335,7 +335,10 @@ fn test_keypair_roundtrip() {
     let verifying_key = load_public_key(pub_path).unwrap();
 
     // Verify keys match (public key from private key should match loaded public key)
-    assert_eq!(signing_key.verifying_key().to_bytes(), verifying_key.to_bytes());
+    assert_eq!(
+        signing_key.verifying_key().to_bytes(),
+        verifying_key.to_bytes()
+    );
 
     // Cleanup
     fs::remove_file(priv_path).ok();
@@ -375,7 +378,12 @@ fn test_verify_manifest_with_signature_without_prefix() {
     let mut signed = sign_manifest(&manifest, &signing_key, "Company").unwrap();
 
     // Remove 0x prefix from signature (should still work due to strip_prefix in verify)
-    signed.signature.sig_hex = signed.signature.sig_hex.strip_prefix("0x").unwrap().to_string();
+    signed.signature.sig_hex = signed
+        .signature
+        .sig_hex
+        .strip_prefix("0x")
+        .unwrap()
+        .to_string();
 
     // Verify should still work
     let result = verify_manifest(&signed, &verifying_key);
