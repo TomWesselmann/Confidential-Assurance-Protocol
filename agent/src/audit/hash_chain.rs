@@ -168,7 +168,6 @@ impl AuditEvent {
 }
 
 /// Audit chain verification report
-#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct VerifyReport {
     /// Total events verified
@@ -186,7 +185,6 @@ pub struct VerifyReport {
 
 impl VerifyReport {
     /// Creates a successful verification report
-    #[allow(dead_code)]
     pub fn ok(total_events: usize) -> Self {
         Self {
             total_events,
@@ -197,7 +195,6 @@ impl VerifyReport {
     }
 
     /// Creates a failed verification report
-    #[allow(dead_code)]
     pub fn fail(total_events: usize, tamper_index: usize, error: String) -> Self {
         Self {
             total_events,
@@ -209,7 +206,6 @@ impl VerifyReport {
 }
 
 /// Audit chain manager (JSONL storage)
-#[allow(dead_code)]
 pub struct AuditChain {
     path: String,
     last_hash: String,
@@ -217,12 +213,10 @@ pub struct AuditChain {
 
 impl AuditChain {
     /// Genesis hash for first event
-    #[allow(dead_code)]
     pub const GENESIS_HASH: &'static str =
         "0x0000000000000000000000000000000000000000000000000000000000000000";
 
     /// Creates or opens an audit chain
-    #[allow(dead_code)]
     ///
     /// # Arguments
     /// * `path` - Path to JSONL file
@@ -249,7 +243,6 @@ impl AuditChain {
     }
 
     /// Reads last event hash from chain
-    #[allow(dead_code)]
     fn read_last_hash(path: &str) -> Result<String> {
         let file = File::open(path)?;
         let reader = BufReader::new(file);
@@ -278,7 +271,6 @@ impl AuditChain {
     ///
     /// # Returns
     /// The appended event
-    #[allow(dead_code)]
     pub fn append(
         &mut self,
         event: String,
@@ -314,7 +306,6 @@ impl AuditChain {
     }
 
     /// Returns the current tail hash
-    #[allow(dead_code)]
     pub fn tail_hash(&self) -> &str {
         &self.last_hash
     }
@@ -327,7 +318,6 @@ impl AuditChain {
 ///
 /// # Returns
 /// VerifyReport with tamper detection
-#[allow(dead_code)]
 pub fn verify_chain<P: AsRef<Path>>(path: P) -> Result<VerifyReport> {
     let file = File::open(path)?;
     let reader = BufReader::new(file);
@@ -381,7 +371,6 @@ pub fn verify_chain<P: AsRef<Path>>(path: P) -> Result<VerifyReport> {
 ///
 /// # Returns
 /// Vector of filtered events
-#[allow(dead_code)]
 pub fn export_events<P: AsRef<Path>>(
     path: P,
     from_ts: Option<&str>,

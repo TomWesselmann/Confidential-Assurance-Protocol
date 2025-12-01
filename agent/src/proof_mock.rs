@@ -1,10 +1,8 @@
+use crate::io::JsonPersistent;
 use crate::manifest::Manifest;
 use crate::policy::Policy;
 use serde::{Deserialize, Serialize};
 use std::error::Error;
-use std::fs::File;
-use std::io::Write;
-use std::path::Path;
 
 /// Mock-Proof Check-Result
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -128,34 +126,10 @@ impl MockProof {
         Ok(())
     }
 
-    /// Speichert Mock-Proof als JSON
-    ///
-    /// # Argumente
-    /// * `path` - Zielpfad für JSON-Datei
-    ///
-    /// # Rückgabe
-    /// Result
-    pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<(), Box<dyn Error>> {
-        let json = serde_json::to_string_pretty(self)?;
-        let mut file = File::create(path)?;
-        file.write_all(json.as_bytes())?;
-        Ok(())
-    }
-
-    /// Lädt Mock-Proof aus JSON-Datei
-    ///
-    /// # Argumente
-    /// * `path` - Pfad zur JSON-Datei
-    ///
-    /// # Rückgabe
-    /// MockProof-Objekt
-    #[allow(dead_code)]
-    pub fn load<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn Error>> {
-        let file = File::open(path)?;
-        let proof: MockProof = serde_json::from_reader(file)?;
-        Ok(proof)
-    }
 }
+
+/// JsonPersistent Trait für MockProof - ermöglicht load()/save() via Trait
+impl JsonPersistent for MockProof {}
 
 #[cfg(test)]
 mod tests {

@@ -1,6 +1,6 @@
+use crate::io::JsonPersistent;
 use crate::manifest::Manifest;
 use crate::policy::Policy;
-use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use sha3::{Digest, Sha3_256};
 use std::error::Error;
@@ -151,33 +151,6 @@ impl Proof {
         Ok(())
     }
 
-    /// Speichert Proof als JSON-Datei
-    ///
-    /// # Argumente
-    /// * `path` - Zielpfad
-    ///
-    /// # Rückgabe
-    /// Result
-    pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<(), Box<dyn Error>> {
-        let json = serde_json::to_string_pretty(self)?;
-        let mut file = File::create(path)?;
-        file.write_all(json.as_bytes())?;
-        Ok(())
-    }
-
-    /// Lädt Proof aus JSON-Datei
-    ///
-    /// # Argumente
-    /// * `path` - Pfad zur Datei
-    ///
-    /// # Rückgabe
-    /// Proof-Objekt
-    pub fn load<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn Error>> {
-        let file = File::open(path)?;
-        let proof: Proof = serde_json::from_reader(file)?;
-        Ok(proof)
-    }
-
     /// Speichert Proof als Base64-kodierte Datei (proof.dat Format)
     ///
     /// # Argumente
@@ -214,69 +187,8 @@ impl Proof {
     }
 }
 
-/// Exportiert ein vollständiges Proof-Paket
-///
-/// # Argumente
-/// * `manifest` - Das Manifest
-/// * `proof` - Der Proof
-/// * `signature_path` - Optional: Pfad zur Signatur-Datei
-/// * `output_dir` - Zielverzeichnis für das Paket
-///
-/// # Rückgabe
-/// Result
-#[allow(dead_code)]
-pub fn export_proof_package<P: AsRef<Path>>(
-    manifest: &Manifest,
-    proof: &Proof,
-    signature_path: Option<&str>,
-    output_dir: P,
-) -> Result<(), Box<dyn Error>> {
-    let dir = output_dir.as_ref();
-
-    // Erstelle Verzeichnis
-    fs::create_dir_all(dir)?;
-
-    // Kopiere/Erstelle manifest.json
-    let manifest_path = dir.join("manifest.json");
-    manifest.save(&manifest_path)?;
-
-    // Erstelle proof.dat (Base64)
-    let proof_path = dir.join("proof.dat");
-    proof.save_as_dat(&proof_path)?;
-
-    // Kopiere signature.json falls vorhanden
-    if let Some(sig_path) = signature_path {
-        let sig_dest = dir.join("signature.json");
-        fs::copy(sig_path, sig_dest)?;
-    }
-
-    // Erstelle README.txt
-    let readme_path = dir.join("README.txt");
-    let mut readme = File::create(readme_path)?;
-    writeln!(readme, "LkSG Proof Package")?;
-    writeln!(readme, "==================")?;
-    writeln!(readme)?;
-    writeln!(readme, "Generated: {}", Utc::now().to_rfc3339())?;
-    writeln!(readme, "Proof Version: {}", proof.version)?;
-    writeln!(readme, "Proof Type: {}", proof.proof_type)?;
-    writeln!(readme, "Status: {}", proof.status)?;
-    writeln!(readme)?;
-    writeln!(readme, "Files:")?;
-    writeln!(readme, "  - manifest.json: Compliance manifest")?;
-    writeln!(readme, "  - proof.dat: Base64-encoded proof")?;
-    if signature_path.is_some() {
-        writeln!(readme, "  - signature.json: Ed25519 signature")?;
-    }
-    writeln!(readme)?;
-    writeln!(readme, "Verification:")?;
-    writeln!(
-        readme,
-        "  cargo run -- verifier run --package {}",
-        dir.display()
-    )?;
-
-    Ok(())
-}
+/// JsonPersistent Trait für Proof - ermöglicht load()/save() via Trait
+impl JsonPersistent for Proof {}
 
 #[cfg(test)]
 mod tests {

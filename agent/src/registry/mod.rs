@@ -1,11 +1,31 @@
 //! Registry Module v1.1
 //!
 //! Modular registry structure with schema versioning and migration support.
+//!
+//! ## Module Structure (v0.11 Refactoring)
+//!
+//! - `entry`: RegistryEntry data structure
+//! - `signing`: Ed25519 signing and verification
+//! - `timestamp`: RFC3161 timestamp support (mock + real providers)
+//! - `store`: Registry storage backends (JSON, SQLite)
+//! - `v1_0`: Re-export layer for backward compatibility
+//! - `api`: Unified registry API
+//! - `schema`: v1.1 schema definitions
+//! - `migrate`: Migration utilities
 
+// Core modules (v0.11 split)
+pub mod entry;
+pub mod signing;
+pub mod store;
+pub mod timestamp;
+
+// Legacy re-export layer
+pub mod v1_0;
+
+// Higher-level modules
 pub mod api;
 pub mod migrate;
 pub mod schema;
-pub mod v1_0;
 
 // Re-export v1.0 types (for backward compatibility and migration)
 #[allow(unused_imports)]

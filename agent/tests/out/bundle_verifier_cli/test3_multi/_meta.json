@@ -1,0 +1,53 @@
+{
+  "bundle_id": "test-bundle-123",
+  "created_at": "2025-11-24T12:00:00Z",
+  "files": {
+    "manifest_0.json": {
+      "content_type": "application/json",
+      "hash": "0x3a4466ead5fc9d84c49638a518d167e0b56ae852cd8cb9090c54af83181167dd",
+      "optional": false,
+      "role": "manifest",
+      "size": 616
+    },
+    "manifest_1.json": {
+      "content_type": "application/json",
+      "hash": "0x65db6b4d524a5b6800e63ceaeff8614bccb034f2ffcf32821acfbeae144e61f2",
+      "optional": false,
+      "role": "manifest",
+      "size": 616
+    },
+    "proof_0.capz": {
+      "hash": "0xb1b2e827de65c35c15ebc4172ece5e1ba6f2ce3cffb52b804696b3f3c49692a9",
+      "optional": false,
+      "role": "proof",
+      "size": 287
+    },
+    "proof_1.capz": {
+      "hash": "0x0bae9ff63424d924a8ddaef23f435d72eb3ab568ad6e019145a461a7abf31e40",
+      "optional": false,
+      "role": "proof",
+      "size": 287
+    }
+  },
+  "proof_units": [
+    {
+      "backend": "mock",
+      "depends_on": [],
+      "id": "unit_a",
+      "manifest_file": "manifest_0.json",
+      "policy_hash": "0xabc1234567890123456789012345678901234567890123456789012345678901",
+      "policy_id": "policy.a.v1",
+      "proof_file": "proof_0.capz"
+    },
+    {
+      "backend": "mock",
+      "depends_on": [],
+      "id": "unit_b",
+      "manifest_file": "manifest_1.json",
+      "policy_hash": "0xdef1234567890123456789012345678901234567890123456789012345678901",
+      "policy_id": "policy.b.v1",
+      "proof_file": "proof_1.capz"
+    }
+  ],
+  "schema": "cap-bundle.v1"
+}

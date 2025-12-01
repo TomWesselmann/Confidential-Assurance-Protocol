@@ -167,13 +167,8 @@ pub fn verify_core(input: CoreVerifyInput) -> CoreVerifyResult {
 
     // 3. Policy-Verifikation
     // Parse Manifest JSON
-    eprintln!(
-        "DEBUG [verify_core]: Parsing manifest JSON ({} bytes)",
-        input.manifest_bytes.len()
-    );
     match serde_json::from_slice::<serde_json::Value>(&input.manifest_bytes) {
         Ok(manifest) => {
-            eprintln!("DEBUG [verify_core]: Manifest JSON parsed successfully");
 
             // Prüfe Policy-Hash im Manifest gegen input.policy_hash
             if let Some(policy_obj) = manifest.get("policy") {
