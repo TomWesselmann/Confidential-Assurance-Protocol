@@ -4,21 +4,35 @@
 
 Diese Roadmap definiert alle notwendigen Schritte, um den LsKG-Agent von v0.12.0 zu einem **produktionsreifen MVP** zu entwickeln, das in fremden Unternehmen eingesetzt werden kann.
 
-**Aktueller Stand:** v0.12.0 (27. November 2025)
+**Aktueller Stand:** v0.13.0 (11. Dezember 2025)
 - ✅ CLI vollständig (Proof Engine, Registry, Keys, BLOB Store)
-- ✅ REST API mit OAuth2 + TLS/mTLS + Rate Limiting
-- ✅ **Desktop App (NEU!)** (Tauri 2.0) - Offline-fähiger 6-Schritt Workflow ✨
-- ✅ **Web UI** (React + TypeScript + Vite) - Upload & Verification ✨
-- ✅ **Policy Store System** (InMemory + SQLite, 19/19 Tests)
-- ✅ **Standardized Bundle Format** (cap-bundle.v1: SHA3-256, proof_units, policy auto-extraction) ✨
+- ✅ **Desktop App** (Tauri 2.0) - Offline-fähiger 6-Schritt Workflow ✨
+- ✅ **Standardized Bundle Format** (cap-bundle.v1/v2: SHA3-256, proof_units, CAPZ containers) ✨
 - ✅ **Audit Trail V1.0** (SHA3-256 Hash-Chain, JSONL Format) ✨
-- ✅ **Production Monitoring Stack** (Prometheus, Grafana, Loki, Jaeger) - Week 2 ✨
-- ✅ **Docker Deployment** (Dockerfile.optimized, docker-compose.yml)
-- ✅ **Kubernetes Manifests** (Basic deployment configs)
-- ✅ **Alle Tests bestehen** (556/556 Tests, 100% Success Rate, 0 Failures) ✨
-- ✅ **Load Testing** (22-27 RPS sustained throughput, 100% success rate) ✨
-- 🔄 Mock ZK-Proofs (SimplifiedZK - ausreichend für MVP)
+- ✅ **Alle Tests bestehen** (538/538 Tests, 100% Success Rate, 0 Failures) ✨
+- ✅ Mock ZK-Proofs (SimplifiedZK - ausreichend für MVP)
 - 🔄 SAP-Adapter (Stub vorhanden)
+
+**Änderungen (11. Dezember 2025 - Minimal Local Agent Refactoring):**
+- ❌ **ENTFERNT:** REST API Server (cap-verifier-api Binary)
+- ❌ **ENTFERNT:** TLS/mTLS Support
+- ❌ **ENTFERNT:** Policy Store System (API-basiert)
+- ❌ **ENTFERNT:** Monitoring Stack (Prometheus, Grafana, Loki, Jaeger)
+- ❌ **ENTFERNT:** WASM Loader & Executor
+- ❌ **ENTFERNT:** ZK Backend Abstraction (zk_system.rs)
+- ❌ **ENTFERNT:** Orchestrator/Enforcer Module
+- ❌ **ENTFERNT:** Lists Module (Sanctions, Jurisdictions)
+- ❌ **ENTFERNT:** Web UI (React Frontend)
+- ✅ **Behalten:** Vollständige CLI-Funktionalität
+- ✅ **Behalten:** Proof Engine (Mock + Structured Proofs)
+- ✅ **Behalten:** Registry (JSON + SQLite)
+- ✅ **Behalten:** Key Management (Ed25519, KID, Attestation)
+- ✅ **Behalten:** BLOB Store (CAS, GC)
+- ✅ **Behalten:** Bundle V2 (CAPZ, native fallback)
+- ✅ **Behalten:** Audit Trail (Hash-Chain)
+- ✅ **Behalten:** Policy Validation/Lint/Compile (CLI)
+
+**Rationale:** Fokus auf minimalen lokalen Agenten ohne Server-Komponenten für einfachere Deployment- und Wartungsszenarien.
 
 **Letzte Änderungen (27. November 2025):**
 - ✅ **Desktop App (Tauri 2.0):** Offline-fähige Desktop-Anwendung mit Proofer/Verifier/Audit Modes ✨

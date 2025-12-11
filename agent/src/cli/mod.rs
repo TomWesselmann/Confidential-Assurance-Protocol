@@ -19,14 +19,17 @@ pub mod verifier;
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
-/// LkSG Proof Agent - Confidential Assurance Protocol (CAP)
+/// CAP Agent Version (minimal local agent)
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+/// CAP Agent - Confidential Assurance Protocol
 ///
 /// CLI-Tool zur Erzeugung kryptografisch prüfbarer Commitments
 /// für Lieferketten- und Sanktionsprüfungen.
 #[derive(Parser)]
 #[command(name = "cap-agent")]
-#[command(version = super::VERSION)]
-#[command(about = "LkSG Proof Agent (Proof & Verifier Layer MVP)", long_about = None)]
+#[command(version = VERSION)]
+#[command(about = "CAP Agent - Minimal Local Agent for Cryptographic Audit Proofs", long_about = None)]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Commands,

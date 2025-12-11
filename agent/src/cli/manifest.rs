@@ -8,11 +8,22 @@ use crate::commitment;
 use crate::manifest;
 use crate::policy;
 use crate::registry;
-use crate::VerificationReport;
-use cap_agent::verifier::core as verifier_core;
+use crate::verifier::core as verifier_core;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::error::Error;
 use std::fs;
+
+/// Verification Report für manifest verify Kommando
+#[derive(Debug, Serialize, Deserialize)]
+pub struct VerificationReport {
+    pub manifest_hash: String,
+    pub proof_hash: String,
+    pub timestamp_valid: bool,
+    pub registry_match: bool,
+    pub signature_valid: bool,
+    pub status: String,
+}
 
 // ============================================================================
 // Helper-Funktionen für run_manifest_verify

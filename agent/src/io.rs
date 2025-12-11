@@ -17,7 +17,7 @@ use std::path::Path;
 ///
 /// # Beispiel
 /// ```ignore
-/// use cap_agent::io::JsonPersistent;
+/// use crate::io::JsonPersistent;
 ///
 /// #[derive(Serialize, Deserialize)]
 /// struct MyConfig { name: String }

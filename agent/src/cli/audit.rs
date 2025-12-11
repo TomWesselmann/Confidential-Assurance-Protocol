@@ -327,7 +327,7 @@ pub fn run_audit_append(
     result: Option<String>,
     run_id: Option<String>,
 ) -> Result<(), Box<dyn Error>> {
-    use cap_agent::audit::{AuditChain, AuditEventResult};
+    use crate::audit::{AuditChain, AuditEventResult};
 
     output::writing("Füge Event zur Audit-Chain hinzu...");
 
@@ -368,7 +368,7 @@ pub fn run_audit_verify_chain(
     file_path: &str,
     out: Option<String>,
 ) -> Result<(), Box<dyn Error>> {
-    use cap_agent::audit::verify_chain;
+    use crate::audit::verify_chain;
 
     output::searching("Verifiziere Audit-Chain...");
 
@@ -416,7 +416,7 @@ pub fn run_audit_export(
     policy_id: Option<String>,
     out: Option<String>,
 ) -> Result<(), Box<dyn Error>> {
-    use cap_agent::audit::export_events;
+    use crate::audit::export_events;
 
     output::packaging("Exportiere Events aus Audit-Chain...");
 

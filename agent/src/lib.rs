@@ -1,35 +1,37 @@
-/// LkSG Proof Agent - Library Interface
+/// CAP Agent - Minimal Local Agent Library
 ///
-/// This library exposes core modules for benchmarking, testing, and external use.
-/// The main application logic remains in the binary (main.rs).
-#[cfg(feature = "api-server")]
-pub mod api;
-pub mod audit;
-#[cfg(feature = "api-server")]
-pub mod auth;
-pub mod blob_store;
-pub mod bundle;
+/// Cryptographic Audit Proofs for Supply Chain Compliance
+/// This library provides core modules for bundle creation, verification, and signing.
+
+// Core cryptographic modules
+pub mod commitment;
 pub mod crypto;
-#[cfg(feature = "api-server")]
-pub mod http;
-pub mod keys;
-#[cfg(feature = "api-server")]
-pub mod metrics;
-pub mod orchestrator;
+pub mod sign;
+
+// Audit and registry
+pub mod audit;
+pub mod registry;
+
+// Bundle handling
+pub mod bundle;
+pub mod manifest;
+pub mod io;
+pub mod blob_store;
+
+// Policy engine
 pub mod policy;
 pub mod policy_v2;
-pub mod proof;
-pub mod providers;
-pub mod registry;
-#[cfg(feature = "api-server")]
-pub mod tls;
-pub mod verifier;
-pub mod wasm;
 
-// Binary-only modules exported for integration testing
-// These modules are primarily used by the CLI binary (main.rs)
-// but are exported here to enable integration tests and Tarpaulin coverage
-pub mod commitment;
-pub mod io;
-pub mod manifest;
-pub mod sign;
+// Verification
+pub mod verifier;
+pub mod proof;
+pub mod proof_engine;
+pub mod proof_mock;
+pub mod package_verifier;
+
+// Key management
+pub mod keys;
+pub mod providers;
+
+// CLI (for integration testing)
+pub mod cli;

@@ -4,9 +4,8 @@
 //! Enthält: run_bundle_v2, run_verify_bundle
 
 use super::output;
-use cap_agent::crypto;
-use cap_agent::verifier;
-use cap_agent::wasm;
+use crate::crypto;
+use crate::verifier;
 use std::error::Error;
 use std::fs;
 use std::io::Write;
@@ -157,16 +156,12 @@ pub fn run_bundle_v2(
     let proof_dest = format!("{}/proof.capz", out);
     fs::copy(proof, &proof_dest)?;
 
-    // Copy verifier WASM if provided
-    if let Some(wasm_path) = verifier_wasm {
-        output::step(3, 7, "Copying WASM verifier...");
-        fs::copy(&wasm_path, format!("{}/verifier.wasm", out))?;
-        output::step(4, 7, "Creating executor.json...");
-        wasm::ExecutorConfig::default().save(format!("{}/executor.json", out))?;
-    } else {
-        output::step(3, 7, "No WASM verifier provided (will use native fallback)");
-        output::step(4, 7, "Skipping executor.json");
+    // Note: WASM verifier support removed in minimal local agent
+    if verifier_wasm.is_some() {
+        output::warning("WASM verifier not supported in minimal agent, ignoring");
     }
+    output::step(3, 7, "Using native verifier");
+    output::step(4, 7, "Skipping WASM executor config");
 
     // Calculate hashes
     let manifest_bytes = fs::read(&manifest_dest)?;
@@ -194,7 +189,7 @@ pub fn run_bundle_v2(
     Ok(())
 }
 
-/// Verify Bundle - Verify a proof package
+/// Verify Bundle - Verify a proof package (native verifier, no WASM)
 pub fn run_verify_bundle(bundle: &str, out: Option<String>) -> Result<(), Box<dyn Error>> {
     output::searching("Verifying Proof Bundle...");
 
@@ -203,25 +198,37 @@ pub fn run_verify_bundle(bundle: &str, out: Option<String>) -> Result<(), Box<dy
         return Err(format!("Bundle not found: {}", bundle).into());
     }
 
-    // Create executor
     output::step(1, 5, "Loading bundle...");
-    let executor = wasm::BundleExecutor::new(bundle.to_string())?;
+
+    // Load manifest and proof
+    let manifest_path = format!("{}/manifest.json", bundle);
+    let proof_path = format!("{}/proof.capz", bundle);
+
+    if !Path::new(&manifest_path).exists() {
+        return Err(format!("Manifest not found: {}", manifest_path).into());
+    }
+    if !Path::new(&proof_path).exists() {
+        return Err(format!("Proof not found: {}", proof_path).into());
+    }
 
     // Validate bundle integrity via _meta.json hashes
     output::step(2, 5, "Validating bundle integrity...");
     let meta_path = format!("{}/_meta.json", bundle);
+    let manifest_bytes = fs::read(&manifest_path)?;
+    let proof_bytes = fs::read(&proof_path)?;
+    let manifest_hash = crypto::hex_lower_prefixed32(crypto::sha3_256(&manifest_bytes));
+    let proof_hash = crypto::hex_lower_prefixed32(crypto::sha3_256(&proof_bytes));
+
     if Path::new(&meta_path).exists() {
-        let meta_content = std::fs::read_to_string(&meta_path)?;
+        let meta_content = fs::read_to_string(&meta_path)?;
         let meta: serde_json::Value = serde_json::from_str(&meta_content)?;
 
         // Check manifest hash
         if let Some(expected_manifest_hash) = meta["hashes"]["manifest_sha3"].as_str() {
-            let manifest_bytes = std::fs::read(format!("{}/manifest.json", bundle))?;
-            let actual_hash = crypto::hex_lower_prefixed32(crypto::sha3_256(&manifest_bytes));
-            if actual_hash != expected_manifest_hash {
+            if manifest_hash != expected_manifest_hash {
                 return Err(format!(
                     "Bundle integrity check failed: Manifest hash mismatch\n  Expected: {}\n  Actual:   {}",
-                    expected_manifest_hash, actual_hash
+                    expected_manifest_hash, manifest_hash
                 ).into());
             }
             output::indent("Manifest hash valid");
@@ -229,12 +236,10 @@ pub fn run_verify_bundle(bundle: &str, out: Option<String>) -> Result<(), Box<dy
 
         // Check proof hash
         if let Some(expected_proof_hash) = meta["hashes"]["proof_sha3"].as_str() {
-            let proof_bytes = std::fs::read(format!("{}/proof.capz", bundle))?;
-            let actual_hash = crypto::hex_lower_prefixed32(crypto::sha3_256(&proof_bytes));
-            if actual_hash != expected_proof_hash {
+            if proof_hash != expected_proof_hash {
                 return Err(format!(
                     "Bundle integrity check failed: Proof hash mismatch\n  Expected: {}\n  Actual:   {}",
-                    expected_proof_hash, actual_hash
+                    expected_proof_hash, proof_hash
                 ).into());
             }
             output::indent("Proof hash valid");
@@ -243,28 +248,28 @@ pub fn run_verify_bundle(bundle: &str, out: Option<String>) -> Result<(), Box<dy
         output::warning("No _meta.json found, skipping hash validation");
     }
 
-    output::step(3, 5, "Checking verifier...");
-    if executor.has_wasm() {
-        output::indent("WASM verifier found");
-    } else {
-        output::warning("No WASM verifier, using native fallback");
-    }
+    output::step(3, 5, "Using native verifier...");
+
+    // Parse manifest as JSON Value (verifier expects serde_json::Value)
+    let manifest_json: serde_json::Value = serde_json::from_slice(&manifest_bytes)?;
 
     // Create verification options
     output::step(4, 5, "Running verification...");
-    let options = verifier::VerifyOptions {
+    let options = verifier::core::VerifyOptions {
         check_timestamp: false,
         check_registry: false,
     };
 
-    let report = executor.verify(&options)?;
+    // Extract statement and verify
+    let stmt = verifier::core::extract_statement_from_manifest(&manifest_json)?;
+    let report = verifier::core::verify(&manifest_json, &proof_bytes, &stmt, &options)?;
 
     output::step(5, 5, "Generating report...");
     output::section("");
     output::stats("Verification Report:");
     output::detail("Status", &report.status);
-    output::detail("Manifest Hash", &report.manifest_hash);
-    output::detail("Proof Hash", &report.proof_hash);
+    output::detail("Manifest Hash", &manifest_hash);
+    output::detail("Proof Hash", &proof_hash);
     output::detail(
         "Signature",
         if report.signature_valid { "valid" } else { "invalid" },
@@ -273,7 +278,7 @@ pub fn run_verify_bundle(bundle: &str, out: Option<String>) -> Result<(), Box<dy
     // Save report if requested
     if let Some(out_path) = out {
         let report_json = serde_json::to_string_pretty(&report)?;
-        std::fs::write(&out_path, report_json)?;
+        fs::write(&out_path, report_json)?;
         output::section("");
         output::saving(&format!("Report saved: {}", out_path));
     }

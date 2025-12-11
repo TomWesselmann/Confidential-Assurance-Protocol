@@ -1,10 +1,10 @@
 mod audit;
 mod blob_store;
+mod bundle;
 mod cli;
 mod commitment;
 mod io;
 mod keys;
-mod lists;
 mod manifest;
 mod package_verifier;
 mod policy;
@@ -12,21 +12,20 @@ mod proof_engine;
 mod proof_mock;
 mod registry;
 mod sign;
-mod zk_system;
 
 // Re-export library modules for use by bin modules (crate::crypto, etc.)
 pub use cap_agent::crypto;
 pub use cap_agent::verifier;
-pub use cap_agent::wasm;
+pub use cap_agent::bundle as cap_bundle;
 
 use clap::Parser;
 use cli::{
-    AuditCommands, BlobCommands, Cli, Commands, KeysCommands, ListsCommands, ManifestCommands,
+    AuditCommands, BlobCommands, Cli, Commands, KeysCommands, ManifestCommands,
     PolicyCommands, ProofCommands, RegistryCommands, SignCommands, VerifierCommands,
 };
 use serde::{Deserialize, Serialize};
 
-const VERSION: &str = "0.8.0";
+const VERSION: &str = "0.2.0"; // Minimal Local Agent (without REST API)
 
 /// Verification Report für manifest verify Kommando
 #[derive(Debug, Serialize, Deserialize)]
@@ -129,42 +128,23 @@ fn main() {
                 out.clone(),
                 *force,
             ),
-            ProofCommands::ZkBuild {
-                policy,
-                manifest,
-                out,
-                sanctions_root,
-                jurisdiction_root,
-                sanctions_csv,
-            } => cli::proof::run_zk_build(
-                policy,
-                manifest,
-                out.clone(),
-                sanctions_root.clone(),
-                jurisdiction_root.clone(),
-                sanctions_csv.clone(),
-            ),
-            ProofCommands::ZkVerify { proof } => cli::proof::run_zk_verify(proof),
-            ProofCommands::Bench {
-                policy,
-                manifest,
-                iterations,
-            } => cli::proof::run_zk_bench(policy, manifest, *iterations),
-            ProofCommands::Adapt {
-                policy,
-                ir,
-                context,
-                enforce,
-                rollout,
-                drift_max,
-                selector,
-                weights,
-                dry_run,
-                out,
-            } => cli::proof::run_proof_adapt(
-                policy, ir, context, *enforce, *rollout, *drift_max, selector, weights, *dry_run,
-                out,
-            ),
+            // Note: ZK commands removed in minimal local agent
+            ProofCommands::ZkBuild { .. } => {
+                eprintln!("ZK-Build nicht verfügbar im minimalen lokalen Agenten");
+                Err("ZK commands removed".into())
+            }
+            ProofCommands::ZkVerify { .. } => {
+                eprintln!("ZK-Verify nicht verfügbar im minimalen lokalen Agenten");
+                Err("ZK commands removed".into())
+            }
+            ProofCommands::Bench { .. } => {
+                eprintln!("ZK-Bench nicht verfügbar im minimalen lokalen Agenten");
+                Err("ZK commands removed".into())
+            }
+            ProofCommands::Adapt { .. } => {
+                eprintln!("Proof-Adapt nicht verfügbar im minimalen lokalen Agenten");
+                Err("Orchestrator removed".into())
+            }
         },
         Commands::Sign(cmd) => match cmd {
             SignCommands::Keygen { dir } => cli::sign::run_sign_keygen(dir.clone()),
@@ -255,14 +235,11 @@ fn main() {
                 out.clone(),
             ),
         },
-        Commands::Lists(cmd) => match cmd {
-            ListsCommands::SanctionsRoot { csv, out } => {
-                cli::registry::run_lists_sanctions_root(csv, out.clone())
-            }
-            ListsCommands::JurisdictionsRoot { csv, out } => {
-                cli::registry::run_lists_jurisdictions_root(csv, out.clone())
-            }
-        },
+        // Note: Lists commands removed in minimal local agent
+        Commands::Lists(_cmd) => {
+            eprintln!("Lists-Commands nicht verfügbar im minimalen lokalen Agenten");
+            Err("Lists module removed".into())
+        }
         Commands::Registry(cmd) => match cmd {
             RegistryCommands::Add {
                 manifest,

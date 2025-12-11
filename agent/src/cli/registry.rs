@@ -7,7 +7,7 @@
 
 use super::output;
 use crate::audit::AuditLog;
-use crate::{lists, registry};
+use crate::registry;
 use registry::RegistryBackend;
 use serde_json::json;
 use std::error::Error;
@@ -126,95 +126,8 @@ fn sign_and_validate_entry(
 // Öffentliche CLI-Funktionen
 // ============================================================================
 
-/// Lists sanctions-root - Generiert Sanctions Merkle Root
-pub fn run_lists_sanctions_root(
-    csv_path: &str,
-    out: Option<String>,
-) -> Result<(), Box<dyn Error>> {
-    output::listing("Generiere Sanctions Merkle Root...");
-
-    let mut audit = AuditLog::new("build/agent.audit.jsonl")?;
-
-    // Berechne Root aus CSV
-    let (root, entries) = lists::compute_sanctions_root(csv_path)?;
-
-    let out_path = out.unwrap_or_else(|| "build/sanctions.root".to_string());
-
-    // Erstelle Root-Info
-    let info = lists::SanctionsRootInfo {
-        root: root.clone(),
-        count: entries.len(),
-        source: csv_path.to_string(),
-        generated_at: chrono::Utc::now().to_rfc3339(),
-        algorithm: "BLAKE3".to_string(),
-    };
-
-    // Speichere Root-Info
-    lists::save_sanctions_root_info(&info, &out_path)?;
-
-    // Audit-Event
-    audit.log_event(
-        "sanctions_root_generated",
-        json!({
-            "root": root,
-            "count": entries.len(),
-            "source": csv_path,
-            "output": out_path
-        }),
-    )?;
-
-    output::success("Sanctions Root generiert:");
-    output::detail("Root", &root);
-    output::detail_fmt("Count", entries.len());
-    output::detail("Output", &out_path);
-
-    Ok(())
-}
-
-/// Lists jurisdictions-root - Generiert Jurisdictions Merkle Root
-pub fn run_lists_jurisdictions_root(
-    csv_path: &str,
-    out: Option<String>,
-) -> Result<(), Box<dyn Error>> {
-    output::network("Generiere Jurisdictions Merkle Root...");
-
-    let mut audit = AuditLog::new("build/agent.audit.jsonl")?;
-
-    // Berechne Root aus CSV
-    let (root, entries) = lists::compute_jurisdictions_root(csv_path)?;
-
-    let out_path = out.unwrap_or_else(|| "build/jurisdictions.root".to_string());
-
-    // Erstelle Root-Info
-    let info = lists::JurisdictionsRootInfo {
-        root: root.clone(),
-        count: entries.len(),
-        source: csv_path.to_string(),
-        generated_at: chrono::Utc::now().to_rfc3339(),
-        algorithm: "BLAKE3".to_string(),
-    };
-
-    // Speichere Root-Info
-    lists::save_jurisdictions_root_info(&info, &out_path)?;
-
-    // Audit-Event
-    audit.log_event(
-        "jurisdictions_root_generated",
-        json!({
-            "root": root,
-            "count": entries.len(),
-            "source": csv_path,
-            "output": out_path
-        }),
-    )?;
-
-    output::success("Jurisdictions Root generiert:");
-    output::detail("Root", &root);
-    output::detail_fmt("Count", entries.len());
-    output::detail("Output", &out_path);
-
-    Ok(())
-}
+// Note: run_lists_sanctions_root and run_lists_jurisdictions_root removed
+// in minimal local agent. These features require the lists module.
 
 /// Registry add - Fügt einen Proof zur Registry hinzu
 #[allow(clippy::too_many_arguments)]

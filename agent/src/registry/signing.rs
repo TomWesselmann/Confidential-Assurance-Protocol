@@ -121,14 +121,15 @@ pub fn validate_key_status(kid: &str, key_store_path: &str) -> Result<(), Box<dy
 
     let store = KeyStore::new(key_store_path)?;
 
+    use crate::keys::KeyStatus;
+
     match store.find_by_kid(kid)? {
-        Some(key_meta) => match key_meta.status.as_str() {
-            "active" => Ok(()),
-            "retired" => {
+        Some(key_meta) => match key_meta.status {
+            KeyStatus::Active => Ok(()),
+            KeyStatus::Retired => {
                 Err(format!("Key {} is retired and cannot be used for new entries", kid).into())
             }
-            "revoked" => Err(format!("Key {} is revoked and cannot be used", kid).into()),
-            other => Err(format!("Key {} has unknown status: {}", kid, other).into()),
+            KeyStatus::Revoked => Err(format!("Key {} is revoked and cannot be used", kid).into()),
         },
         None => Err(format!("Key not found in store: {}", kid).into()),
     }

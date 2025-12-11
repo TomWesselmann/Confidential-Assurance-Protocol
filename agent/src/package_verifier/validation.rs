@@ -5,8 +5,8 @@
 //! - File size limits (DoS prevention)
 //! - Hash validation
 
-use cap_agent::bundle::meta::BundleMeta;
-use cap_agent::crypto::{hex_lower_prefixed32, sha3_256};
+use crate::bundle::meta::BundleMeta;
+use crate::crypto::{hex_lower_prefixed32, sha3_256};
 use std::collections::HashMap;
 use std::error::Error;
 use std::fs;
