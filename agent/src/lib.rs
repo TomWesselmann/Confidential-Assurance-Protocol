@@ -1,7 +1,7 @@
-/// CAP Agent - Minimal Local Agent Library
-///
-/// Cryptographic Audit Proofs for Supply Chain Compliance
-/// This library provides core modules for bundle creation, verification, and signing.
+//! CAP Agent - Minimal Local Agent Library
+//!
+//! Cryptographic Audit Proofs for Supply Chain Compliance
+//! This library provides core modules for bundle creation, verification, and signing.
 
 // Core cryptographic modules
 pub mod commitment;

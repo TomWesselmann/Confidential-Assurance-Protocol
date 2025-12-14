@@ -6,6 +6,8 @@ description = "CAP Agent - Minimal Local Agent for Cryptographic Audit Proofs"
 
 [features]
 default = []
+pkcs11 = []    # HSM support (future)
+cloudkms = []  # Cloud KMS support (future)
 
 [lib]
 name = "cap_agent"

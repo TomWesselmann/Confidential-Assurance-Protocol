@@ -306,6 +306,7 @@ impl AuditChain {
     }
 
     /// Returns the current tail hash
+    #[allow(dead_code)] // Public API for audit chain inspection
     pub fn tail_hash(&self) -> &str {
         &self.last_hash
     }

@@ -1,0 +1,70 @@
+# Dependabot Configuration
+# https://docs.github.com/en/code-security/dependabot/dependabot-version-updates
+
+version: 2
+updates:
+  # Rust dependencies (agent crate)
+  - package-ecosystem: "cargo"
+    directory: "/agent"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Europe/Berlin"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps(rust)"
+    labels:
+      - "dependencies"
+      - "rust"
+    reviewers:
+      - "tomwesselmann"
+
+  # Rust dependencies (Tauri backend)
+  - package-ecosystem: "cargo"
+    directory: "/src-tauri"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Europe/Berlin"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps(tauri)"
+    labels:
+      - "dependencies"
+      - "tauri"
+    reviewers:
+      - "tomwesselmann"
+
+  # NPM dependencies (Frontend)
+  - package-ecosystem: "npm"
+    directory: "/tauri-frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Europe/Berlin"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps(npm)"
+    labels:
+      - "dependencies"
+      - "frontend"
+    reviewers:
+      - "tomwesselmann"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Europe/Berlin"
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "deps(actions)"
+    labels:
+      - "dependencies"
+      - "ci"

@@ -23,6 +23,10 @@ pub mod export;
 pub mod meta;
 pub mod source;
 
+// Public API re-exports for external consumers
+#[allow(unused_imports)]
 pub use export::{export_bundle, ExportedFiles, ExportResult};
+#[allow(unused_imports)]
 pub use meta::{BundleFileMeta, BundleMeta, ProofUnitMeta, BUNDLE_SCHEMA_V1};
+#[allow(unused_imports)]
 pub use source::{load_bundle_atomic, parse_bundle_source, BundleData, BundleSource};

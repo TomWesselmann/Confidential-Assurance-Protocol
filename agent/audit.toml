@@ -1,0 +1,49 @@
+# cargo-audit Configuration
+# https://github.com/rustsec/rustsec/tree/main/cargo-audit
+#
+# This file documents any security advisories that have been reviewed
+# and accepted as non-applicable or low-risk for this project.
+
+[advisories]
+# List of advisory IDs to ignore
+# Each entry should have a comment explaining why it's acceptable
+ignore = [
+    # Example:
+    # "RUSTSEC-2024-XXXX", # Reason: Only affects feature X which we don't use
+]
+
+# Severity threshold (low, medium, high, critical)
+# Advisories below this threshold are ignored
+# severity_threshold = "medium"
+
+[database]
+# Path to advisory database (default: ~/.cargo/advisory-db)
+# path = "~/.cargo/advisory-db"
+
+# URL to advisory database git repository
+# url = "https://github.com/RustSec/advisory-db.git"
+
+# Perform a git fetch before checking (default: true)
+# fetch = true
+
+# Allow a stale (local-only) database
+# stale = false
+
+[output]
+# Output format: terminal, json, markdown
+# format = "terminal"
+
+# Terminal output coloring: auto, always, never
+# color = "auto"
+
+# Quiet mode (suppress informational messages)
+# quiet = false
+
+[packages]
+# Package-specific configuration
+
+# Packages to ignore completely (name only, no version)
+# ignore = []
+
+# Source of packages to audit: all, crates-io, git
+# source = "all"

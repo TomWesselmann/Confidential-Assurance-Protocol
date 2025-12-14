@@ -25,7 +25,7 @@ pub const MAX_FILE_SIZE: u64 = 100 * 1024 * 1024;
 /// # Security
 /// - TOCTOU mitigation: File read only once
 /// - DoS prevention: File size limit (100 MB)
-/// - Memory-safe: Hash computed on Vec<u8>
+/// - Memory-safe: Hash computed on `Vec<u8>`
 pub fn validate_file_hash(file_path: &Path, expected_hash: &str) -> Result<Vec<u8>, Box<dyn Error>> {
     // 1. Load file into memory (single read)
     let bytes = fs::read(file_path)?;

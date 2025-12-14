@@ -15,10 +15,13 @@ pub mod types;
 pub mod validation;
 pub mod verifier;
 
-// Re-exports for backward compatibility
+// Public API re-exports for backward compatibility
 pub use summary::show_package_summary;
+#[allow(unused_imports)]
 pub use types::{BundleType, BundleVerifyResult, VerificationResult};
+#[allow(unused_imports)]
 pub use validation::{load_and_validate_bundle, validate_file_hash, MAX_FILE_SIZE};
+#[allow(unused_imports)]
 pub use verifier::{detect_bundle_type, BundleVerifier, Verifier};
 
 #[cfg(test)]

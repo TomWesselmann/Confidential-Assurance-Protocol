@@ -57,7 +57,7 @@ impl PolicyStore for SqlitePolicyStore {
         let hash = compute_policy_hash(&policy)?;
         let now = now_iso8601();
 
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().expect("Failed to acquire policy store lock");
 
         // Check if policy with same hash exists
         let existing: Option<(String, String)> = conn
@@ -120,7 +120,7 @@ impl PolicyStore for SqlitePolicyStore {
     }
 
     async fn get(&self, id: &str) -> Result<Option<CompiledPolicy>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().expect("Failed to acquire policy store lock");
 
         let result: Option<(String, String, String, String, String, String, String, String, Option<Vec<u8>>)> = conn
             .query_row(
@@ -179,7 +179,7 @@ impl PolicyStore for SqlitePolicyStore {
 
     async fn get_by_hash(&self, hash: &str) -> Result<Option<CompiledPolicy>> {
         let id: Option<String> = {
-            let conn = self.conn.lock().unwrap();
+            let conn = self.conn.lock().expect("Failed to acquire policy store lock");
             conn.query_row(
                 "SELECT id FROM policies WHERE hash = ?1",
                 params![hash],
@@ -195,7 +195,7 @@ impl PolicyStore for SqlitePolicyStore {
     }
 
     async fn list(&self, status_filter: Option<PolicyStatus>) -> Result<Vec<PolicyMetadata>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().expect("Failed to acquire policy store lock");
 
         let query = if let Some(status) = status_filter {
             let status_str = Self::status_to_string(status);
@@ -247,7 +247,7 @@ impl PolicyStore for SqlitePolicyStore {
     }
 
     async fn set_status(&self, id: &str, status: PolicyStatus) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().expect("Failed to acquire policy store lock");
 
         let status_str = Self::status_to_string(status);
         let now = now_iso8601();

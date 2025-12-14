@@ -147,6 +147,7 @@ impl Policy {
     ///
     /// # Rückgabe
     /// Result mit () bei Erfolg oder Fehler mit fehlenden Keys
+    #[allow(dead_code)] // Public API - validation helper for policy engine
     pub fn check_required_statement_roots(
         &self,
         sanctions_root: &Option<String>,

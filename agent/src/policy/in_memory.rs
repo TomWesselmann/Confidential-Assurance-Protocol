@@ -41,13 +41,13 @@ impl PolicyStore for InMemoryPolicyStore {
 
         // Check if policy with same hash already exists
         let existing_id = {
-            let hash_idx = self.hash_index.lock().unwrap();
+            let hash_idx = self.hash_index.lock().expect("Failed to acquire in-memory policy store lock");
             hash_idx.get(&hash).cloned()
         };
 
         if let Some(existing_id) = existing_id {
             // Update existing policy's timestamp
-            let mut policies = self.policies.lock().unwrap();
+            let mut policies = self.policies.lock().expect("Failed to acquire in-memory policy store lock");
             if let Some(existing) = policies.get_mut(&existing_id) {
                 existing.metadata.updated_at = now.clone();
                 return Ok(existing.metadata.clone());
@@ -78,19 +78,19 @@ impl PolicyStore for InMemoryPolicyStore {
             .lock()
             .unwrap()
             .insert(id_str.clone(), compiled);
-        self.hash_index.lock().unwrap().insert(hash, id_str);
+        self.hash_index.lock().expect("Failed to acquire in-memory policy store lock").insert(hash, id_str);
 
         Ok(metadata)
     }
 
     async fn get(&self, id: &str) -> Result<Option<CompiledPolicy>> {
-        let policies = self.policies.lock().unwrap();
+        let policies = self.policies.lock().expect("Failed to acquire in-memory policy store lock");
         Ok(policies.get(id).cloned())
     }
 
     async fn get_by_hash(&self, hash: &str) -> Result<Option<CompiledPolicy>> {
         let id = {
-            let hash_idx = self.hash_index.lock().unwrap();
+            let hash_idx = self.hash_index.lock().expect("Failed to acquire in-memory policy store lock");
             hash_idx.get(hash).cloned()
         };
 
@@ -101,7 +101,7 @@ impl PolicyStore for InMemoryPolicyStore {
     }
 
     async fn list(&self, status_filter: Option<PolicyStatus>) -> Result<Vec<PolicyMetadata>> {
-        let policies = self.policies.lock().unwrap();
+        let policies = self.policies.lock().expect("Failed to acquire in-memory policy store lock");
         let mut result: Vec<_> = policies
             .values()
             .filter(|p| {
@@ -120,7 +120,7 @@ impl PolicyStore for InMemoryPolicyStore {
     }
 
     async fn set_status(&self, id: &str, status: PolicyStatus) -> Result<()> {
-        let mut policies = self.policies.lock().unwrap();
+        let mut policies = self.policies.lock().expect("Failed to acquire in-memory policy store lock");
         if let Some(policy) = policies.get_mut(id) {
             policy.metadata.status = status;
             policy.metadata.updated_at = now_iso8601();
@@ -154,14 +154,14 @@ mod tests {
     #[tokio::test]
     async fn test_new() {
         let store = InMemoryPolicyStore::new();
-        let policies = store.policies.lock().unwrap();
+        let policies = store.policies.lock().expect("Failed to acquire in-memory policy store lock");
         assert_eq!(policies.len(), 0);
     }
 
     #[tokio::test]
     async fn test_default() {
         let store = InMemoryPolicyStore::default();
-        let policies = store.policies.lock().unwrap();
+        let policies = store.policies.lock().expect("Failed to acquire in-memory policy store lock");
         assert_eq!(policies.len(), 0);
     }
 

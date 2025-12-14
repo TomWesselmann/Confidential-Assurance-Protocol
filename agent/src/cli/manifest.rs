@@ -15,6 +15,7 @@ use std::error::Error;
 use std::fs;
 
 /// Verification Report für manifest verify Kommando
+#[allow(dead_code)] // Used for JSON output in CLI commands
 #[derive(Debug, Serialize, Deserialize)]
 pub struct VerificationReport {
     pub manifest_hash: String,

@@ -171,9 +171,11 @@ pub fn run_audit_verify_anchor(
         })
     } else {
         // Check individual components
-        let has_anchor = manifest.time_anchor.is_some();
-        let has_private = has_anchor && manifest.time_anchor.as_ref().unwrap().private.is_some();
-        let has_public = has_anchor && manifest.time_anchor.as_ref().unwrap().public.is_some();
+        let (has_private, has_public) = manifest
+            .time_anchor
+            .as_ref()
+            .map(|anchor| (anchor.private.is_some(), anchor.public.is_some()))
+            .unwrap_or((false, false));
 
         json!({
             "status": "ok",

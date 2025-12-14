@@ -1,0 +1,9 @@
+ubo_id,supplier_id,name,nationality,ownership_percentage,pep_status
+UBO001,SUP001,Max Mustermann,DE,51.0,false
+UBO002,SUP001,Erika Musterfrau,DE,49.0,false
+UBO003,SUP002,Hans Schmidt,DE,100.0,false
+UBO004,SUP003,John Smith,GB,60.0,false
+UBO005,SUP003,Jane Doe,US,40.0,true
+UBO006,SUP004,Karl Huber,AT,75.0,false
+UBO007,SUP004,Maria Wagner,AT,25.0,false
+UBO008,SUP005,Erik Nordmann,NO,100.0,false

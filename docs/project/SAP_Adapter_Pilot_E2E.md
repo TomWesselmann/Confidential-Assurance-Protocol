@@ -1,4 +1,8 @@
-# SAP Adapter Pilot E2E Flow (Week 6 - Track C)
+# SAP Adapter Pilot E2E Flow
+
+> **Status:** GEPLANT (Future Version v1.0+)
+> Dieses Feature ist für zukünftige Enterprise-Versionen geplant.
+> Derzeit nicht im Minimal Local Agent (v0.12.0) enthalten.
 
 ## Overview
 

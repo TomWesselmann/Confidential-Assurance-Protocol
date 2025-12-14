@@ -1,0 +1,76 @@
+# Pre-commit configuration for CAP
+# Install: pip install pre-commit && pre-commit install
+# See https://pre-commit.com for more information
+
+repos:
+  # Rust formatting and linting
+  - repo: local
+    hooks:
+      - id: cargo-fmt
+        name: cargo fmt
+        description: Format Rust code with rustfmt
+        entry: cargo fmt --all -- --check
+        language: system
+        types: [rust]
+        pass_filenames: false
+
+      - id: cargo-clippy
+        name: cargo clippy
+        description: Lint Rust code with clippy
+        entry: cargo clippy --workspace -- -D warnings
+        language: system
+        types: [rust]
+        pass_filenames: false
+
+      - id: cargo-test
+        name: cargo test
+        description: Run Rust tests
+        entry: cargo test --workspace --lib
+        language: system
+        types: [rust]
+        pass_filenames: false
+        stages: [pre-push]
+
+  # Frontend linting
+  - repo: local
+    hooks:
+      - id: npm-lint
+        name: npm lint
+        description: Lint TypeScript/React code
+        entry: bash -c 'cd tauri-frontend && npm run lint'
+        language: system
+        types_or: [ts, tsx, javascript, jsx]
+        pass_filenames: false
+
+      - id: npm-typecheck
+        name: npm typecheck
+        description: TypeScript type checking
+        entry: bash -c 'cd tauri-frontend && npx tsc --noEmit'
+        language: system
+        types_or: [ts, tsx]
+        pass_filenames: false
+
+  # General file checks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: ^(tauri-frontend/node_modules/|agent/target/)
+      - id: end-of-file-fixer
+        exclude: ^(tauri-frontend/node_modules/|agent/target/)
+      - id: check-yaml
+        exclude: ^(tauri-frontend/node_modules/)
+      - id: check-json
+        exclude: ^(tauri-frontend/node_modules/)
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: ['--maxkb=500']
+
+  # Commit message format
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v3.1.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]
+        args: [feat, fix, docs, style, refactor, test, chore, ci, perf]

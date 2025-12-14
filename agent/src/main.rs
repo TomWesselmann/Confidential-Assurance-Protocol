@@ -28,6 +28,7 @@ use serde::{Deserialize, Serialize};
 const VERSION: &str = "0.2.0"; // Minimal Local Agent (without REST API)
 
 /// Verification Report für manifest verify Kommando
+#[allow(dead_code)] // Type definition kept for future use, actual construction in cli::manifest
 #[derive(Debug, Serialize, Deserialize)]
 struct VerificationReport {
     pub manifest_hash: String,

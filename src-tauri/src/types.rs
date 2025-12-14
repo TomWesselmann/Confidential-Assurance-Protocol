@@ -20,6 +20,7 @@ pub enum CsvType {
 }
 
 /// Workflow step status
+#[allow(dead_code)] // Used for workflow state serialization
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum StepStatus {

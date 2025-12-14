@@ -113,7 +113,10 @@ fn create_bundle_zip(out: &str) -> Result<(), Box<dyn Error>> {
         let entry = entry?;
         let path = entry.path();
         if path.is_file() {
-            let file_name = path.file_name().unwrap().to_str().unwrap();
+            let file_name = path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .ok_or_else(|| format!("Invalid filename in path: {}", path.display()))?;
             let file_data = fs::read(&path)?;
             zip_writer.start_file(file_name, options)?;
             zip_writer.write_all(&file_data)?;

@@ -95,12 +95,10 @@ pub fn backfill_kid(registry: &mut RegistryV1_1) -> Result<usize> {
         }
 
         // Skip if no public_key to derive from
-        if entry.public_key.is_none() {
-            continue;
-        }
-
-        // Derive KID from public_key using Week 7 formula
-        let public_key = entry.public_key.as_ref().unwrap();
+        let public_key = match entry.public_key.as_ref() {
+            Some(pk) => pk,
+            None => continue,
+        };
 
         // Use the key derivation from Track S
         // For now, we use a simple hash of the public key

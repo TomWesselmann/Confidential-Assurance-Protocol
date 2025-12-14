@@ -1,5 +1,9 @@
 # CAP-Agent Refactoring Guide
 
+> **Status:** ABGESCHLOSSEN (Sessions 1-17)
+> Dieses Dokument dokumentiert das abgeschlossene CLI-Refactoring.
+> main.rs wurde von 4.467 LOC auf 401 LOC reduziert.
+
 _Maßgeschneiderte Anleitung für strukturelle Verbesserungen des CAP-Agent Projekts_
 
 ---

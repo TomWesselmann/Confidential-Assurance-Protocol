@@ -27,6 +27,7 @@ impl Commitments {
     ///
     /// # Rückgabe
     /// Commitments-Objekt oder Fehler
+    #[allow(dead_code)] // Public API - alternative to load_commitments()
     pub fn load<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn Error>> {
         load_commitments(path)
     }

@@ -102,7 +102,10 @@ fn sign_and_validate_entry(
         .into());
     }
 
-    let signing_key = ed25519_dalek::SigningKey::from_bytes(&key_bytes.try_into().unwrap());
+    let key_array: [u8; 32] = key_bytes
+        .try_into()
+        .map_err(|_| "Failed to convert key bytes to array")?;
+    let signing_key = ed25519_dalek::SigningKey::from_bytes(&key_array);
 
     // Sign entry
     registry::sign_entry(entry, &signing_key)?;

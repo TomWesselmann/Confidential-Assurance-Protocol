@@ -1,17 +1,19 @@
-/// SAP Adapter - v0.3.0: Production-Ready OData v4 Integration
-///
-/// Implements CAP Engineering Guide Section 9.2:
-/// 1. OData fetch Funktion erstellen      ✅
-/// 2. Sanitizer definieren                 ✅
-/// 3. Mapping-Funktion schreiben           ✅
-/// 4. Merkle Root Berechnung ergänzen      ✅ (integrated in mapper)
-/// 5. context.json erweitern               ✅
-/// 6. Tests schreiben                      ✅ (module tests)
-/// 7. CLI Command ergänzen                 ✅
-///
-/// CLI Usage:
-///   sap-adapter --mode mock --output context.json
-///   sap-adapter --mode odata --sap-url <URL> --sap-user <USER> --sap-pass <PASS>
+//! SAP Adapter - v0.3.0: Production-Ready OData v4 Integration
+//!
+//! Implements CAP Engineering Guide Section 9.2:
+//! 1. OData fetch Funktion erstellen      (done)
+//! 2. Sanitizer definieren                 (done)
+//! 3. Mapping-Funktion schreiben           (done)
+//! 4. Merkle Root Berechnung ergänzen      (integrated in mapper)
+//! 5. context.json erweitern               (done)
+//! 6. Tests schreiben                      (module tests)
+//! 7. CLI Command ergänzen                 (done)
+//!
+//! ## CLI Usage
+//! ```bash
+//! sap-adapter --mode mock --output context.json
+//! sap-adapter --mode odata --sap-url <URL> --sap-user <USER> --sap-pass <PASS>
+//! ```
 
 use anyhow::{Context as AnyhowContext, Result};
 use clap::{Parser, ValueEnum};

@@ -4,7 +4,6 @@
 
 use super::output;
 use crate::audit::AuditLog;
-use crate::commitment::Commitments;
 use crate::io::JsonPersistent;
 use crate::{commitment, io, manifest, policy, proof_engine, proof_mock};
 use crate::bundle::export;
