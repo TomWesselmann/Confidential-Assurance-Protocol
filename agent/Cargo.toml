@@ -46,7 +46,7 @@ jsonschema = "0.17"
 rusqlite = { version = "0.31", features = ["bundled"] }
 
 # Bundle format
-zip = "2.1"
+zip = "6.0"
 
 # Error handling
 anyhow = "1.0"
