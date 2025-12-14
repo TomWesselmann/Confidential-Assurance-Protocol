@@ -1,0 +1,58 @@
+# Tarpaulin Coverage Configuration
+# https://github.com/xd009642/tarpaulin
+
+[default]
+# Workspace mode - test all crates
+workspace = true
+
+# Output formats
+out = ["Html", "Lcov", "Json"]
+output-dir = "coverage"
+
+# Exclude test files and benches from coverage
+exclude-files = [
+    "*/tests/*",
+    "*/benches/*",
+    "**/test_*.rs",
+    "**/*_test.rs",
+]
+
+# Exclude specific paths
+exclude = [
+    "src-tauri",  # Tauri app has separate testing
+]
+
+# Fail if coverage is below threshold
+fail-under = 70
+
+# Run tests in release mode for faster execution
+release = false
+
+# Timeout per test in seconds
+timeout = 120
+
+# Skip functions that are too complex to instrument
+skip-clean = false
+
+# Verbose output
+verbose = true
+
+# Include line coverage
+line = true
+
+# Include branch coverage
+branch = true
+
+# Ignore test functions themselves
+ignore-tests = true
+
+# Number of test threads
+jobs = 4
+
+[agent]
+# Specific configuration for agent crate
+name = "agent"
+manifest-path = "agent/Cargo.toml"
+
+# Additional test arguments
+test-args = ["--", "--test-threads=4"]

@@ -50,7 +50,7 @@ fn get_last_entry(audit_path: &Path) -> Option<(u64, String)> {
     }
 
     let content = fs::read_to_string(audit_path).ok()?;
-    let last_line = content.lines().filter(|l| !l.trim().is_empty()).last()?;
+    let last_line = content.lines().filter(|l| !l.trim().is_empty()).next_back()?;
 
     let entry: serde_json::Value = serde_json::from_str(last_line).ok()?;
     let seq = entry.get("seq")?.as_u64()?;

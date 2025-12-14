@@ -1,0 +1,6 @@
+supplier_id,name,country,risk_score,sector,registration_number
+SUP001,Acme Corp,DE,25,Manufacturing,HRB12345
+SUP002,Global Trade GmbH,DE,15,Logistics,HRB67890
+SUP003,Tech Solutions Ltd,GB,30,Technology,UK12345678
+SUP004,Green Energy AG,AT,10,Energy,FN123456a
+SUP005,Nordic Supplies AS,NO,20,Retail,987654321

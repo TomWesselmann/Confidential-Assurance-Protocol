@@ -22,6 +22,7 @@ struct ManifestFile {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)] // Fields deserialized from JSON manifest
 struct PolicyRef {
     name: String,
     version: String,

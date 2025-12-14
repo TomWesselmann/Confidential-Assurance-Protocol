@@ -1,6 +1,7 @@
-/// OData v4 Client for SAP S/4HANA Business Partner API
-/// Implements deterministic, auditable data fetching with timeout and error handling
-/// Follows CAP Engineering Guide Section 9.2
+//! OData v4 Client for SAP S/4HANA Business Partner API
+//!
+//! Implements deterministic, auditable data fetching with timeout and error handling.
+//! Follows CAP Engineering Guide Section 9.2.
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};

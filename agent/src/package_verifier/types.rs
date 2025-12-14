@@ -32,12 +32,12 @@ pub struct BundleVerifyResult {
     #[allow(dead_code)] // Reserved for future reporting/serialization
     pub created_at: String,
     pub status: VerifyStatus,
-    pub unit_results: Vec<(String, cap_agent::verifier::core::VerifyReport)>,
+    pub unit_results: Vec<(String, crate::verifier::core::VerifyReport)>,
 }
 
 /// Aggregiert den Gesamtstatus aus allen Unit-Ergebnissen
 pub fn aggregate_status(
-    unit_results: &[(String, cap_agent::verifier::core::VerifyReport)],
+    unit_results: &[(String, crate::verifier::core::VerifyReport)],
 ) -> VerifyStatus {
     unit_results
         .iter()

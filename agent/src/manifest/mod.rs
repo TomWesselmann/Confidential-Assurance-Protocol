@@ -15,10 +15,13 @@ pub mod io;
 pub mod signed;
 pub mod types;
 
-// Re-exports for backward compatibility
+// Public API re-exports for backward compatibility
+#[allow(unused_imports)]
 pub use anchor::{PublicChain, TimeAnchor, TimeAnchorPrivate, TimeAnchorPublic};
+#[allow(unused_imports)]
 pub use io::read_audit_tail;
 pub use signed::SignedManifest;
+#[allow(unused_imports)]
 pub use types::{AuditInfo, Manifest, ProofInfo, SignatureInfo, MANIFEST_SCHEMA_VERSION};
 
 #[cfg(test)]

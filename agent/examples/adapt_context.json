@@ -1,0 +1,12 @@
+{
+    "supplier_hashes": [
+        "0xdde3f2c96c5ffc46eef6af7fe449ba6c575b71eff26d0829ce6d48872b2f1610"
+    ],
+    "ubo_hashes": [
+        "0xf89ea642046c73faa32494ed30672c7a7a7f764e399d1fb6d1c342ff3e7bf846"
+    ],
+    "company_commitment_root": "0x83a8779d0d7e3a7590133318265569f2651a4f8090afcae880741efcfc898ae5",
+    "sanctions_root": null,
+    "jurisdiction_root": null,
+    "variables": {}
+}

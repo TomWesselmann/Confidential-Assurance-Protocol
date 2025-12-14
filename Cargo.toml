@@ -1,0 +1,77 @@
+# CAP - Confidential Assurance Protocol
+# Workspace Configuration
+
+[workspace]
+resolver = "2"
+members = [
+    "agent",
+    "src-tauri",
+    "sap-adapter",
+]
+
+# Shared workspace metadata
+[workspace.package]
+version = "0.12.0"
+edition = "2021"
+authors = ["Tom Wesselmann"]
+license = "LicenseRef-Proprietary"
+repository = "https://github.com/TomWesselmann/Confidential-Assurance-Protocol"
+
+# Shared dependencies for all workspace members
+[workspace.dependencies]
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+
+# Cryptography
+blake3 = "1.5"
+sha3 = "0.10"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "2.0"
+
+# Async
+tokio = { version = "1.35", features = ["rt", "macros"] }
+
+# Date/Time
+chrono = { version = "0.4", features = ["serde"] }
+
+# CLI
+clap = { version = "4.5", features = ["derive"] }
+
+# Testing
+tempfile = "3.8"
+
+# Workspace-wide lint configuration
+[workspace.lints.rust]
+unsafe_code = "warn"
+missing_docs = "allow"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+# Allow common patterns
+module_name_repetitions = "allow"
+too_many_arguments = "allow"
+too_many_lines = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+
+# Release profile optimization
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = "z"
+strip = true
+
+# Dev profile for faster builds
+[profile.dev]
+opt-level = 0
+debug = true
+
+# Test profile
+[profile.test]
+opt-level = 0
+debug = true

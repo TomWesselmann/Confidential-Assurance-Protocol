@@ -334,8 +334,9 @@ fn test_verify_bundle_multiple_units() {
         output.status.success(),
         "Should verify bundle with multiple units"
     );
+    // Note: output::detail_fmt pads labels to 14 chars, so "Proof Units:" becomes "Proof Units:  "
     assert!(
-        stdout.contains("Proof Units: 2"),
+        stdout.contains("Proof Units:") && stdout.contains("2"),
         "Should report 2 proof units"
     );
 

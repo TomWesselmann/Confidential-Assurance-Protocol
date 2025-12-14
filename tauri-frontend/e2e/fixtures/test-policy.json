@@ -1,0 +1,31 @@
+{
+  "policy_id": "test-policy-001",
+  "name": "LkSG Compliance Policy",
+  "version": "1.0.0",
+  "description": "Test policy for E2E tests",
+  "constraints": [
+    {
+      "id": "max_risk_score",
+      "type": "range",
+      "field": "risk_score",
+      "max": 50,
+      "description": "Maximum allowed risk score"
+    },
+    {
+      "id": "allowed_countries",
+      "type": "inclusion",
+      "field": "country",
+      "values": ["DE", "AT", "CH", "GB", "NO", "SE", "DK", "FI"],
+      "description": "Allowed supplier countries"
+    },
+    {
+      "id": "no_pep",
+      "type": "boolean",
+      "field": "pep_status",
+      "value": false,
+      "description": "No politically exposed persons"
+    }
+  ],
+  "created_at": "2024-01-15T10:00:00Z",
+  "hash": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+}

@@ -1,6 +1,7 @@
-/// Sanitizer for SAP Business Partner data
-/// Validates, cleanses, and normalizes input before processing
-/// Follows CAP Engineering Guide: "Sanitizer definieren"
+//! Sanitizer for SAP Business Partner data
+//!
+//! Validates, cleanses, and normalizes input before processing.
+//! Follows CAP Engineering Guide: "Sanitizer definieren".
 
 use anyhow::{Context, Result};
 use crate::odata_client::SapBusinessPartner;

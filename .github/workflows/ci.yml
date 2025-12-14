@@ -146,3 +146,199 @@ jobs:
 
       - name: Run security audit
         run: cargo audit
+
+  coverage:
+    name: Code Coverage
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: agent
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            agent/target
+          key: ${{ runner.os }}-cargo-coverage-${{ hashFiles('agent/Cargo.lock') }}
+
+      - name: Install cargo-tarpaulin
+        run: cargo install cargo-tarpaulin
+
+      - name: Run coverage
+        run: |
+          cargo tarpaulin \
+            --out Html --out Lcov --out Json \
+            --output-dir ../coverage \
+            --ignore-tests \
+            --timeout 600 \
+            --skip-clean
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 30
+
+      - name: Upload to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: coverage/lcov.info
+          fail_ci_if_error: false
+        continue-on-error: true
+
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tauri-frontend
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: tauri-frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: TypeScript Check
+        run: npx tsc --noEmit
+
+      - name: Run tests
+        run: npm test
+
+      - name: Run tests with coverage
+        run: npm run test:coverage
+
+      - name: Build
+        run: npm run build
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: tauri-frontend/coverage/
+          retention-days: 7
+
+  tauri-build:
+    name: Tauri Build (${{ matrix.platform.name }})
+    needs: [test, frontend]
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - name: Linux
+            os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+          - name: macOS
+            os: macos-latest
+            target: x86_64-apple-darwin
+          - name: macOS-ARM
+            os: macos-latest
+            target: aarch64-apple-darwin
+          - name: Windows
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+    runs-on: ${{ matrix.platform.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: tauri-frontend/package-lock.json
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform.target }}
+
+      - name: Install Linux dependencies
+        if: matrix.platform.os == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src-tauri/target
+          key: ${{ runner.os }}-${{ matrix.platform.target }}-cargo-tauri-${{ hashFiles('src-tauri/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.platform.target }}-cargo-tauri-
+
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: tauri-frontend
+
+      - name: Build frontend
+        run: npm run build
+        working-directory: tauri-frontend
+
+      - name: Build Tauri App
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: src-tauri
+          args: --target ${{ matrix.platform.target }}
+
+      - name: Upload Tauri Artifacts (Linux)
+        if: matrix.platform.os == 'ubuntu-22.04'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tauri-linux-${{ matrix.platform.target }}
+          path: |
+            src-tauri/target/${{ matrix.platform.target }}/release/bundle/deb/*.deb
+            src-tauri/target/${{ matrix.platform.target }}/release/bundle/appimage/*.AppImage
+          retention-days: 7
+
+      - name: Upload Tauri Artifacts (macOS)
+        if: matrix.platform.os == 'macos-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tauri-macos-${{ matrix.platform.target }}
+          path: |
+            src-tauri/target/${{ matrix.platform.target }}/release/bundle/dmg/*.dmg
+            src-tauri/target/${{ matrix.platform.target }}/release/bundle/macos/*.app
+          retention-days: 7
+
+      - name: Upload Tauri Artifacts (Windows)
+        if: matrix.platform.os == 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tauri-windows-${{ matrix.platform.target }}
+          path: |
+            src-tauri/target/${{ matrix.platform.target }}/release/bundle/msi/*.msi
+            src-tauri/target/${{ matrix.platform.target }}/release/bundle/nsis/*.exe
+          retention-days: 7

@@ -3,7 +3,7 @@
 //! Commands for verifying proof bundles (existing functionality, refactored).
 
 use crate::security::sanitize_error_message;
-use crate::types::{BundleInfo, ProofUnitInfo, VerifyBundleRequest, VerifyBundleResponse, VerifyOptionsInput};
+use crate::types::{BundleInfo, ProofUnitInfo, VerifyBundleRequest, VerifyBundleResponse};
 use cap_agent::bundle::{parse_bundle_source, BundleSource};
 use cap_agent::verifier::{verify_from_source, VerifyOptions};
 use std::path::Path;

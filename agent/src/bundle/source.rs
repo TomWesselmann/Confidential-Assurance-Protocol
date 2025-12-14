@@ -10,6 +10,10 @@
 //! - Zip-Bomb-Protection (Größen- und Ratio-Limits)
 //! - TOCTOU-Prevention (atomic loading)
 
+// Allow dead_code for this module - Public API for bundle loading (REQ-03)
+// Functions will be used by external consumers and CLI commands
+#![allow(dead_code)]
+
 use crate::bundle::meta::{load_bundle_meta, sanitize_filename, BundleMeta};
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};

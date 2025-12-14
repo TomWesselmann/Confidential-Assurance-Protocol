@@ -6,6 +6,8 @@
 //! - timestamp.rs: Timestamp and providers
 //! - store.rs: Registry, RegistryStore, backends
 
+// Public API re-exports for backward compatibility
+
 // Re-export from entry module
 pub use super::entry::RegistryEntry;
 
@@ -13,12 +15,14 @@ pub use super::entry::RegistryEntry;
 pub use super::signing::{sign_entry, validate_key_status, verify_entry_signature};
 
 // Re-export from timestamp module
+#[allow(unused_imports)]
 pub use super::timestamp::{
     make_provider, provider_from_cli, verify_timestamp_from_file, MockRfc3161Provider,
     ProviderKind, RealRfc3161Provider, Timestamp, TimestampProvider,
 };
 
 // Re-export from store module
+#[allow(unused_imports)]
 pub use super::store::{
     compute_file_hash, open_store, verify_entry_from_file, JsonRegistryStore, Registry,
     RegistryBackend, RegistryStore, SqliteRegistryStore,

@@ -93,7 +93,7 @@ pub fn run_keys_list(
         .iter()
         .filter(|k| {
             if let Some(ref status) = status_filter {
-                if k.status != *status {
+                if k.status.to_string() != *status {
                     return false;
                 }
             }
@@ -115,10 +115,11 @@ pub fn run_keys_list(
 
     for key in &filtered_keys {
         let valid_to_short = &key.valid_to[0..10]; // YYYY-MM-DD
+        let status_str = key.status.to_string();
         output::table_row(&[
             (&key.kid, 32),
             (&key.owner, 15),
-            (&key.status, 10),
+            (&status_str, 10),
             (valid_to_short, 20),
         ]);
     }
@@ -141,7 +142,7 @@ pub fn run_keys_show(dir: &str, kid: &str) -> Result<(), Box<dyn Error>> {
             output::detail("KID", &key.kid);
             output::detail("Owner", &key.owner);
             output::detail("Algorithm", &key.algorithm);
-            output::detail("Status", &key.status);
+            output::detail("Status", &key.status.to_string());
             output::detail("Created", &key.created_at);
             output::detail("Valid From", &key.valid_from);
             output::detail("Valid To", &key.valid_to);

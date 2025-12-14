@@ -1,8 +1,11 @@
 # CAP Desktop Proofer - Systemarchitektur & Inventur
 
-**Version:** 1.0.0
-**Datum:** 2024-11-27
-**Status:** Implementiert (Phase 2 abgeschlossen)
+**Version:** 1.2.2 (Minimal Local Agent)
+**Datum:** 2025-12-14
+**Status:** Implementiert - Einzige UI für v0.12.0 (WebUI entfernt)
+
+> Diese Dokumentation ist die **konsolidierte Desktop App Dokumentation** für den Minimal Local Agent.
+> Sie ersetzt: TAURI_ARCHITECTURE.md, TAURI_SETUP.md
 
 ---
 
@@ -40,7 +43,7 @@ CAP Desktop Proofer ist eine **Offline-First** Desktop-Anwendung zur Erstellung 
 ├─────────────────────────────────────────────────────────────┤
 │  ┌──────────────────────────────────────────────────────┐  │
 │  │              React Frontend (WebView)                 │  │
-│  │  - App.tauri.tsx (Main Application)                  │  │
+│  │  - App.tsx (Main Application)                        │  │
 │  │  - Zustand Store (State Management)                  │  │
 │  │  - Tailwind CSS (Styling)                            │  │
 │  └──────────────────────────────────────────────────────┘  │
@@ -125,18 +128,19 @@ LsKG-Agent/
 │   ├── Cargo.toml                # Rust Dependencies
 │   └── tauri.conf.json           # Tauri Configuration
 │
-├── webui/                        # React Frontend
+├── tauri-frontend/               # React Frontend (Tauri Desktop UI)
 │   ├── src/
 │   │   ├── main.tsx              # React Entry Point
-│   │   ├── App.tauri.tsx         # Main App Component
+│   │   ├── App.tsx               # Main App Component (Prover + Verifier)
 │   │   ├── lib/
 │   │   │   └── tauri.ts          # Tauri API Client
 │   │   ├── store/
 │   │   │   ├── workflowStore.ts  # Proofer Workflow State
 │   │   │   └── verificationStore.ts
+│   │   ├── core/
+│   │   │   ├── models/           # Data Models (Manifest)
+│   │   │   └── utils/            # Pure Validation Functions
 │   │   └── components/
-│   │       ├── layout/
-│   │       │   └── ProjectSidebar.tsx
 │   │       ├── workflow/
 │   │       │   ├── ImportView.tsx
 │   │       │   ├── CommitmentsView.tsx
@@ -148,7 +152,7 @@ LsKG-Agent/
 │   │       ├── audit/
 │   │       │   └── AuditTimeline.tsx
 │   │       ├── upload/
-│   │       │   └── BundleUploader.tauri.tsx
+│   │       │   └── BundleUploader.tsx
 │   │       └── verification/
 │   │           └── VerificationView.tsx
 │   ├── package.json              # NPM Dependencies
@@ -302,7 +306,7 @@ pub fn run() {
 ### 5.1 Komponenten-Hierarchie
 
 ```
-App.tauri.tsx
+App.tsx
 ├── Header
 │   ├── Sidebar Toggle Button
 │   ├── App Title ("CAP Desktop Proofer")
@@ -817,4 +821,30 @@ Die Desktop-App nutzt `cap-agent` als lokale Dependency für:
 ---
 
 *Dokument erstellt: 2024-11-27*
-*Letzte Aktualisierung: 2024-11-27*
+*Letzte Aktualisierung: 2025-12-14*
+
+---
+
+## Changelog
+
+### v1.2.2 (2025-12-14)
+- **Code-Refactoring**: ESLint-Fehler behoben (7 Errors, 2 Warnings → 0)
+  - `ManifestViewer.tsx`: Section-Komponente außerhalb Render extrahiert
+  - `VerificationView.tsx`: `any`-Typ durch konkreten Typ ersetzt
+  - `AuditTimeline.tsx`: `useCallback` für `loadAuditData` hinzugefügt
+  - `SigningView.tsx`: `useCallback` für `loadKeys`/`checkExistingSignature` hinzugefügt
+
+### v1.2.1 (2025-12-14)
+- **Clean-up**: Verwaiste Dateien entfernt nach WebUI-Entfernung
+  - `src/hooks/useBundleExtractor.ts` - nicht mehr verwendet
+  - `src/hooks/` - leeres Verzeichnis
+  - `src/components/layout/` - ProjectSidebar, SimpleSidebar nicht verwendet
+  - `src/App.css` - Vite-Template nicht importiert
+  - `examples/` - WebUI-Testdaten
+- **Dependencies regeneriert**: package-lock.json und node_modules ohne axios
+
+### v1.2.0 (2025-12-14)
+- **WebUI entfernt**: Standalone WebUI (HTTP-basiert) wurde entfernt
+- **Konsolidierung**: `App.tauri.tsx` → `App.tsx`, `BundleUploader.tauri.tsx` → `BundleUploader.tsx`
+- **Dependencies bereinigt**: axios und HTTP-API-Client entfernt
+- **Architektur vereinfacht**: Nur noch Tauri Desktop App als einzige UI

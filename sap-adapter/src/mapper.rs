@@ -1,6 +1,7 @@
-/// Mapper: SAP Business Partner → CAP Context
-/// Deterministic transformation with BLAKE3 hashing
-/// Follows CAP Engineering Guide: "Mapping-Funktion schreiben"
+//! Mapper: SAP Business Partner → CAP Context
+//!
+//! Deterministic transformation with BLAKE3 hashing.
+//! Follows CAP Engineering Guide: "Mapping-Funktion schreiben".
 
 use blake3::Hasher;
 use serde::{Deserialize, Serialize};

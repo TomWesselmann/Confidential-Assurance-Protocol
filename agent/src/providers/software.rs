@@ -94,7 +94,7 @@ impl SoftwareProvider {
             .map_err(|e| KeyError::IoError(format!("Failed to list keys: {}", e)))?;
 
         for key in keys {
-            if key.status == "active" {
+            if key.status == crate::keys::KeyStatus::Active {
                 // Extrahiere Schlüsselnamen aus metadata kid
                 // Format: <keyname>.v1.json
                 let metadata_path = self.keys_dir.join(format!("{}.v1.json", key.kid));
@@ -195,7 +195,7 @@ impl KeyProvider for SoftwareProvider {
 
         // Load metadata and check status
         let metadata = self.load_metadata(&key_name)?;
-        if metadata.status == "revoked" {
+        if metadata.status == crate::keys::KeyStatus::Revoked {
             return Err(KeyError::ProviderError(format!(
                 "Key {} is revoked and cannot be used",
                 key_name

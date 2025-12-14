@@ -93,6 +93,7 @@ pub fn validate_project_name(name: &str) -> Result<(), String> {
 /// # Security
 /// - Prevents path traversal attacks
 /// - Uses canonicalization to resolve symlinks
+#[allow(dead_code)] // Security API - used for path validation
 pub fn validate_path_within_project(project_path: &Path, target: &Path) -> Result<(), String> {
     // Canonicalize both paths to resolve symlinks and ".."
     let canonical_project = project_path
@@ -156,6 +157,7 @@ pub fn validate_path_exists(path: &Path) -> Result<(), String> {
 }
 
 /// Validates that a path does NOT exist (for creation)
+#[allow(dead_code)] // Security API - used for safe path creation
 pub fn validate_path_not_exists(path: &Path) -> Result<(), String> {
     if path.exists() {
         return Err("Path already exists".to_string());
@@ -168,6 +170,7 @@ pub fn validate_path_not_exists(path: &Path) -> Result<(), String> {
 // ============================================================================
 
 /// Validates CSV record field lengths
+#[allow(dead_code)] // Security API - used for CSV input validation
 pub fn validate_csv_field(field: &str) -> Result<(), String> {
     if field.len() > MAX_CSV_FIELD_LENGTH {
         return Err(format!(

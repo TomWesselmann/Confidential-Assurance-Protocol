@@ -6,7 +6,7 @@
 use super::output;
 use crate::audit::AuditLog;
 use crate::blob_store::{BlobStore, SqliteBlobStore};
-use cap_agent::crypto;
+use crate::crypto;
 use serde_json::json;
 use std::error::Error;
 use std::fs;

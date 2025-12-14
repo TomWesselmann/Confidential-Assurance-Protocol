@@ -254,7 +254,7 @@ pub async fn get_project_status(project: String) -> Result<ProjectStatus, String
     let has_proof = project_path.join("build/proof.capz").exists()
         || project_path.join("build/proof.dat").exists();
 
-    // Determine current step
+    // Determine current step in workflow
     let current_step = if has_proof {
         "export"
     } else if has_manifest {
@@ -263,10 +263,8 @@ pub async fn get_project_status(project: String) -> Result<ProjectStatus, String
         "manifest"
     } else if has_suppliers_csv && has_ubos_csv {
         "commitments"
-    } else if has_policy {
-        "import"
     } else {
-        "import"
+        "import" // Default: need to import data and/or policy
     };
 
     Ok(ProjectStatus {

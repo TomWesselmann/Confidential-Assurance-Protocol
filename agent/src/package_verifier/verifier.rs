@@ -5,8 +5,8 @@
 
 use crate::manifest::Manifest;
 use crate::proof_engine::Proof;
-use cap_agent::bundle::meta::{check_dependency_cycles, load_bundle_meta, BundleMeta, ProofUnitMeta};
-use cap_agent::verifier::core::{
+use crate::bundle::meta::{check_dependency_cycles, load_bundle_meta, BundleMeta, ProofUnitMeta};
+use crate::verifier::core::{
     extract_statement_from_manifest, verify as core_verify, VerifyOptions,
 };
 use std::error::Error;
@@ -221,7 +221,7 @@ impl Verifier {
         &self,
         unit: &ProofUnitMeta,
         meta: &BundleMeta,
-    ) -> anyhow::Result<cap_agent::verifier::core::VerifyReport> {
+    ) -> anyhow::Result<crate::verifier::core::VerifyReport> {
         // 1. Lade Manifest
         let manifest_path = self.package_dir.join(&unit.manifest_file);
         let manifest_bytes = std::fs::read(&manifest_path)?;

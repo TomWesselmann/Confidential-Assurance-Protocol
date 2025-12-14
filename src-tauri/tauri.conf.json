@@ -4,10 +4,10 @@
   "version": "0.1.0",
   "identifier": "com.cap.desktop-proofer",
   "build": {
-    "beforeDevCommand": { "script": "npm run dev", "cwd": "../webui" },
+    "beforeDevCommand": { "script": "npm run dev", "cwd": "../tauri-frontend" },
     "devUrl": "http://localhost:5173",
     "beforeBuildCommand": "",
-    "frontendDist": "../webui/dist"
+    "frontendDist": "../tauri-frontend/dist"
   },
   "app": {
     "withGlobalTauri": true,
