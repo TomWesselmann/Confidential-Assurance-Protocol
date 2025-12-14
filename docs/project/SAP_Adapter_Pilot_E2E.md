@@ -2,7 +2,8 @@
 
 > **Status:** GEPLANT (Future Version v1.0+)
 > Dieses Feature ist für zukünftige Enterprise-Versionen geplant.
-> Derzeit nicht im Minimal Local Agent (v0.12.0) enthalten.
+> Derzeit nicht im Minimal Local Agent (v0.12.2) enthalten.
+> Voraussetzung: Wiedereinführung der REST API für Server-Kommunikation.
 
 ## Overview
 
@@ -707,6 +708,7 @@ sudo systemctl status cap-adapter.service
 
 ---
 
-**Document Version:** 1.0.0
-**Last Updated:** 2025-11-10
+**Document Version:** 1.1.0
+**Last Updated:** 2025-12-14
 **Author:** CAP Engineering Team
+**Note:** Dieses Dokument beschreibt geplante Features für Enterprise-Versionen (v1.0+).

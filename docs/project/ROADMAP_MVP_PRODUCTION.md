@@ -2,13 +2,13 @@
 
 ## Über diese Roadmap
 
-Diese Roadmap dokumentiert den aktuellen Stand des **Minimal Local Agent** (v0.12.0) und die geplanten Schritte zum Enterprise-MVP.
+Diese Roadmap dokumentiert den aktuellen Stand des **Minimal Local Agent** (v0.12.2 - Production-Ready) und die geplanten Schritte zum Enterprise-MVP.
 
-**Aktueller Stand:** v0.12.0 - Minimal Local Agent (11. Dezember 2025)
+**Aktueller Stand:** v0.12.2 - Minimal Local Agent (Production-Ready, 14. Dezember 2025)
 
 ---
 
-## Minimal Local Agent v0.12.0 - Status
+## Minimal Local Agent v0.12.2 - Status
 
 ### Verfügbare Features
 
@@ -23,7 +23,7 @@ Diese Roadmap dokumentiert den aktuellen Stand des **Minimal Local Agent** (v0.1
 | **Bundle V2** | ✅ | CAPZ Format mit Integritätsprüfung |
 | **Audit Trail** | ✅ | SHA3-256 Hash-Chain (V1.0 Format) |
 | **Policy Engine** | ✅ | YAML v2 mit Validation/Lint/Compile |
-| **Tests** | ✅ | 538+ Tests passing (100% Success Rate) |
+| **Tests** | ✅ | 610 Tests passing (342 Rust + 268 Frontend, 98.95% Coverage) |
 
 ### Entfernte Features (seit v0.12.0)
 
@@ -128,7 +128,7 @@ cap-agent policy compile --policy policy.yml --out policy.bin
 
 ## Technische Architektur
 
-### Aktuelle Struktur (v0.12.0)
+### Aktuelle Struktur (v0.12.2)
 
 ```
 agent/
@@ -171,9 +171,11 @@ src-tauri/
 
 | Metrik | Wert | Status |
 |--------|------|--------|
-| Tests | 538+ passing | ✅ |
-| Test Success Rate | 100% | ✅ |
-| Clippy Warnings | 0 Critical/High | ✅ |
+| Rust Tests | 342 passing | ✅ |
+| Frontend Tests | 268 passing (98.95% Coverage) | ✅ |
+| Gesamt Tests | 610 passing | ✅ |
+| Clippy Warnings | 0 (--deny warnings) | ✅ |
+| ESLint | 0 Errors/Warnings | ✅ |
 | Cargo Audit | 0 Critical | ✅ |
 
 ---
@@ -186,6 +188,8 @@ src-tauri/
 | [DESKTOP_APP_ARCHITEKTUR.md](DESKTOP_APP_ARCHITEKTUR.md) | Tauri 2.0 Architektur |
 | [REFACTORING_GUIDE.md](REFACTORING_GUIDE.md) | CLI Refactoring (abgeschlossen) |
 | [SAP_Adapter_Pilot_E2E.md](SAP_Adapter_Pilot_E2E.md) | SAP Integration (geplant) |
+| [CONTRIBUTING.md](../../CONTRIBUTING.md) | Entwicklungsrichtlinien |
+| [CHANGELOG.md](../../CHANGELOG.md) | Versionshistorie (Keep-a-Changelog) |
 
 ---
 
@@ -193,6 +197,8 @@ src-tauri/
 
 | Version | Datum | Änderungen |
 |---------|-------|------------|
+| v0.12.2 | 14.12.2025 | Production-Ready: 268 Frontend Tests (98.95% Coverage), CI/CD, CONTRIBUTING.md, CHANGELOG.md |
+| v0.12.1 | 13.12.2025 | Frontend Test Coverage erhöht, ESLint clean |
 | v0.12.0 | 11.12.2025 | Minimal Local Agent - Server-Features entfernt |
 | v0.11.0 | 24.11.2025 | Desktop App (Tauri 2.0), Full Stack |
 | v0.10.x | Nov 2025 | REST API, WebUI, Monitoring Stack |
@@ -200,5 +206,5 @@ src-tauri/
 ---
 
 *Erstellt: 17. November 2025*
-*Aktualisiert: 11. Dezember 2025 - Minimal Local Agent Refactoring*
-*Version: 4.0*
+*Aktualisiert: 14. Dezember 2025 - Production-Ready Release*
+*Version: 5.0*

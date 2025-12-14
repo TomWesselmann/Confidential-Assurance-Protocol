@@ -13,9 +13,9 @@ _Maßgeschneiderte Anleitung für strukturelle Verbesserungen des CAP-Agent Proj
 | Metrik | Wert | Bewertung |
 |--------|------|-----------|
 | **Sprache** | Rust 2021 | |
-| **Projektart** | CLI-Tool + Library + REST-API | Multi-Binary |
+| **Projektart** | CLI-Tool + Library + Desktop App (Tauri) | Minimal Local Agent |
 | **Quellcode** | 76 Dateien, ~28.000 LOC | Mittelgroß |
-| **Tests** | 400 Unit-Tests, 718 Test-Funktionen | Gut abgedeckt |
+| **Tests** | 342 Rust Tests + 268 Frontend Tests (98.95% Coverage) | Excellent |
 | **Externe Deps** | ~40 Crates | Moderat |
 
 ### Architektur-Übersicht
@@ -25,7 +25,7 @@ cap-agent/
 ├── src/
 │   ├── main.rs           # 4.467 LOC - CLI Entry Point (KRITISCH)
 │   ├── lib.rs            # Public Library API
-│   ├── api/              # REST API Layer (Axum)
+│   ├── api/              # REST API Layer (entfernt in Minimal Version)
 │   ├── audit/            # Audit Trail System
 │   ├── bundle/           # Bundle Format Handling
 │   ├── crypto/           # Kryptographie-Wrapper
@@ -333,8 +333,9 @@ cargo run -- verifier run --help
 - `cli/policy.rs`: 39 LOC - output:: migriert (Session 10)
 - `cli/bundle.rs`: 287 LOC (2 pub + 3 private Helper) - output:: migriert (Session 15)
 - `cli/blob.rs`: 322 LOC (4 Blob-Funktionen) - output:: migriert (Session 15)
-- Alle 400 Unit-Tests grün ✅
+- Alle 342 Rust Tests grün ✅
 - Alle Integration-Tests grün ✅
+- Alle 268 Frontend Tests grün (98.95% Coverage) ✅
 - Keine Clippy-Warnings ✅
 
 **Ziel (Phase 1: Extraktion - ERREICHT ✅):**
@@ -394,5 +395,6 @@ Ist Krypto-Code betroffen?
 ---
 
 _Erstellt: 2025-11-30_
-_Projekt: CAP-Agent v0.1.0 MVP_
+_Letzte Aktualisierung: 2025-12-14_
+_Projekt: CAP-Agent v0.12.2 (Minimal Local Agent - Production-Ready)_
 _Autor: Claude (Refactoring-Analyse)_

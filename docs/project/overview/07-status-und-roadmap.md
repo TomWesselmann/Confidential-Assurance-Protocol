@@ -101,10 +101,10 @@ Geplante Features für die Production-Version:
 ```
 
 **Tests:**
-- ✅ 556/556 Tests bestanden (385 Library + 164 Binary + 42 Integration Suites + 7 Doctests)
+- ✅ 610/610 Tests bestanden (342 Rust + 268 Frontend, 98.95% Coverage)
 - ✅ End-to-End Tests (CSV → Proof → Verify)
 - ✅ 0 Test-Fehler (100% Success Rate)
-- ✅ 0 Clippy-Warnings
+- ✅ 0 Clippy/ESLint-Warnings
 
 ---
 
@@ -452,14 +452,12 @@ Failed requests:  187 (1.87%)
 
 **Test Suite Statistics:**
 ```bash
-Total Tests:        556 tests
-Library Tests:      385 tests
-Binary Tests:       164 tests
-Integration Tests:  42 test suites
-Doc Tests:          7 tests
+Total Tests:        610 tests
+Rust Tests:         342 tests (cap-agent: 275, cap-tauri: 43, sap-adapter: 24)
+Frontend Tests:     268 tests (98.95% Coverage, React + TypeScript)
 
-Status:             ✅ 556/556 passed (100% Success Rate, 0 Failures)
-Execution Time:     ~15 seconds (debug), ~10 seconds (release)
+Status:             ✅ 610/610 passed (100% Success Rate, 0 Failures)
+Execution Time:     ~15 seconds (Rust), ~8 seconds (Frontend)
 ```
 
 **Test Breakdown by Module:**
@@ -495,11 +493,13 @@ Integration (42 test suites):
   ... (weitere Tests)
 ```
 
-**Test Coverage (v0.11.0):**
+**Test Coverage (v0.12.2):**
 ```bash
-Test Success Rate:  100% (556/556 passing, 0 failures)
+Test Success Rate:  100% (610/610 passing, 0 failures)
+Rust Tests:         342 (cap-agent: 275, cap-tauri: 43, sap-adapter: 24)
+Frontend Tests:     268 (98.95% Coverage)
 Test Categories:    Bundle v2, Dual-Anchor, Hash Validation, Registry,
-                    SQLite, Policy Store, Package Flow Refactoring
+                    SQLite, Policy Store, Tauri IPC, React Components
 Security Tests:     Path Traversal Prevention, Cycle Detection,
                     TOCTOU Mitigation, Hash Validation
 ```

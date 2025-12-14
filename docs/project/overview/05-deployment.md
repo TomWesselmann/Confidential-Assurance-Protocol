@@ -673,7 +673,7 @@ Das **cap-bundle.v1 Format** ist das standardisierte Package-Format für offline
 - SHA3-256 Hashes für Integritätsprüfung
 - Sicherheit: Path Traversal Prevention, Cycle Detection, TOCTOU Mitigation
 - Bundle Type Detection (Modern vs Legacy)
-- Alle 556 Tests bestehen ✅ (100% Success Rate, 0 Failures)
+- Alle 610 Tests bestehen ✅ (342 Rust + 268 Frontend, 98.95% Coverage)
 
 ### Package-Struktur
 

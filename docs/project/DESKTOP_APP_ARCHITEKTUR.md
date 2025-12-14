@@ -1,8 +1,8 @@
 # CAP Desktop Proofer - Systemarchitektur & Inventur
 
-**Version:** 1.2.2 (Minimal Local Agent)
+**Version:** 1.3.0 (Production-Ready)
 **Datum:** 2025-12-14
-**Status:** Implementiert - Einzige UI für v0.12.0 (WebUI entfernt)
+**Status:** Production-Ready - Einzige UI für v0.12.2
 
 > Diese Dokumentation ist die **konsolidierte Desktop App Dokumentation** für den Minimal Local Agent.
 > Sie ersetzt: TAURI_ARCHITECTURE.md, TAURI_SETUP.md
@@ -746,7 +746,7 @@ cap-bundle.zip
 
 ```bash
 # Frontend Development Server
-cd webui
+cd tauri-frontend
 npm install
 npm run dev
 
@@ -760,7 +760,7 @@ cargo tauri dev
 
 ```bash
 # Frontend Build
-cd webui
+cd tauri-frontend
 npm run build
 
 # Tauri Release Build
@@ -785,7 +785,7 @@ npx @tauri-apps/cli build
 
 ## Anhang A: Test-Abdeckung
 
-### Backend Tests (35 Tests)
+### Backend Tests (43 Tests - cap-tauri)
 
 ```
 commands::audit::tests::                    6 Tests
@@ -798,12 +798,19 @@ commands::export::tests::                   1 Test
 commands::verify::tests::                   2 Tests
 security::tests::                           5 Tests
 audit_logger::tests::                       2 Tests
+types::tests::                              10 Tests (neu)
 ```
 
-### Frontend Tests (18 Tests)
+### Frontend Tests (268 Tests - 98.95% Coverage)
 
 ```
-utils/validation.test.ts                    18 Tests
+core/models/manifest.test.ts                52 Tests
+core/utils/validation.test.ts               45 Tests
+lib/tauri.test.ts                          42 Tests
+store/workflowStore.test.ts                38 Tests
+components/workflow/*.test.tsx              65 Tests
+components/verification/*.test.tsx          16 Tests
+components/audit/*.test.tsx                 10 Tests
 ```
 
 ---
@@ -826,6 +833,14 @@ Die Desktop-App nutzt `cap-agent` als lokale Dependency für:
 ---
 
 ## Changelog
+
+### v1.3.0 (2025-12-14) - Production-Ready
+- **Status**: Production-Ready Release
+- **Test Coverage**: 268 Frontend Tests (98.95% Coverage), 43 Backend Tests
+- **CI/CD**: Full Pipeline mit Frontend + Tauri Build
+- **Dokumentation**: CONTRIBUTING.md, CHANGELOG.md hinzugefügt
+- **Code Quality**: ESLint + Clippy -D warnings clean
+- **Pre-commit Hooks**: cargo-fmt, clippy, npm-lint konfiguriert
 
 ### v1.2.2 (2025-12-14)
 - **Code-Refactoring**: ESLint-Fehler behoben (7 Errors, 2 Warnings → 0)

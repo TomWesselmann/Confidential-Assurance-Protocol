@@ -2,13 +2,14 @@
 
 **Minimal Local Agent - Offline Compliance Proof System for Supply Chain Due Diligence**
 
-> ⚠️ **Minimal Local Agent Version (v0.12.0)** - Diese Version fokussiert auf lokale/offline Funktionalität.
-> Server-Komponenten (REST API, WebUI, Monitoring Stack) wurden entfernt.
+> **Minimal Local Agent Version (v0.12.2)** - Production-Ready Release
+> Fokus auf lokale/offline Funktionalität. Server-Komponenten wurden entfernt.
 
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/TomWesselmann/Confidential-Assurance-Protocol)
-[![Version](https://img.shields.io/badge/version-0.12.0--minimal-blue)](https://github.com/TomWesselmann/Confidential-Assurance-Protocol/releases)
+[![Version](https://img.shields.io/badge/version-0.12.2-blue)](https://github.com/TomWesselmann/Confidential-Assurance-Protocol/releases)
 [![License](https://img.shields.io/badge/license-All%20Rights%20Reserved-red)](LICENSE)
 [![Desktop](https://img.shields.io/badge/desktop-Tauri%202.0-24C8DB?logo=tauri)](src-tauri/)
+[![Coverage](https://img.shields.io/badge/coverage-98.95%25-brightgreen)](tauri-frontend/)
 
 ---
 
@@ -28,7 +29,7 @@ The **Confidential Assurance Protocol (CAP)** is a cryptographic compliance proo
 ✅ **Bundle V2 Format** - Standardisiertes Proof-Package-Format
 ✅ **Registry** - JSON or SQLite backend für Proof-Verwaltung
 ✅ **BLOB Store** - Content-Addressable Storage für Dateien
-✅ **Test Coverage** - 100% test pass rate with 556 tests passing
+✅ **Test Coverage** - 342 Rust tests + 268 Frontend tests (98.95% coverage)
 
 ### Entfernte Features (siehe Full Version)
 
@@ -92,12 +93,14 @@ cargo build --release
 ## 📚 Documentation
 
 ### Primary Documentation
-- **[DESKTOP_APP_ARCHITEKTUR.md](docs/project/DESKTOP_APP_ARCHITEKTUR.md)** - Desktop App Architektur (Tauri 2.0)
-- **[GETTING_STARTED.md](agent/docs/GETTING_STARTED.md)** - Beginner-friendly Quick Start
-- **[REFACTORING_GUIDE.md](docs/project/REFACTORING_GUIDE.md)** - CLI Refactoring Guide (abgeschlossen)
+- **[DESKTOP_APP_ARCHITEKTUR.md](DESKTOP_APP_ARCHITEKTUR.md)** - Desktop App Architektur (Tauri 2.0)
+- **[ROADMAP_PRODUCTION_READY.md](ROADMAP_PRODUCTION_READY.md)** - Production-Ready Roadmap (COMPLETED)
+- **[REFACTORING_GUIDE.md](REFACTORING_GUIDE.md)** - CLI Refactoring Guide (abgeschlossen)
+- **[CONTRIBUTING.md](../../CONTRIBUTING.md)** - Development Guidelines
+- **[CHANGELOG.md](../../CHANGELOG.md)** - Version History
 
 ### Zukünftige Features
-- **[SAP_Adapter_Pilot_E2E.md](docs/project/SAP_Adapter_Pilot_E2E.md)** - SAP S/4HANA Integration (geplant)
+- **[SAP_Adapter_Pilot_E2E.md](SAP_Adapter_Pilot_E2E.md)** - SAP S/4HANA Integration (geplant)
 
 ---
 
@@ -105,7 +108,7 @@ cargo build --release
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│              CAP Minimal Local Agent v0.12.0                    │
+│              CAP Minimal Local Agent v0.12.2                    │
 ├─────────────────────────────────────────────────────────────────┤
 │  Desktop App Layer (Tauri 2.0)                                  │
 │  ├─ 6-Step Proofer Workflow                                    │
@@ -250,14 +253,13 @@ cargo tarpaulin --all-features --workspace --timeout 120 --out Html
 ```
 
 **Test Results:**
-- Total Tests: 556 passing ✅ (0 failures)
-- Test Breakdown:
-  - Library Unit Tests: 385 passing
-  - Binary Unit Tests: 164 passing
-  - Integration Tests: 42 test suites passing
-  - Doc Tests: 7 passing
-- Test Coverage: Bundle v2, Dual-Anchor, Hash Validation, Registry, SQLite, Policy Store
-- Performance: All benchmarks passing
+- Rust Tests: 342 passing ✅ (0 failures)
+  - cap-agent: 275 tests
+  - cap-tauri: 43 tests
+  - sap-adapter: 24 tests
+- Frontend Tests: 268 passing ✅ (98.95% coverage)
+- E2E Tests: WebdriverIO infrastructure ready
+- Code Quality: `cargo clippy -- -D warnings` clean
 
 ### Code Quality
 
@@ -312,7 +314,7 @@ cargo build --release
 
 ## 🗺️ Roadmap
 
-### ✅ Completed (Minimal Local Agent v0.12.0)
+### ✅ Completed (Production-Ready v0.12.2)
 - CLI & Core Features (Commitment, Policy, Proof, Verifier)
 - Desktop App (Tauri 2.0) mit 6-Step Workflow
 - Key Management with KID Rotation
@@ -322,7 +324,10 @@ cargo build --release
 - Policy Engine v2 mit Linting
 - Audit Trail (SHA3-256 Hash Chain)
 - SimplifiedZK Proof Backend
-- All Tests Passing (556 tests)
+- Production-Ready Roadmap Complete (Phases 1-5)
+- Full CI/CD Pipeline (Frontend + Tauri Build)
+- 98.95% Frontend Test Coverage (268 tests)
+- 342 Rust Tests Passing
 
 ### ❌ Entfernt in Minimal Version
 - REST API Server (cap-verifier-api)
@@ -395,12 +400,14 @@ For licensing inquiries, please contact: [contact information]
 
 ---
 
-**Project Status:** Minimal Local Agent (Offline-First)
-**Current Version:** v0.12.0-minimal
-**Last Updated:** December 11, 2025
+**Project Status:** Production-Ready (Offline-First)
+**Current Version:** v0.12.2
+**Last Updated:** December 14, 2025
 
 **Key Metrics:**
-- Tests: 556/556 passing (0 failures)
+- Rust Tests: 342/342 passing (0 failures)
+- Frontend Tests: 268/268 passing (98.95% coverage)
 - Interfaces: Desktop App (Tauri 2.0) + CLI
 - Proof Backend: SimplifiedZK (Mock)
-- Security Features: Path traversal prevention, cycle detection, TOCTOU mitigation
+- Security: cargo audit clean, Dependabot active
+- Code Quality: Clippy -D warnings clean
