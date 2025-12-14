@@ -1380,7 +1380,7 @@ curl -k https://localhost:8443/healthz
 > - Prometheus: http://localhost:9090
 > - Jaeger UI: http://localhost:16686
 >
-> **Für Details siehe:** [monitoring/README.md](/Users/tomwesselmann/Desktop/LsKG-Agent/agent/monitoring/README.md) und [07-status-und-roadmap.md](./07-status-und-roadmap.md)
+> **Für Details siehe:** [monitoring/README.md](/Users/tomwesselmann/Desktop/LsKG-Agent/agent/monitoring/README.md) und [ROADMAP_MVP_PRODUCTION.md](../ROADMAP_MVP_PRODUCTION.md)
 
 ---
 

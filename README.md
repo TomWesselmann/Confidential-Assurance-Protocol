@@ -84,7 +84,7 @@ LsKG-Agent/
 - **[Desktop App Architektur](docs/project/DESKTOP_APP_ARCHITEKTUR.md)** - Tauri 2.0 Architektur
 - **[Getting Started](agent/docs/GETTING_STARTED.md)** - Beginner-friendly Quick Start
 - **[Project Overview](docs/project/README.md)** - Detaillierte Projektdokumentation
-- **[Roadmap](docs/project/ROADMAP_PRODUCTION_READY.md)** - Production-Ready Roadmap
+- **[Roadmap](docs/project/ROADMAP_MVP_PRODUCTION.md)** - Zentrale Projekt-Roadmap
 
 ---
 

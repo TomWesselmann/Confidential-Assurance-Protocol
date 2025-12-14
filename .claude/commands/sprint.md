@@ -30,9 +30,9 @@ Dies verhindert:
 1. **Roadmap:** Lies `ROADMAP_MVP_PRODUCTION.md`
    - Welche Woche im 6-Wochen-Plan?
    - Welche Tasks sind offen?
-2. **Status:** Lies `docs/project/overview/07-status-und-roadmap.md`
-   - Was ist fertig? (v0.11.0)
-   - Was kommt als Nächstes?
+2. **Status:** Lies `docs/project/ROADMAP_MVP_PRODUCTION.md`
+   - Was ist fertig? (v0.12.2)
+   - Welche Features sind verfügbar?
 3. **Tests:** Führe aus:
    ```bash
    cd /Users/tomwesselmann/Desktop/LsKG-Agent/agent
@@ -372,9 +372,9 @@ Frage den User:
 - **Deliverable:** `proof/halo2_circuit.rs` mit Basic Circuit ✅
 ```
 
-### 2. docs/project/overview/07-status-und-roadmap.md
-- [ ] "Was ist FERTIG" Sektion aktualisieren
-- [ ] Feature-Matrix aktualisieren (v0.11.0 → v0.12.0)
+### 2. docs/project/ROADMAP_MVP_PRODUCTION.md
+- [ ] "Verfügbare Features" Sektion aktualisieren
+- [ ] Feature-Matrix aktualisieren (falls nötig)
 
 **Beispiel:**
 ```markdown
@@ -444,7 +444,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 
 **Aktualisierte Dokumente:**
 - ✅ ROADMAP_MVP_PRODUCTION.md (Week 1, Tasks 1-2 ✅)
-- ✅ docs/project/overview/07-status-und-roadmap.md (Halo2 Status aktualisiert)
+- ✅ docs/project/ROADMAP_MVP_PRODUCTION.md (Status aktualisiert)
 - ✅ agent/CLAUDE.md (Modul `proof/halo2_circuit.rs` dokumentiert)
 
 **Git Commit:**

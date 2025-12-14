@@ -10,7 +10,7 @@ Diese Dokumentation besteht aus 7 zusammenhängenden Kapiteln, die Sie Schritt f
 4. **04-api-reference.md** - Wie bedient man das System? (Bedienungsanleitung)
 5. **05-deployment.md** - Wie installiert man das System? (Installationsanleitung)
 6. **06-troubleshooting.md** - Was tun bei Problemen? (Fehlerbehebung)
-7. **07-status-und-roadmap.md** - Was ist fertig? Was kommt noch? (Status & Zukunft) ⭐ **NEU**
+7. **[ROADMAP_MVP_PRODUCTION.md](../ROADMAP_MVP_PRODUCTION.md)** - Zentrale Projekt-Roadmap
 
 **Warum diese Struktur?** Stellen Sie sich vor, Sie kaufen ein komplexes Gerät:
 - Zuerst lesen Sie den **Überblick** (Was kann es?)
@@ -637,7 +637,7 @@ LsKG-Agent/
 | **SAP-Integration** | 🔄 In Entwicklung (Q1 2026) |
 | **External Security Audit** | 📅 Geplant (Q1 2026) |
 
-**📊 Für Details siehe:** [07-status-und-roadmap.md](./07-status-und-roadmap.md)
+**📊 Für Details siehe:** [ROADMAP_MVP_PRODUCTION.md](../ROADMAP_MVP_PRODUCTION.md)
 
 #### Test-Abdeckung
 
@@ -682,7 +682,7 @@ LsKG-Agent/
 ### Nächste Schritte
 
 Für detaillierte Informationen zu den einzelnen Komponenten, siehe:
-- **[07-status-und-roadmap.md](./07-status-und-roadmap.md)** ⭐ **Was ist fertig? Was kommt?** (NEU)
+- **[ROADMAP_MVP_PRODUCTION.md](../ROADMAP_MVP_PRODUCTION.md)** ⭐ Zentrale Projekt-Roadmap
 - [02-architecture.md](./02-architecture.md) - Systemarchitektur
 - [03-components.md](./03-components.md) - Alle Module und Dateien
 - [04-api-reference.md](./04-api-reference.md) - REST API Dokumentation

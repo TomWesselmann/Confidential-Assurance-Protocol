@@ -94,7 +94,7 @@ cargo build --release
 
 ### Primary Documentation
 - **[DESKTOP_APP_ARCHITEKTUR.md](DESKTOP_APP_ARCHITEKTUR.md)** - Desktop App Architektur (Tauri 2.0)
-- **[ROADMAP_PRODUCTION_READY.md](ROADMAP_PRODUCTION_READY.md)** - Production-Ready Roadmap (COMPLETED)
+- **[ROADMAP_MVP_PRODUCTION.md](ROADMAP_MVP_PRODUCTION.md)** - Zentrale Projekt-Roadmap
 - **[REFACTORING_GUIDE.md](REFACTORING_GUIDE.md)** - CLI Refactoring Guide (abgeschlossen)
 - **[CONTRIBUTING.md](../../CONTRIBUTING.md)** - Development Guidelines
 - **[CHANGELOG.md](../../CHANGELOG.md)** - Version History
