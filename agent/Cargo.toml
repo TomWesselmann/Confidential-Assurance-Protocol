@@ -43,7 +43,7 @@ uuid = { version = "1.6", features = ["v4", "serde"] }
 jsonschema = "0.17"
 
 # Storage
-rusqlite = { version = "0.31", features = ["bundled"] }
+rusqlite = { version = "0.37", features = ["bundled"] }
 
 # Bundle format
 zip = "2.1"
