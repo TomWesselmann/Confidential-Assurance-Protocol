@@ -40,7 +40,7 @@ base64 = "0.22"
 uuid = { version = "1.6", features = ["v4", "serde"] }
 
 # Validation
-jsonschema = "0.17"
+jsonschema = "0.37"
 
 # Storage
 rusqlite = { version = "0.31", features = ["bundled"] }
