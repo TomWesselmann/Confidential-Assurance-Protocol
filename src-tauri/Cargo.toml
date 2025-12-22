@@ -44,7 +44,7 @@ chrono = { version = "0.4", features = ["serde"] }
 csv = "1"
 
 # ZIP Archive
-zip = { version = "2", default-features = false, features = ["deflate"] }
+zip = { version = "7", default-features = false, features = ["deflate"] }
 
 # Error handling
 anyhow = "1"
